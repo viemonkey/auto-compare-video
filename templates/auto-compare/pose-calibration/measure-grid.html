@@ -1,0 +1,30 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  body{margin:0;background:#fff;font-family:monospace;}
+  .grid{display:grid;grid-template-columns:repeat(4,520px);gap:0;}
+  .cell{position:relative;width:520px;height:560px;box-sizing:border-box;border:1px solid #333;overflow:hidden;background:#dfe7ef;}
+  .cell .svgwrap{position:absolute;left:10px;top:36px;width:500px;height:500px;} /* viewBox 300 -> 500px, scale 1.667 */
+  .cell img{width:100%;height:100%;display:block;}
+  .cell .label{position:absolute;left:0;top:0;right:0;height:32px;line-height:32px;background:#222;color:#fff;font-size:15px;padding-left:8px;z-index:5;}
+  /* grid lines every 20 viewBox units = 33.33px, starting at top:36 left:10 */
+  .cell .h{position:absolute;left:10px;width:500px;height:1px;background:rgba(220,0,0,.35);z-index:3;}
+  .cell .h b{position:absolute;left:2px;top:-8px;font-size:9px;color:#a00;background:#fff8;}
+  .cell .v{position:absolute;top:36px;height:500px;width:1px;background:rgba(0,80,220,.3);z-index:3;}
+  .cell .v b{position:absolute;top:2px;left:1px;font-size:9px;color:#04a;background:#fff8;}
+  .cell .center{position:absolute;top:36px;height:500px;width:2px;left:260px;background:rgba(0,150,0,.5);z-index:4;}
+</style></head><body>
+<div class="grid" id="g"></div>
+<script>
+const ids=["confused","explain-a","explain-b","point-up-left","point-up-right","shocked-a","shrug-a","thinking","thumbs-up-a"];
+const S=500/300; // px per viewBox unit
+const g=document.getElementById("g");
+for(const id of ids){
+  const c=document.createElement("div");c.className="cell";
+  let lines="";
+  for(let u=0;u<=300;u+=20){
+    const y=36+u*S; lines+=`<div class="h" style="top:${y}px"><b>${u}</b></div>`;
+    const x=10+u*S; lines+=`<div class="v" style="left:${x}px"><b>${u}</b></div>`;
+  }
+  c.innerHTML=`<div class="label">${id}</div>${lines}<div class="center"></div><div class="svgwrap"><img src="../../../assets/actions/${id}.svg"></div>`;
+  g.appendChild(c);
+}
+</script></body></html>

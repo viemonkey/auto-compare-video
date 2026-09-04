@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Auto Compare Video Studio — Trình Tạo Video So Sánh Tự Động</title>
+  
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <link rel="stylesheet" href="style.css" />
+</head>
+<body>
+  <div class="app-container">
+    
+    <!-- Top Header -->
+    <header class="main-header">
+      <div class="logo-group">
+        <div class="logo-icon">⚡</div>
+        <div class="logo-text">
+          <h1>AUTO COMPARE VIDEO</h1>
+          <span class="sub-logo">HyperFrames Engine + Gemini AI Vision</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button id="btn-existing-videos" class="btn btn-secondary">
+          <span class="icon">📁</span> Danh sách video đã dựng
+        </button>
+      </div>
+    </header>
+
+    <!-- Progress Stepper -->
+    <nav class="stepper-bar">
+      <div class="step-item active" id="step-nav-1">
+        <div class="step-badge">1</div>
+        <div class="step-label">
+          <span class="step-title">Tải 2 Ảnh So Sánh</span>
+          <span class="step-desc">Đối tượng A & B</span>
+        </div>
+      </div>
+      <div class="step-divider"></div>
+      <div class="step-item" id="step-nav-2">
+        <div class="step-badge">2</div>
+        <div class="step-label">
+          <span class="step-title">Studio Kịch Bản & Pose</span>
+          <span class="step-desc">Gemini AI & Hành động Mascot</span>
+        </div>
+      </div>
+      <div class="step-divider"></div>
+      <div class="step-item" id="step-nav-3">
+        <div class="step-badge">3</div>
+        <div class="step-label">
+          <span class="step-title">Duyệt & Tạo Video</span>
+          <span class="step-desc">Tự động dựng & Kiểm tra</span>
+        </div>
+      </div>
+    </nav>
+
+    <!-- STEP 1: Upload Images & Topic Hint -->
+    <section class="step-section active" id="step-1">
+      <div class="section-card">
+        <div class="card-header">
+          <h2>📷 Bước 1: Chọn 2 Ảnh So Sánh Kiến Thức</h2>
+          <p>Tải lên 2 hình ảnh minh họa cho 2 khái niệm/vật thể bạn muốn so sánh (ví dụ: Kim Cương vs Than Đá, Dev vs DevOps, Nhẫn Vàng vs Nhẫn Kim Cương).</p>
+        </div>
+
+        <div class="dropzone-grid">
+          <!-- Left Image Dropzone -->
+          <div class="dropzone-box" id="dropzone-left">
+            <div class="zone-tag tag-cyan">CARD BÊN TRÁI (ĐỐI TƯỢNG A)</div>
+            <input type="file" id="file-left" accept="image/*" class="file-input" />
+            <div class="dropzone-placeholder" id="ph-left">
+              <div class="upload-icon">🖼️</div>
+              <p class="upload-title">Kéo thả hoặc click để chọn ảnh trái</p>
+              <span class="upload-hint">PNG, JPG, WEBP (Tối đa 15MB)</span>
+            </div>
+            <div class="preview-wrapper hidden" id="prev-left-wrap">
+              <img id="prev-left" class="img-preview" alt="Preview Left" />
+              <button type="button" class="btn-remove-img" id="rm-left">✕ Xóa</button>
+            </div>
+          </div>
+
+          <!-- Right Image Dropzone -->
+          <div class="dropzone-box" id="dropzone-right">
+            <div class="zone-tag tag-pink">CARD BÊN PHẢI (ĐỐI TƯỢNG B)</div>
+            <input type="file" id="file-right" accept="image/*" class="file-input" />
+            <div class="dropzone-placeholder" id="ph-right">
+              <div class="upload-icon">🖼️</div>
+              <p class="upload-title">Kéo thả hoặc click để chọn ảnh phải</p>
+              <span class="upload-hint">PNG, JPG, WEBP (Tối đa 15MB)</span>
+            </div>
+            <div class="preview-wrapper hidden" id="prev-right-wrap">
+              <img id="prev-right" class="img-preview" alt="Preview Right" />
+              <button type="button" class="btn-remove-img" id="rm-right">✕ Xóa</button>
+            </div>
+          </div>
+        </div>
+
+        <!-- Optional Topic Hint -->
+        <div class="topic-hint-group">
+          <label for="topic-hint">💡 Gợi ý ngữ cảnh thêm cho Gemini AI (không bắt buộc):</label>
+          <input type="text" id="topic-hint" class="input-text" placeholder="Ví dụ: Đồ trang sức kim hoàn, hoặc Công nghệ lập trình..." />
+        </div>
+
+        <!-- Video Theme Selector -->
+        <div class="form-group" style="margin-bottom: 24px;">
+          <label for="video-theme">🎨 Giao diện & Phong cách Video (TikTok Match):</label>
+          <select id="video-theme" class="input-text" style="font-weight: 700; background-color: var(--panel);">
+            <option value="paper" selected>📝 TikTok Giấy Kẻ Ô (viesnap.vn match - Nền giấy tập, Sub Vàng Viền Đen, Host HuyK)</option>
+            <option value="dark">🌌 Cyber Dark (Nền Tím-Hồng-Cyan)</option>
+          </select>
+        </div>
+
+        <!-- Submit Button -->
+        <div class="card-footer">
+          <button id="btn-generate-content" class="btn btn-primary btn-large">
+            <span class="btn-text">✨ TẠO NỘI DUNG VỚI GEMINI AI</span>
+            <div class="spinner hidden" id="spin-gen"></div>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 2: Script & Character Action Pose Studio -->
+    <section class="step-section" id="step-2">
+      <div class="section-card">
+        <div class="card-header">
+          <h2>🤖 Bước 2: Studio Chỉnh Sửa Kịch Bản & Chọn Tư Thế Nhân Vật</h2>
+          <p>Gemini Vision AI đã sinh kịch bản bên dưới. Bạn có thể tự do chỉnh sửa câu từ và <strong>chọn tư thế biểu cảm của nhân vật host (`assets/actions/`)</strong> cho từng điểm so sánh.</p>
+        </div>
+
+        <div class="studio-grid">
+          <!-- Metadata Fields -->
+          <div class="studio-row-2">
+            <div class="form-group">
+              <label>🏷️ Tên Khái Niệm Trái (Label Left)</label>
+              <input type="text" id="script-label-left" class="input-text" placeholder="Ví dụ: Dev" />
+            </div>
+            <div class="form-group">
+              <label>🏷️ Tên Khái Niệm Phải (Label Right)</label>
+              <input type="text" id="script-label-right" class="input-text" placeholder="Ví dụ: DevOps" />
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label>❓ Câu Hỏi Mở Đầu (Title / Question Beat)</label>
+            <input type="text" id="script-title" class="input-text input-highlight" placeholder="Câu hỏi mở đầu gây tò mò..." />
+          </div>
+
+          <div class="form-group">
+            <label>📁 Tên thư mục video (Slug ID)</label>
+            <input type="text" id="script-slug" class="input-text" placeholder="Tự sinh nếu để rỗng, ví dụ: dev-vs-devops" />
+          </div>
+
+          <!-- Comparison Points List -->
+          <div class="points-header">
+            <h3>📝 Các Điểm So Sánh (Comparison Points)</h3>
+            <button id="btn-add-point" class="btn btn-small btn-secondary">+ Thêm điểm so sánh</button>
+          </div>
+
+          <div id="points-container" class="points-list">
+            <!-- Dynamic Point Rows injected here -->
+          </div>
+        </div>
+
+        <!-- Step 2 Footer -->
+        <div class="card-footer space-between">
+          <button id="btn-back-step1" class="btn btn-secondary">
+            ← Chọn lại ảnh
+          </button>
+          <button id="btn-approve-build" class="btn btn-primary btn-large glow-pink">
+            <span class="btn-text">🚀 DUYỆT KỊCH BẢN & TẠO VIDEO</span>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- STEP 3: Real-Time Build Log Console & Preview -->
+    <section class="step-section" id="step-3">
+      <div class="section-card">
+        <div class="card-header">
+          <h2>🚀 Bước 3: Tiến Trình Dựng Video Theo Thời Gian Thực</h2>
+          <p>Hệ thống đang sinh giọng đọc TTS, tính nhịp GSAP, ghép ảnh card & hành động nhân vật, và chạy `npm run check`.</p>
+        </div>
+
+        <!-- Terminal Log Box -->
+        <div class="terminal-box">
+          <div class="terminal-header">
+            <div class="terminal-dots">
+              <span class="dot red"></span>
+              <span class="dot yellow"></span>
+              <span class="dot green"></span>
+            </div>
+            <span class="terminal-title">BUILD LOG CONSOLE</span>
+          </div>
+          <pre id="terminal-logs" class="terminal-body">
+▶ Đang chờ bắt đầu...
+          </pre>
+        </div>
+
+        <!-- Completion Success Deck -->
+        <div id="build-success-card" class="success-card hidden">
+          <div class="success-icon">🎉</div>
+          <h3>ĐÃ DỰNG VIDEO THÀNH CÔNG!</h3>
+          <p id="success-desc">Video của bạn đã được kiểm tra và sẵn sàng để xem trước hoặc xuất ra file MP4.</p>
+          
+          <div class="success-actions">
+            <a id="btn-open-preview" href="#" target="_blank" class="btn btn-primary btn-large">
+              🎬 MỞ XEM TRƯỚC (PREVIEW PAGE)
+            </a>
+            <button id="btn-create-another" class="btn btn-secondary">
+              ➕ Tạo Video Mới
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+
+  <!-- Action Selector Modal -->
+  <div id="action-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>CHỌN HÀNH ĐỘNG NHÂN VẬT (MASCOT POSE)</h3>
+        <button id="btn-close-modal" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-subtitle">Bộ 27 hình ảnh hành động thực tế của host HuyK trong <code>assets/actions/</code></p>
+        <div id="action-grid" class="action-grid">
+          <!-- Action Cards Injected via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Existing Videos Drawer/Modal -->
+  <div id="videos-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog wide">
+      <div class="modal-header">
+        <h3>DANH SÁCH VIDEO ĐÃ TẠO</h3>
+        <button id="btn-close-videos-modal" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div id="videos-list-grid" class="videos-grid">
+          <!-- Videos injected via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

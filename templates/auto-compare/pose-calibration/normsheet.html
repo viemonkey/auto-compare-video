@@ -1,0 +1,35 @@
+<!doctype html><html><head><meta charset="utf-8"><style>
+  body{margin:0;background:#fff;font-family:monospace;}
+  .grid{display:grid;grid-template-columns:repeat(6,1fr);gap:2px;background:#999;}
+  /* each cell = a 0.30x view of canvas x[0..1080] y[640..1920] (1080 x 1280) => 324 x 384 */
+  .cell{position:relative;width:324px;height:384px;overflow:hidden;background:#eef2f6;}
+  .cell .lbl{position:absolute;left:0;top:0;right:0;height:18px;line-height:18px;font-size:11px;background:#222;color:#fff;z-index:20;padding-left:4px;}
+  .stage{position:absolute;left:0;top:0;width:1080px;height:1280px;transform-origin:0 0;transform:scale(0.30);}
+  /* replicate template: #avatar-host top 866 (=> 226 within this stage since stage starts at canvas y640), left 0, 1080x1054, overflow hidden */
+  #avatar-host{position:absolute;top:226px;left:0;width:1080px;height:1054px;overflow:hidden;}
+  #host-fx{position:absolute;inset:0;transform-origin:50% 12%;}
+  .host-avatar-img{position:absolute;top:-26px;left:50%;width:1080px;height:1080px;margin-left:-540px;transform-origin:50% 0;}
+  /* reference lines: target crown local y=46 -> canvas 866+46=912 -> within stage 912-640=272 ; target chin = crown + 95*U(3.033)=46+288=334 local -> canvas 1200 -> stage 560 */
+  .refc{position:absolute;left:0;width:1080px;height:3px;background:rgba(230,0,0,.7);z-index:15;top:269px;}
+  .refch{position:absolute;left:0;width:1080px;height:3px;background:rgba(0,160,0,.6);z-index:15;top:557px;}
+  .refcx{position:absolute;top:0;height:1280px;width:3px;background:rgba(0,90,230,.5);z-index:15;left:538px;}
+  .refzone{position:absolute;left:0;width:1080px;top:1240px;height:3px;background:rgba(120,0,160,.6);z-index:15;} /* canvas 1880 bottom-ish */
+</style></head><body>
+<div class="grid" id="g"></div>
+<script>
+const ADJ = JSON_PLACEHOLDER;
+const ids=Object.keys(ADJ);
+const g=document.getElementById("g");
+for(const id of ids){
+  const a=ADJ[id];
+  const c=document.createElement("div");c.className="cell";
+  c.innerHTML=`<div class="lbl">${id}  s=${a.scale}</div>
+    <div class="stage">
+      <div class="refc"></div><div class="refch"></div><div class="refcx"></div><div class="refzone"></div>
+      <div id="avatar-host"><div id="host-fx">
+        <img class="host-avatar-img" style="transform:translate(${a.x}px,${a.y}px) scale(${a.scale})" src="../../../assets/actions/${id}.svg">
+      </div></div>
+    </div>`;
+  g.appendChild(c);
+}
+</script></body></html>
