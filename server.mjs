@@ -96,6 +96,47 @@ app.post("/api/upload", (req, res) => {
   });
 });
 
+// Single audio file upload for Voice Cloning (3-5s reference clip)
+const refAudioStorage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+  filename: (_req, file, cb) => {
+    const rand = Math.random().toString(36).slice(2, 8);
+    cb(null, `ref-voice-${Date.now()}-${rand}${path.extname(file.originalname).toLowerCase()}`);
+  },
+});
+
+const uploadRefAudio = multer({
+  storage: refAudioStorage,
+  limits: { fileSize: 25 * 1024 * 1024 },
+}).single("refAudio");
+
+app.post("/api/upload-ref-audio", (req, res) => {
+  uploadRefAudio(req, res, (err) => {
+    if (err) return res.status(400).json({ error: err.message });
+    if (!req.file) return res.status(400).json({ error: "Không tìm thấy file audio." });
+    res.json({ refPath: req.file.path, filename: req.file.filename });
+  });
+});
+
+app.get("/api/vieneu-voices", (_req, res) => {
+  const voicesFile = path.join(__dirname, "VieNeu-TTS", "src", "vieneu", "assets", "voices_v3_turbo.json");
+  if (!fs.existsSync(voicesFile)) {
+    return res.json({ voices: [{ id: "Adam", label: "Adam (Mặc định)" }], defaultVoice: "Adam" });
+  }
+  try {
+    const data = JSON.parse(fs.readFileSync(voicesFile, "utf8"));
+    const presets = data.presets || {};
+    const voices = Object.keys(presets).map((name) => {
+      const info = presets[name];
+      const desc = info.description ? ` (${info.description})` : "";
+      return { id: name, label: `${name}${desc}` };
+    });
+    res.json({ voices, defaultVoice: data.default_voice || "Minh Quân" });
+  } catch (e) {
+    res.json({ voices: [{ id: "Adam", label: "Adam (Mặc định)" }], defaultVoice: "Adam" });
+  }
+});
+
 // ------------------------------------------------------------------
 // Helper: chạy 1 script node, gom stdout+stderr
 // ------------------------------------------------------------------
@@ -196,7 +237,7 @@ app.post("/api/create-video", async (req, res) => {
 
   let contentPath = null;
   try {
-    const { content, slug, topicHint } = req.body || {};
+    const { content, slug, topicHint, ttsProvider, vieneuVoice, vieneuRefPath } = req.body || {};
     const leftPath = assertInsideUploads(req.body?.leftPath, "leftPath");
     const rightPath = assertInsideUploads(req.body?.rightPath, "rightPath");
 
@@ -226,6 +267,16 @@ app.post("/api/create-video", async (req, res) => {
     ];
     const hint = String(topicHint || "").trim();
     if (hint) args.push("--topic-hint", hint);
+
+    if (ttsProvider) args.push("--tts-provider", ttsProvider);
+    if (ttsProvider === "vieneu") {
+      if (vieneuRefPath) {
+        const refAbs = assertInsideUploads(vieneuRefPath, "vieneuRefPath");
+        args.push("--vieneu-voice", refAbs);
+      } else if (vieneuVoice) {
+        args.push("--vieneu-voice", vieneuVoice);
+      }
+    }
 
     say(`▶ Lệnh: node ${args.join(" ")}`);
     const scaffold = await runNode(args, { onLine: (l) => say(l) });

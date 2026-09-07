@@ -50,10 +50,11 @@ const HOOK_POSE_RIGHT = "point-up-right"; // giới thiệu khái niệm bên ca
 const QUESTION_POSE = "thinking"; // use_case: "đặt câu hỏi mở đầu kiểu 'Sự khác nhau là gì?'"
 const PAYOFF_POSE = "thumbs-up-a"; // use_case: "xác nhận câu trả lời đúng / khen ngợi"
 
-// #root backdrop (2026-08-31) — templates/auto-compare/index.html references this
-// filename directly; each scaffolded video needs its own local copy (same pattern
-// as assets/actions/*.svg below), so keep this in sync with the template's CSS.
-const BACKGROUND_FILE = "marble-jewelry-stand.png";
+// #root backdrop (2026-09-07, was marble-jewelry-stand.png) —
+// templates/auto-compare/index.html references this filename directly; each
+// scaffolded video needs its own local copy (same pattern as assets/actions/*.svg
+// below), so keep this in sync with the template's CSS.
+const BACKGROUND_FILE = "paper-crumpled.webp";
 
 // Timing (2026-09-04, bản v2): generate-vo.mjs đã trim ~0.2s lead + ~0.8s trailing
 // silence khỏi mỗi line-*.mp3 theo word boundary, nên KHÔNG cần gap lớn theo beat
@@ -74,20 +75,22 @@ function fail(msg) {
 // ============================================================
 function parseArgs(argv) {
   const positional = [];
-  const opts = { slug: null, contentPath: null, topicHint: null, skipCheck: false };
+  const opts = { slug: null, contentPath: null, topicHint: null, skipCheck: false, ttsProvider: null, vieneuVoice: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--slug") opts.slug = argv[++i];
     else if (a === "--content") opts.contentPath = argv[++i];
     else if (a === "--topic-hint") opts.topicHint = argv[++i];
     else if (a === "--skip-check") opts.skipCheck = true;
+    else if (a === "--tts-provider") opts.ttsProvider = argv[++i];
+    else if (a === "--vieneu-voice") opts.vieneuVoice = argv[++i];
     else if (!a.startsWith("--")) positional.push(a);
     else fail(`Cờ không nhận diện được: ${a}`);
   }
   if (positional.length !== 2) {
     fail(
       "Usage: node scripts/scaffold-compare-video.mjs <left-image> <right-image> " +
-        "[--slug <name>] [--content <path>] [--topic-hint <text>] [--skip-check]",
+        "[--slug <name>] [--content <path>] [--topic-hint <text>] [--skip-check] [--tts-provider <name>] [--vieneu-voice <voice_or_path>]",
     );
   }
   opts.left = positional[0];
@@ -702,6 +705,14 @@ async function main() {
 
   // 5. patch LINES trong generate-vo.mjs đã copy sẵn
   patchGenerateVoLines(target, lines);
+
+  // 5b. Ghi .env cục bộ cho video nếu truyền ttsProvider / vieneuVoice
+  const localEnvLines = [];
+  if (opts.ttsProvider) localEnvLines.push(`TTS_PROVIDER=${opts.ttsProvider}`);
+  if (opts.vieneuVoice) localEnvLines.push(`VIENEU_VOICE=${opts.vieneuVoice}`);
+  if (localEnvLines.length) {
+    fs.writeFileSync(path.join(target, ".env"), localEnvLines.join("\n") + "\n");
+  }
 
   // 6. cài dependency (edge-tts-universal) rồi sinh VO thật
   // --ignore-scripts: bare `npm install` here must NOT run the project's lifecycle hooks —

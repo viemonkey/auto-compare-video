@@ -48,6 +48,16 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnOpenPreview = document.getElementById("btn-open-preview");
   const btnCreateAnother = document.getElementById("btn-create-another");
 
+  // DOM Elements - VieNeu TTS
+  const ttsProviderSelect = document.getElementById("tts-provider");
+  const vieneuPresetContainer = document.getElementById("vieneu-preset-container");
+  const vieneuPresetSelect = document.getElementById("vieneu-preset-select");
+  const vieneuCloneContainer = document.getElementById("vieneu-clone-container");
+  const vieneuRefFile = document.getElementById("vieneu-ref-file");
+  const vieneuRefStatus = document.getElementById("vieneu-ref-status");
+
+  let uploadedRefAudioPath = null;
+
   // Slug — must match the kebab-case rule scaffold-compare-video.mjs enforces
   // (/^[a-z0-9]+(-[a-z0-9]+)*$/). Vietnamese needs the NFD pass: plain
   // .replace(/[^a-z0-9]+/g, "-") deletes the accented letter itself, so
@@ -83,9 +93,10 @@ document.addEventListener("DOMContentLoaded", () => {
   const videosListGrid = document.getElementById("videos-list-grid");
 
   // -------------------------------------------------------------
-  // Initial Setup: Fetch Action Catalog
+  // Initial Setup: Fetch Action Catalog & VieNeu Preset Voices
   // -------------------------------------------------------------
   fetchActionCatalog();
+  fetchVieNeuVoices();
 
   async function fetchActionCatalog() {
     try {
@@ -95,6 +106,65 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       console.error("Failed to load actions catalog:", err);
     }
+  }
+
+  async function fetchVieNeuVoices() {
+    if (!vieneuPresetSelect) return;
+    try {
+      const res = await fetch("/api/vieneu-voices");
+      const data = await res.json();
+      const voices = data.voices || [];
+      vieneuPresetSelect.innerHTML = "";
+      voices.forEach((v) => {
+        const opt = document.createElement("option");
+        opt.value = v.id;
+        opt.textContent = v.label;
+        if (v.id === data.defaultVoice) opt.selected = true;
+        vieneuPresetSelect.appendChild(opt);
+      });
+    } catch (err) {
+      console.error("Failed to load VieNeu voices:", err);
+    }
+  }
+
+  // Handle TTS Provider Change
+  if (ttsProviderSelect) {
+    ttsProviderSelect.addEventListener("change", () => {
+      const val = ttsProviderSelect.value;
+      if (val === "vieneu_preset") {
+        vieneuPresetContainer.classList.remove("hidden");
+        vieneuCloneContainer.classList.add("hidden");
+      } else if (val === "vieneu_clone") {
+        vieneuPresetContainer.classList.add("hidden");
+        vieneuCloneContainer.classList.remove("hidden");
+      } else {
+        vieneuPresetContainer.classList.add("hidden");
+        vieneuCloneContainer.classList.add("hidden");
+      }
+    });
+  }
+
+  // Handle Voice Cloning Audio Upload
+  if (vieneuRefFile) {
+    vieneuRefFile.addEventListener("change", async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      try {
+        vieneuRefStatus.textContent = "⏳ Đang tải file audio mẫu...";
+        const formData = new FormData();
+        formData.append("refAudio", file);
+
+        const res = await fetch("/api/upload-ref-audio", { method: "POST", body: formData });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data.error || "Tải audio thất bại.");
+
+        uploadedRefAudioPath = data.refPath;
+        vieneuRefStatus.textContent = `✅ Đã tải file mẫu: ${file.name} (Sẵn sàng clone giọng)`;
+      } catch (err) {
+        vieneuRefStatus.textContent = `❌ Lỗi: ${err.message}`;
+        uploadedRefAudioPath = null;
+      }
+    });
   }
 
   // -------------------------------------------------------------
@@ -370,6 +440,23 @@ document.addEventListener("DOMContentLoaded", () => {
     buildSuccessCard.classList.add("hidden");
 
     try {
+      const rawProvider = ttsProviderSelect ? ttsProviderSelect.value : "vieneu_preset";
+      let ttsProvider = "vieneu";
+      let vieneuVoice = null;
+      let vieneuRefPath = null;
+
+      if (rawProvider === "vieneu_preset") {
+        ttsProvider = "vieneu";
+        vieneuVoice = vieneuPresetSelect ? vieneuPresetSelect.value : "Adam";
+      } else if (rawProvider === "vieneu_clone") {
+        ttsProvider = "vieneu";
+        if (!uploadedRefAudioPath) {
+          alert("Bạn chọn nhái giọng nhưng chưa tải lên file audio 3-5 giây!");
+          return;
+        }
+        vieneuRefPath = uploadedRefAudioPath;
+      }
+
       const response = await fetch("/api/create-video", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -380,6 +467,9 @@ document.addEventListener("DOMContentLoaded", () => {
           slug: scriptSlug.value.trim(),
           topicHint: topicHintInput.value.trim(),
           theme: document.getElementById("video-theme") ? document.getElementById("video-theme").value : "paper",
+          ttsProvider,
+          vieneuVoice,
+          vieneuRefPath,
         }),
       });
 

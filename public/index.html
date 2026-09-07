@@ -105,12 +105,38 @@
         </div>
 
         <!-- Video Theme Selector -->
-        <div class="form-group" style="margin-bottom: 24px;">
+        <div class="form-group" style="margin-bottom: 16px;">
           <label for="video-theme">🎨 Giao diện & Phong cách Video (TikTok Match):</label>
           <select id="video-theme" class="input-text" style="font-weight: 700; background-color: var(--panel);">
             <option value="paper" selected>📝 TikTok Giấy Kẻ Ô (viesnap.vn match - Nền giấy tập, Sub Vàng Viền Đen, Host HuyK)</option>
             <option value="dark">🌌 Cyber Dark (Nền Tím-Hồng-Cyan)</option>
           </select>
+        </div>
+
+        <!-- TTS Voice Engine Selector -->
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="tts-provider">🎙️ Giọng Đọc Voiceover (VieNeu-TTS Local Engine):</label>
+          <select id="tts-provider" class="input-text" style="font-weight: 700; background-color: var(--panel);">
+            <option value="vieneu_preset" selected>🔥 VieNeu-TTS (Giọng Mẫu Local: Minh Quân, Adam, Trúc Ly, Ngọc Linh...)</option>
+            <option value="vieneu_clone">✨ VieNeu-TTS (Voice Cloning - Nhái giọng từ File Mẫu 3-5 giây)</option>
+          </select>
+        </div>
+
+        <!-- VieNeu Preset Voice Selection -->
+        <div id="vieneu-preset-container" class="form-group" style="margin-bottom: 16px;">
+          <label for="vieneu-preset-select">🗣️ Chọn Giọng Mẫu VieNeu-TTS:</label>
+          <select id="vieneu-preset-select" class="input-text" style="font-weight: 600; background-color: var(--panel);">
+            <!-- Loaded dynamically from /api/vieneu-voices -->
+          </select>
+        </div>
+
+        <!-- VieNeu Voice Cloning Audio Upload -->
+        <div id="vieneu-clone-container" class="form-group hidden" style="margin-bottom: 16px;">
+          <label for="vieneu-ref-file">🎵 Tải lên Audio Mẫu 3-5 giây (WAV/MP3/M4A) để Nhái Giọng:</label>
+          <input type="file" id="vieneu-ref-file" accept="audio/*" class="input-text" style="padding: 8px;" />
+          <div id="vieneu-ref-status" class="upload-hint" style="margin-top: 6px; font-weight: 500;">
+            💡 Tải lên file ghi âm 3–5 giây tiếng nói rõ ràng để VieNeu clone đúng chất giọng đó cho video.
+          </div>
         </div>
 
         <!-- Submit Button -->

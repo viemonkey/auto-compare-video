@@ -22,15 +22,28 @@ const ROOT = path.resolve(__dirname, "..");
 const REPO_ROOT = path.resolve(ROOT, "..", "..");
 
 function loadEnv() {
-  const envPath = fs.existsSync(path.join(REPO_ROOT, ".env"))
-    ? path.join(REPO_ROOT, ".env")
-    : path.join(REPO_ROOT, ".env.example");
-  if (!fs.existsSync(envPath)) return {};
-  const raw = fs.readFileSync(envPath, "utf8");
   const env = {};
-  for (const line of raw.split("\n")) {
-    const m = line.trim().match(/^([A-Z_]+)=(.*)$/);
-    if (m) env[m[1]] = m[2].trim();
+  // 1. Root .env
+  const rootEnvPath = path.join(REPO_ROOT, ".env");
+  if (fs.existsSync(rootEnvPath)) {
+    const raw = fs.readFileSync(rootEnvPath, "utf8");
+    for (const line of raw.split("\n")) {
+      const m = line.trim().match(/^([A-Z_]+)=(.*)$/);
+      if (m) env[m[1]] = m[2].trim();
+    }
+  }
+  // 2. Local video .env (overrides root .env)
+  const localEnvPath = path.join(ROOT, ".env");
+  if (fs.existsSync(localEnvPath)) {
+    const raw = fs.readFileSync(localEnvPath, "utf8");
+    for (const line of raw.split("\n")) {
+      const m = line.trim().match(/^([A-Z_]+)=(.*)$/);
+      if (m) env[m[1]] = m[2].trim();
+    }
+  }
+  // 3. process.env (overrides all)
+  for (const k of ["TTS_PROVIDER", "VIENEU_VOICE", "EDGE_VOICE", "VBEE_APP_ID", "VBEE_ACCESS_TOKEN", "VBEE_VOICE_CODE"]) {
+    if (process.env[k]) env[k] = process.env[k];
   }
   return env;
 }
@@ -46,6 +59,9 @@ const VOICE_CODE = ENV.VBEE_VOICE_CODE || "n_hanoi_male_protrainer_education_vc"
 // --- Edge TTS config (only required when TTS_PROVIDER=edge) ---
 const EDGE_VOICE = ENV.EDGE_VOICE || "vi-VN-NamMinhNeural";
 
+// --- VieNeu TTS config (only required when TTS_PROVIDER=vieneu) ---
+const VIENEU_VOICE = ENV.VIENEU_VOICE || "Adam";
+
 const SPEED_RATE = 1.1;
 
 if (TTS_PROVIDER === "vbee") {
@@ -57,7 +73,18 @@ if (TTS_PROVIDER === "vbee") {
   }
 }
 
-console.log(`TTS provider: ${TTS_PROVIDER}`);
+console.log(`TTS provider: ${TTS_PROVIDER}${TTS_PROVIDER === "vieneu" ? ` (voice: ${VIENEU_VOICE})` : ""}`);
+
+async function generateVieNeuSpeech(text, outPath) {
+  const pythonBin = path.join(REPO_ROOT, "VieNeu-TTS", ".venv", "bin", "python");
+  const cliScript = path.join(REPO_ROOT, "VieNeu-TTS", "infer_cli.py");
+  await execFileAsync(pythonBin, [
+    cliScript,
+    "--text", text,
+    "--out", outPath,
+    "--voice", VIENEU_VOICE,
+  ]);
+}
 
 // TTS input uses phonetic Vietnamese spelling ("Đép" / "Đép Ốp") so Vbee
 // pronounces "Dev" / "DevOps" correctly — on-screen captions in index.html
@@ -225,8 +252,9 @@ async function main() {
   const durations = {};
   const words = {};          // { "line-1": [{ t, s, d }] }  (s/d in seconds, relative to TRIMMED clip)
   const edgeOnly = TTS_PROVIDER === "edge";
-  if (!edgeOnly) {
-    console.warn("\n⚠ TTS_PROVIDER != edge — Vbee không trả word boundary. words.json sẽ KHÔNG được tạo (caption karaoke cần Edge TTS).\n");
+  const isVieNeu = TTS_PROVIDER === "vieneu";
+  if (!edgeOnly && !isVieNeu) {
+    console.warn("\n⚠ TTS_PROVIDER != edge/vieneu — Vbee không trả word boundary.\n");
   }
 
   for (const line of LINES) {
@@ -235,7 +263,9 @@ async function main() {
     process.stdout.write(`Generating ${line.id}: "${line.text}" ... `);
 
     let subtitle = [];
-    if (edgeOnly) {
+    if (isVieNeu) {
+      await generateVieNeuSpeech(line.text, rawPath);
+    } else if (edgeOnly) {
       ({ subtitle } = await generateEdgeSpeech(line.text, rawPath));
     } else {
       const audioUrl = await generateVbeeSpeech(line.text);
@@ -277,6 +307,17 @@ async function main() {
         );
       }
       words[line.id] = wt;
+    } else if (isVieNeu) {
+      // Estimate word boundaries for VieNeu so karaoke captions work smoothly
+      const display = line.text.split(/\s+/).filter((tok) => /[\p{L}\p{N}]/u.test(tok));
+      if (display.length) {
+        const perWordDur = Math.round((dur / display.length) * 1000) / 1000;
+        words[line.id] = display.map((t, idx) => ({
+          t,
+          s: Math.round(idx * perWordDur * 1000) / 1000,
+          d: perWordDur,
+        }));
+      }
     }
     console.log(`${dur.toFixed(2)}s${subtitle.length ? `  (${subtitle.length} từ)` : ""}`);
   }

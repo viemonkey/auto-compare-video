@@ -80,25 +80,31 @@ tuyệt đối khi so ẢNH TĨNH, NHƯNG khi xem VIDEO chạy thì THÂN nhân 
   → xem `assets/actions/actions.json` § `removed_actions`. `scaffold-compare-video.mjs` có
   `POSE_DOWNGRADE` map các id đó cho `--content` cũ (pose chỉ tay → `point-up-left/right`).
 
-## Nền (`#root` backdrop) — cập nhật 2026-08-31
+## Nền (`#root` backdrop) — cập nhật 2026-09-07
 
-Nền giấy kẻ ô (`#f4f0e8` + 2 gradient tạo dòng kẻ) đã thay bằng ảnh thật
-`assets/backgrounds/marble-jewelry-stand.png` (bệ đá marble trưng nhẫn, ánh sáng vòng vàng,
-nền navy đậm) — vẽ trực tiếp trên `#root` (`background-size: cover`). Ảnh gốc 360×640, đúng
-tỉ lệ 1:3 của khung 1080×1920 nên `cover` không crop/letterbox, hiển thị pixel-khớp.
+Ảnh marble trưng nhẫn (`marble-jewelry-stand.png`) đã thay bằng
+`assets/backgrounds/paper-crumpled.webp` — giấy trắng nhàu, nền **sáng**, trung tính về chủ
+đề. Vẫn vẽ trực tiếp trên `#root` (`background-size: cover`). Ảnh đã là 1080×1920, đúng bằng
+khung, nên `cover` hiển thị 1:1 không crop/letterbox.
 
-- **Không đổi vị trí** card/label/host — chỉ đổi backdrop. `#eyebrow` phải đổi màu (từ
-  `#3a3a3a` sang `#f2ead8` + text-shadow nhẹ) vì màu cũ chỉ đọc được trên giấy sáng, biến mất
-  trên góc navy đậm của ảnh mới.
+- Nguồn: `assets/backgrounds/pexels-photo-20818860.avif` (2480×3508, tỉ lệ A4). Chuyển bằng
+  `ffmpeg -i pexels-photo-20818860.avif -vf "crop=1972:3508,scale=1080:1920:flags=lanczos" \
+  -quality 88 paper-crumpled.webp` — crop giữa về 9:16 rồi hạ cỡ (~154 KB). Giữ WebP thay vì
+  dùng thẳng AVIF cho nhẹ và chắc chắn Chromium headless của renderer đọc được.
+- **Không đổi vị trí** card/label/host — chỉ đổi backdrop. Backdrop này SÁNG (góc trên đọc ra
+  ~`#f5f4f6`, đó cũng là `--bg-fallback` mới): tiêu đề/label/caption đều đã có
+  `-webkit-text-stroke` đen dày nên vẫn đọc được, nhưng `#eyebrow` phải đổi từ `#f2ead8` (màu
+  cho nền navy đậm của ảnh marble) về mực đậm `#2f2b26` + quầng trắng nhẹ.
 - `scripts/scaffold-compare-video.mjs` có `copyBackground()` copy file này vào
   `videos/<slug>/assets/backgrounds/` mỗi lần dựng video mới (giống cách `assets/actions/` /
   `assets/images/` được copy) — **đổi tên/đường dẫn ảnh thì phải sửa cả `BACKGROUND_FILE`
   trong scaffold lẫn `url(...)` trong `index.html`**, không chỉ 1 chỗ.
-- Ảnh mang chủ đề trang sức (bệ marble, nhẫn) — hợp cho topic trang sức/đá quý như
-  `demo-final*`, nhưng đây là **backdrop dùng chung cho MỌI topic** qua pipeline này (video
-  công nghệ, thiên văn, v.v. cũng sẽ dùng ảnh này). Nếu series mở rộng sang nhiều chủ đề khác
-  nhau và ảnh trang sức không hợp ngữ cảnh, cân nhắc: (a) đổi sang ảnh nền trung tính hơn, hoặc
-  (b) thêm cơ chế chọn ảnh nền theo topic (chưa làm — hiện tại 1 ảnh cố định cho cả pipeline).
+- Đây vẫn là **1 backdrop cố định dùng chung cho MỌI topic** qua pipeline này. Ảnh giấy trung
+  tính hơn ảnh trang sức cũ nên hợp mọi chủ đề (công nghệ, thiên văn, thể thao…); cơ chế chọn
+  ảnh nền theo topic vẫn chưa làm.
+- Các video đã dựng trước 2026-09-07 (`nhan-vang-vs-nhan-kim-cuong`, `nhan-vang-vs-vang-trang-v2`,
+  `ronaldo-vs-messi`, `vang-vang-vs-vang-trang-v3`) giữ nguyên bản marble trong
+  `assets/backgrounds/` của chúng — thay đổi này chỉ áp cho template và video dựng mới.
 
 ## Player xem thử
 
