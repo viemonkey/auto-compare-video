@@ -6,7 +6,8 @@
   "main": "server.mjs",
   "scripts": {
     "start": "node server.mjs",
-    "ui": "node server.mjs"
+    "ui": "node server.mjs",
+    "setup:vieneu": "node scripts/setup-vieneu.mjs"
   },
   "dependencies": {
     "express": "^4.19.2",

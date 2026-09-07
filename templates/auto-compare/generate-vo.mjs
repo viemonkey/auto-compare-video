@@ -76,8 +76,20 @@ if (TTS_PROVIDER === "vbee") {
 console.log(`TTS provider: ${TTS_PROVIDER}${TTS_PROVIDER === "vieneu" ? ` (voice: ${VIENEU_VOICE})` : ""}`);
 
 async function generateVieNeuSpeech(text, outPath) {
-  const pythonBin = path.join(REPO_ROOT, "VieNeu-TTS", ".venv", "bin", "python");
+  // venv layout khác nhau giữa Windows (Scripts/python.exe) và Unix (bin/python).
+  const isWindows = process.platform === "win32";
+  const pythonBin = path.join(
+    REPO_ROOT, "VieNeu-TTS", ".venv",
+    isWindows ? "Scripts" : "bin",
+    isWindows ? "python.exe" : "python",
+  );
   const cliScript = path.join(REPO_ROOT, "VieNeu-TTS", "infer_cli.py");
+  if (!fs.existsSync(pythonBin)) {
+    throw new Error(
+      "TTS_PROVIDER=vieneu nhưng chưa dựng môi trường Python cho VieNeu-TTS.\n" +
+        "Chạy `npm run setup:vieneu` ở gốc repo, hoặc đổi TTS_PROVIDER=edge để dùng Edge TTS miễn phí.",
+    );
+  }
   await execFileAsync(pythonBin, [
     cliScript,
     "--text", text,

@@ -58,6 +58,22 @@ assets/temp/
 # nothing and keeps each restored video runnable without a re-copy step.
 !videos/*/assets/**
 
+# VieNeu-TTS — vendored source (upstream github.com/pnnbao97/VieNeu-TTS @ v3.6.4,
+# Apache-2.0; LICENSE kept in place). The ~6MB of source IS committed so a plain
+# `git pull` leaves the TTS provider runnable after one `npm run setup:vieneu`.
+# What is NOT committed, and why:
+#   .venv/               ~980MB, machine-specific (abs paths + editable install);
+#                        recreated by scripts/setup-vieneu.mjs
+#   .git-upstream-clone/ ~32MB, the upstream clone's own .git, renamed out of the
+#                        way so git treats this as a normal subtree instead of a
+#                        nested repo. Restore with `mv .git-upstream-clone .git`
+#                        if you ever need to diff/pull against upstream again.
+# Model weights are NOT here at all — huggingface_hub downloads ~580MB into
+# ~/.cache/huggingface on first run. VieNeu-TTS/.gitignore handles __pycache__,
+# *.egg-info and outputs/ for this subtree.
+VieNeu-TTS/.venv/
+VieNeu-TTS/.git-upstream-clone/
+
 # Claude Code — project skills (.claude/skills/) ARE committed; only the
 # machine-local settings override is not
 .claude/settings.local.json

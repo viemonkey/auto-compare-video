@@ -40,9 +40,10 @@ Một số demo video ngắn dạng TikTok/Reels/Shorts đã xuất bản:
 
 | Video | Chủ đề | Thư mục |
 |---|---|---|
-| Thiên thạch vs Sao băng | Meteorite vs Meteor | [`videos/thien-thach-vs-sao-bang/`](videos/thien-thach-vs-sao-bang/) |
+| Ronaldo vs Messi | Hai lối chơi, hai kiểu vĩ đại | [`videos/ronaldo-vs-messi/`](videos/ronaldo-vs-messi/) |
+| Vàng vàng vs Vàng trắng | Chọn nhẫn cưới: truyền thống hay hiện đại | [`videos/nhan-vang-vs-vang-trang-v2/`](videos/nhan-vang-vs-vang-trang-v2/) |
+| Vàng vàng vs Vàng trắng | Bản dựng trước của cùng chủ đề (tên thư mục không khớp nội dung) | [`videos/nhan-vang-vs-nhan-kim-cuong/`](videos/nhan-vang-vs-nhan-kim-cuong/) |
 | Dev vs DevOps | "Dev xây, DevOps vận hành" | [`videos/dev-vs-devops/`](videos/dev-vs-devops/) |
-| Kim Cương vs Than Đá | Diamond vs Coal (Cấu trúc & áp suất) | [`videos/kim-cuong-vs-than-da/`](videos/kim-cuong-vs-than-da/) |
 
 ## 📌 Tính năng nổi bật
 
@@ -51,7 +52,7 @@ Một số demo video ngắn dạng TikTok/Reels/Shorts đã xuất bản:
   2. **Phần giữa** — caption chạy chữ động, tô nổi bật từ khóa quan trọng bằng màu định sẵn.
   3. **Nửa dưới** — avatar MC robot 2D với 4 tư thế (chỉ tay trái, chỉ tay phải, nhún vai thắc mắc,
      giải thích), miệng/mắt LED nhấp nháy đồng bộ theo nhịp lời thoại.
-- **Voiceover tự động** — hỗ trợ **2 TTS provider**: **Vbee TTS API** (chất lượng cao, cần tài khoản) và **[Edge TTS](https://github.com/travisvn/edge-tts-universal)** (miễn phí, không cần API key, pure Node.js). Dùng `ffprobe` đo độ dài thật từng câu để đồng bộ animation GSAP chính xác tới mili-giây (không ước lượng).
+- **Voiceover tự động** — hỗ trợ **3 TTS provider**: **[Edge TTS](https://github.com/travisvn/edge-tts-universal)** (miễn phí, không cần API key, pure Node.js), **Vbee TTS API** (chất lượng cao, cần tài khoản) và **[VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS)** (chạy offline trên máy, nhân bản được giọng). Dùng `ffprobe` đo độ dài thật từng câu để đồng bộ animation GSAP chính xác tới mili-giây (không ước lượng).
 - **Font tiếng Việt chuẩn** — Be Vietnam Pro nhúng qua `@font-face` + `unicode-range`, không bị lỗi dấu như khi dùng font mặc định của compiler.
 - **Nhiều video, 1 template** — mỗi video là một project HyperFrames độc lập trong `videos/`, dùng chung thiết kế/credentials, dễ nhân bản cho chủ đề mới.
 
@@ -82,8 +83,11 @@ auto-compare-video/
 ├── .env                                ← Vbee credentials dùng chung (tự tạo, không commit)
 ├── .claude/skills/create-video/       ← skill Claude Code: tạo video mới theo đúng template
 ├── .agents/skills/create-video/       ← skill Antigravity: cùng quy trình, cho Antigravity / Antigravity CLI
+├── VieNeu-TTS/                        ← TTS offline, vendor từ upstream (Apache-2.0)
+│                                        source được commit; .venv + model thì không
+│                                        → dựng bằng `npm run setup:vieneu`
 └── videos/
-    ├── thien-thach-vs-sao-bang/       ← 1 video = 1 project HyperFrames độc lập
+    ├── ronaldo-vs-messi/              ← 1 video = 1 project HyperFrames độc lập
     │   ├── package.json, hyperframes.json, meta.json, index.html
     │   ├── BRIEF.md                    ← brief riêng của video này
     │   ├── assets/vo/*.mp3, durations.json
@@ -97,9 +101,10 @@ Mỗi video trong `videos/` là một project HyperFrames **hoàn toàn độc l
 
 ## 🛠️ Yêu cầu hệ thống
 1. **AI coding agent** (Claude Code, Cursor, Codex v.v.) để gọi skill tạo video tự động).
-2. **TTS provider** (chọn 1 trong 2):
+2. **TTS provider** (chọn 1 trong 3):
+   - **[Edge TTS](https://github.com/travisvn/edge-tts-universal)** — miễn phí, không cần API key, giọng Microsoft Neural. Đã tích hợp sẵn qua npm (`edge-tts-universal`), không cần cài gì thêm. **Đây là lựa chọn mặc định và không tốn bước setup nào.**
    - **[Vbee TTS](https://vbee.vn/?aff=cuongit96)** — chất lượng cao, nhiều giọng Việt, cần tài khoản (App ID + Access Token).
-   - **[Edge TTS](https://github.com/travisvn/edge-tts-universal)** — miễn phí, không cần API key, giọng Microsoft Neural. Đã tích hợp sẵn qua npm (`edge-tts-universal`), không cần cài gì thêm.
+   - **[VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS)** — chạy offline trên máy, 23 giọng preset + nhân bản giọng từ mẫu 3-5 giây. Cần thêm một bước setup Python — xem [§ Thiết lập VieNeu-TTS](#3-thiết-lập-vieneu-tts-tuỳ-chọn).
 3. **Node.js** ≥ 18 — tải tại [nodejs.org/en/download](https://nodejs.org/en/download)
 4. **FFmpeg & FFprobe** trong `PATH` — cần để đo độ dài audio và render video. Hướng dẫn cài đặt: [ffmpeg.org/download.html](https://ffmpeg.org/download.html) (Windows có thể dùng `winget install ffmpeg` hoặc `choco install ffmpeg`; macOS dùng `brew install ffmpeg`; Linux dùng `apt install ffmpeg`)
 
@@ -125,7 +130,54 @@ AUTO_CREATE_VIDEO=0                  # 0 = xác nhận từng bước | 1 = ch�
 
 `.env` không commit (đã có trong `.gitignore`) — chỉ `.env.example` được đưa lên repo làm mẫu.
 
-### 2. Tạo video mới
+### 2. Cài dependencies của web UI
+
+Chỉ cần nếu bạn dùng giao diện web (`npm start`). Skill `/create-video` trong Claude Code
+không cần bước này.
+
+```bash
+npm install    # express + multer, ở thư mục gốc repo
+npm start      # mở http://localhost:3000
+```
+
+> Mỗi video trong `videos/` tự gọi `npx hyperframes` nên **không** cần `npm install` riêng.
+
+### 3. Thiết lập VieNeu-TTS (tuỳ chọn)
+
+Bỏ qua mục này nếu bạn dùng Edge TTS hoặc Vbee.
+
+Source của VieNeu-TTS **đã nằm sẵn trong repo** (`VieNeu-TTS/`, vendor từ upstream
+[pnnbao97/VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS) tại tag v3.6.4, Apache-2.0), nên
+`git pull` là có đủ mã nguồn. Thứ **không** đi kèm được là môi trường Python (~1GB) và model
+(~580MB) — một lệnh này dựng lại cả hai:
+
+```bash
+npm run setup:vieneu
+```
+
+Script sẽ kiểm tra [`uv`](https://astral.sh/uv), tạo `VieNeu-TTS/.venv` (Python 3.10), cài
+dependencies rồi tự verify `import vieneu` và `infer_cli.py`. Chưa có `uv` thì script in sẵn
+lệnh cài. Xong thì đổi `.env`:
+
+```env
+TTS_PROVIDER=vieneu
+VIENEU_VOICE=Minh Quân    # 1 trong 23 preset, xem VieNeu-TTS/src/vieneu/assets/voices_v3_turbo.json
+                          # hoặc để đường dẫn tới file audio mẫu 3-5s để nhân bản giọng
+```
+
+**Lần sinh voiceover đầu tiên sẽ tải ~580MB model** về `~/.cache/huggingface` (tự động, chỉ
+một lần) nên chậm hơn hẳn các lần sau: `pnnbao-ump/VieNeu-TTS-v3-Turbo` (~494MB) và
+`OpenMOSS-Team/MOSS-Audio-Tokenizer-Nano-ONNX` (~86MB). Đó là toàn bộ những gì đường ONNX
+v3turbo cần — các model khác trong cache HuggingFace là của backend/công cụ khác.
+
+> **Đừng dùng `make setup` / `uv sync` của upstream.** `pyproject.toml` ở đây đã patch thêm
+> `darwin x86_64` vào `required-environments`, mà extra `gpu` ghim torch 2.8.0 — bản này không
+> có wheel cho macOS Intel nên `uv lock` báo "requirements are unsatisfiable". `npm run
+> setup:vieneu` dùng `uv pip install -e .` (bỏ qua extras, chỉ cài core torch-free chạy bằng
+> ONNX Runtime) và ghim `numba<0.60`, vì numba mới kéo theo llvmlite 0.49 đã bỏ wheel cho macOS
+> Intel và sẽ fail khi build từ source.
+
+### 4. Tạo video mới
 
 Cách nhanh nhất — dùng **Claude Code**, gọi skill có sẵn kèm cặp khái niệm muốn so sánh, ví dụ:
 
@@ -157,7 +209,7 @@ Không dùng AI agent nào ở trên, hoặc muốn tự chạy từng bước t
 **Sinh giọng đọc cho một video:**
 
 ```bash
-cd videos/thien-thach-vs-sao-bang
+cd videos/ronaldo-vs-messi
 node scripts/generate-vo.mjs
 ```
 
@@ -168,7 +220,7 @@ Tải audio về `assets/vo/*.mp3` và ghi độ dài thật vào `assets/vo/dur
 Mọi lệnh chạy với thư mục hiện tại là **thư mục video** (vì `package.json` nằm ở đó):
 
 ```bash
-cd videos/thien-thach-vs-sao-bang
+cd videos/ronaldo-vs-messi
 npm run dev       # preview server (long-running)
 npm run check     # lint + layout + motion + contrast
 npm run render    # render ra renders/*.mp4
