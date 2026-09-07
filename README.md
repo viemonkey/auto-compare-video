@@ -41,8 +41,6 @@ Một số demo video ngắn dạng TikTok/Reels/Shorts đã xuất bản:
 | Video | Chủ đề | Thư mục |
 |---|---|---|
 | Ronaldo vs Messi | Hai lối chơi, hai kiểu vĩ đại | [`videos/ronaldo-vs-messi/`](videos/ronaldo-vs-messi/) |
-| Vàng vàng vs Vàng trắng | Chọn nhẫn cưới: truyền thống hay hiện đại | [`videos/nhan-vang-vs-vang-trang-v2/`](videos/nhan-vang-vs-vang-trang-v2/) |
-| Vàng vàng vs Vàng trắng | Bản dựng trước của cùng chủ đề (tên thư mục không khớp nội dung) | [`videos/nhan-vang-vs-nhan-kim-cuong/`](videos/nhan-vang-vs-nhan-kim-cuong/) |
 | Dev vs DevOps | "Dev xây, DevOps vận hành" | [`videos/dev-vs-devops/`](videos/dev-vs-devops/) |
 
 ## 📌 Tính năng nổi bật
@@ -102,7 +100,7 @@ Mỗi video trong `videos/` là một project HyperFrames **hoàn toàn độc l
 ## 🛠️ Yêu cầu hệ thống
 1. **AI coding agent** (Claude Code, Cursor, Codex v.v.) để gọi skill tạo video tự động).
 2. **TTS provider** (chọn 1 trong 3):
-   - **[Edge TTS](https://github.com/travisvn/edge-tts-universal)** — miễn phí, không cần API key, giọng Microsoft Neural. Đã tích hợp sẵn qua npm (`edge-tts-universal`), không cần cài gì thêm. **Đây là lựa chọn mặc định và không tốn bước setup nào.**
+   - **[Edge TTS](https://github.com/travisvn/edge-tts-universal)** — miễn phí, không cần API key, giọng Microsoft Neural. **Đây là lựa chọn mặc định.** Không cần API key; chỉ cần `npm install` một lần trong thư mục video khi sinh lại voiceover (`edge-tts-universal` là dependency của video — scaffold tự chạy bước này cho video mới).
    - **[Vbee TTS](https://vbee.vn/?aff=cuongit96)** — chất lượng cao, nhiều giọng Việt, cần tài khoản (App ID + Access Token).
    - **[VieNeu-TTS](https://github.com/pnnbao97/VieNeu-TTS)** — chạy offline trên máy, 23 giọng preset + nhân bản giọng từ mẫu 3-5 giây. Cần thêm một bước setup Python — xem [§ Thiết lập VieNeu-TTS](#3-thiết-lập-vieneu-tts-tuỳ-chọn).
 3. **Node.js** ≥ 18 — tải tại [nodejs.org/en/download](https://nodejs.org/en/download)
@@ -140,7 +138,13 @@ npm install    # express + multer, ở thư mục gốc repo
 npm start      # mở http://localhost:3000
 ```
 
-> Mỗi video trong `videos/` tự gọi `npx hyperframes` nên **không** cần `npm install` riêng.
+> Mỗi video trong `videos/` gọi HyperFrames qua `npx` nên **preview/check/render** không cần
+> `npm install` riêng. Nhưng **sinh lại voiceover bằng Edge TTS thì cần** — `scripts/generate-vo.mjs`
+> import `edge-tts-universal`, là dependency khai báo trong `package.json` của chính video đó:
+>
+> ```bash
+> cd videos/<tên-video> && npm install
+> ```
 
 ### 3. Thiết lập VieNeu-TTS (tuỳ chọn)
 

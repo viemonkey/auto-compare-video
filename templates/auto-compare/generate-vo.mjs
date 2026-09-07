@@ -21,8 +21,22 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const REPO_ROOT = path.resolve(ROOT, "..", "..");
 
+function readEnvFile(file, into) {
+  if (!fs.existsSync(file)) return;
+  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
+    const m = line.trim().match(/^([A-Z_]+)=(.*)$/);
+    if (m) into[m[1]] = m[2].trim();
+  }
+}
+
 function loadEnv() {
   const env = {};
+  // 0. .env.example — chỉ làm nền cho các giá trị không phải bí mật (TTS_PROVIDER=edge,
+  //    EDGE_VOICE...). Không có bước này thì người vừa `git pull` mà chưa tạo .env sẽ rơi
+  //    về provider mặc định dưới đây và gặp lỗi "thiếu VBEE_APP_ID", dù README và
+  //    .env.example đều nói mặc định là Edge TTS. scripts/sync-channel.mjs của mỗi video
+  //    đã fallback y hệt — giữ cho hai bên hành xử giống nhau.
+  readEnvFile(path.join(REPO_ROOT, ".env.example"), env);
   // 1. Root .env
   const rootEnvPath = path.join(REPO_ROOT, ".env");
   if (fs.existsSync(rootEnvPath)) {
