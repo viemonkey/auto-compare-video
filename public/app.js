@@ -31,6 +31,11 @@ document.addEventListener("DOMContentLoaded", () => {
   const topicHintInput = document.getElementById("topic-hint");
   const btnGenerateContent = document.getElementById("btn-generate-content");
   const spinGen = document.getElementById("spin-gen");
+  const contentAngleSelect = document.getElementById("content-angle");
+  const contentAngleCustomContainer = document.getElementById("content-angle-custom-container");
+  const contentAngleCustomText = document.getElementById("content-angle-custom-text");
+
+  let contentAngles = [];
 
   // DOM Elements - Step 2
   const scriptLabelLeft = document.getElementById("script-label-left");
@@ -76,6 +81,30 @@ document.addEventListener("DOMContentLoaded", () => {
     return [slugify(left), slugify(right)].filter(Boolean).join("-vs-");
   }
 
+  // Hậu tố slug theo góc độ nội dung đã chọn ở Bước 1 — cùng 1 cặp ảnh nhưng khác góc độ
+  // thì ra khác thư mục videos/<slug>/, không đè lên nhau.
+  //   - "auto"   -> không thêm gì, giữ đúng hành vi buildSlug() cũ.
+  //   - "custom" -> rút gọn vài từ đầu của mô tả tự gõ (không dùng cố định "custom").
+  //   - preset khác -> dùng đúng id (đã kebab-case sẵn trong config/content-angles.mjs).
+  function contentAngleSlugSuffix() {
+    const id = contentAngleSelect ? contentAngleSelect.value : "auto";
+    if (!id || id === "auto") return "";
+    if (id === "custom") {
+      const words = slugify(contentAngleCustomText ? contentAngleCustomText.value : "")
+        .split("-")
+        .filter(Boolean)
+        .slice(0, 4);
+      return words.join("-");
+    }
+    return id;
+  }
+
+  function buildSlugWithAngle(left, right) {
+    const base = buildSlug(left, right);
+    const suffix = contentAngleSlugSuffix();
+    return suffix ? `${base}-${suffix}` : base;
+  }
+
   const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
   // Must be frame_class "full" — see assets/actions/actions.json
@@ -97,6 +126,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // -------------------------------------------------------------
   fetchActionCatalog();
   fetchVieNeuVoices();
+  fetchContentAngles();
 
   async function fetchActionCatalog() {
     try {
@@ -125,6 +155,45 @@ document.addEventListener("DOMContentLoaded", () => {
     } catch (err) {
       console.error("Failed to load VieNeu voices:", err);
     }
+  }
+
+  async function fetchContentAngles() {
+    if (!contentAngleSelect) return;
+    try {
+      const res = await fetch("/api/content-angles");
+      const data = await res.json();
+      contentAngles = data.angles || [];
+    } catch (err) {
+      console.error("Failed to load content angles:", err);
+      contentAngles = [];
+    }
+
+    contentAngleSelect.innerHTML = "";
+
+    const autoOpt = document.createElement("option");
+    autoOpt.value = "auto";
+    autoOpt.textContent = "🤖 Tự động (để AI chọn)";
+    autoOpt.selected = true;
+    contentAngleSelect.appendChild(autoOpt);
+
+    contentAngles.forEach((a) => {
+      const opt = document.createElement("option");
+      opt.value = a.id;
+      opt.textContent = a.label;
+      contentAngleSelect.appendChild(opt);
+    });
+
+    const customOpt = document.createElement("option");
+    customOpt.value = "custom";
+    customOpt.textContent = "✏️ Khác (tự mô tả ở bên dưới)";
+    contentAngleSelect.appendChild(customOpt);
+  }
+
+  if (contentAngleSelect) {
+    contentAngleSelect.addEventListener("change", () => {
+      const isCustom = contentAngleSelect.value === "custom";
+      contentAngleCustomContainer.classList.toggle("hidden", !isCustom);
+    });
   }
 
   // Handle TTS Provider Change
@@ -235,6 +304,13 @@ document.addEventListener("DOMContentLoaded", () => {
       return;
     }
 
+    const contentAngleId = contentAngleSelect ? contentAngleSelect.value : "auto";
+    const customAngleText = contentAngleCustomText ? contentAngleCustomText.value.trim() : "";
+    if (contentAngleId === "custom" && !customAngleText) {
+      alert("Bạn chọn \"Khác\" nhưng chưa mô tả góc độ nội dung riêng!");
+      return;
+    }
+
     try {
       btnGenerateContent.disabled = true;
       spinGen.classList.remove("hidden");
@@ -263,6 +339,8 @@ document.addEventListener("DOMContentLoaded", () => {
           leftPath: uploadedLeftPath,
           rightPath: uploadedRightPath,
           topicHint: topicHintInput.value.trim(),
+          contentAngleId,
+          customAngleText,
         }),
       });
 
@@ -274,9 +352,9 @@ document.addEventListener("DOMContentLoaded", () => {
       scriptTitle.value = content.title || "";
       scriptLabelLeft.value = content.label_left || "";
       scriptLabelRight.value = content.label_right || "";
-      
-      // Auto-generate suggested slug
-      scriptSlug.value = buildSlug(content.label_left, content.label_right);
+
+      // Auto-generate suggested slug — hậu tố theo góc độ nội dung đã chọn ở Bước 1
+      scriptSlug.value = buildSlugWithAngle(content.label_left, content.label_right);
 
       pointsData = content.points || [];
       renderPointsList();
@@ -414,7 +492,7 @@ document.addEventListener("DOMContentLoaded", () => {
     // scaffold-compare-video.mjs rejects it and the whole run is wasted.
     const slug = scriptSlug.value.trim();
     if (!SLUG_RE.test(slug)) {
-      const suggested = buildSlug(scriptLabelLeft.value, scriptLabelRight.value);
+      const suggested = buildSlugWithAngle(scriptLabelLeft.value, scriptLabelRight.value);
       const useSuggested =
         suggested &&
         confirm(

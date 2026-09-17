@@ -1,0 +1,704 @@
+{
+  "$schema_version": 1,
+  "character": "huyk",
+  "generated_at": "2026-08-31",
+  "source_note": "Bộ ảnh host 'HuyK' (tạp dề nâu thêu tên) ĐÃ THAY MỚI 2026-08-30. Raster-in-SVG: mỗi .svg bọc 1 ảnh PNG 1024x1024 (RGB) + 1 mask PNG grayscale tách nền (kỹ thuật <mask>+feColorMatrix). Đuôi .svg giữ để HyperFrames/trình duyệt render thẳng; KHÔNG có path/stroke vector để đổi màu qua CSS.",
+  "asset_format": {
+    "type": "raster-in-svg (PNG 1024x1024 + mask, wrapped in <svg><mask>...<image>)",
+    "viewBox": "0 0 300 299.999988",
+    "declared_width_height": "400x400",
+    "aspect_ratio": "1:1 (VUÔNG) — khác bộ cũ (2:3 dọc). Bộ cũ: viewBox 768x1151.999944, declared 1024x1536.",
+    "framing": "24 ảnh mới đều chụp ~thắt lưng trở lên (waist-up), bố cục ĐỒNG ĐỀU: đỉnh đầu gần mép trên, thân giữa khung, cắt ngang eo. Không có ảnh toàn thân."
+  },
+  "render_note": "SHARED FIXED PLACEMENT (v5, 2026-08-31). Trước đây (v4) chuẩn hoá theo đầu — scale RIÊNG mỗi pose theo head_h (0.85–1.22) — làm THÂN nhân vật phồng/co mỗi lần đổi pose, xem video chạy bị giật. v5: MỌI pose dùng CHUNG 1 { x, y, scale } (xem const HOST_BASE trong templates/auto-compare/index.html; hiện scale=1.0). Ảnh đều bottom-aligned (silhouette chạm đáy khung) nên 1 giá trị y giữ eo đứng yên; đánh đổi: đầu cao/thấp lệch ~50–75px + kích thước lệch ~15% giữa các pose, theo đúng khung hình gốc mỗi ảnh. 2026-09-01: bỏ point-left-far/point-right-far (2 pose từng cần POSE_ADJUST nudge x) — giờ KHÔNG pose nào cần ngoại lệ, POSE_ADJUST rỗng. frame_class:\"full\" vẫn chỉ là cờ \"pose dùng được\".",
+  "notes": [
+    "THAY BỘ 2026-08-30: bộ SVG mới, đã đổi tên theo action id nhận diện qua tư thế.",
+    "CHUẨN HOÁ v5 (2026-08-31): BỎ scale riêng theo đầu (v4) — gây giật thân khi xem video. Giờ mọi pose dùng chung HOST_BASE {x,y,scale}. Xem render_note.",
+    "2026-09-01: POSE_ADJUST rỗng — mọi pose dùng thẳng HOST_BASE, không còn ngoại lệ nudge x.",
+    "Khớp yếu: thumbs-up-b = dấu OK 👌; explain-b = tay chống cằm.",
+    "CHỈ TAY TRÁI/PHẢI — CHUẨN 2026-09-01: chỉ dùng point-up-left (trái) / point-up-right (phải). Đã bỏ mọi biến thể khác (point-up-a/b, point-left-far/point-right-far). Nhiều beat cùng hướng thì tái dùng lại đúng 1 trong 2, KHÔNG tạo/giữ pose gần giống để đa dạng.",
+    "point-up-right / point-up-left (thêm 2026-08-31): 1 cặp trái/phải đối xứng — tay PHẢI chỉ chéo lên-phải / tay TRÁI chỉ chéo lên-trái (soi gương). Cả 2 dùng thẳng HOST_BASE (v5 shared placement)."
+  ],
+  "removed_actions": [
+    {
+      "id": "point-left-far",
+      "old_file": "point-left-far.svg",
+      "reason": "BỎ 2026-09-01 — chuẩn hoá pose chỉ tay: chỉ giữ point-up-left (trái) / point-up-right (phải). Mọi tham chiếu point-left-far → point-up-left."
+    },
+    {
+      "id": "point-right-far",
+      "old_file": "point-right-far.svg",
+      "reason": "BỎ 2026-09-01 — chuẩn hoá pose chỉ tay: chỉ giữ point-up-left (trái) / point-up-right (phải). Mọi tham chiếu point-right-far → point-up-right."
+    },
+    {
+      "id": "point-up-a",
+      "old_file": "point-up-a.svg",
+      "reason": "BỎ 2026-09-01 — biến thể 'point-up' gần trùng, không còn cần. Tham chiếu cũ → point-up-left."
+    },
+    {
+      "id": "point-up-b",
+      "old_file": "point-up-b.svg",
+      "reason": "BỎ 2026-09-01 — biến thể 'point-up' gần trùng, không còn cần. Tham chiếu cũ → point-up-right."
+    },
+    {
+      "id": "point-right-near",
+      "old_file": "point-right-near.svg",
+      "reason": "Bộ mới không có point-right tay duỗi thẳng. Không phải hành động chỉ trái/phải thuần → POSE_DOWNGRADE map sang 'explain-b'."
+    },
+    {
+      "id": "walk",
+      "old_file": "walk.svg",
+      "reason": "Không có ảnh đi bộ/toàn thân. Không nơi nào trong code hardcode 'walk' (chỉ nằm trong POSE map template cũ). Nếu cần pose chuyển cảnh: tạm dùng 'idle-confident' hoặc 'wave'."
+    },
+    {
+      "id": "inspect-gem",
+      "old_file": "inspect-gem.svg",
+      "reason": "BỎ HẲN — prop kim hoàn, host mới không dùng cho chủ đề trang sức."
+    },
+    {
+      "id": "present-ring",
+      "old_file": "present-ring.svg",
+      "reason": "BỎ HẲN — prop kim hoàn."
+    },
+    {
+      "id": "show-item",
+      "old_file": "show-item.svg",
+      "reason": "BỎ HẲN — prop kim hoàn."
+    },
+    {
+      "id": "present-clipboard",
+      "old_file": "present-clipboard.svg",
+      "reason": "BỎ HẲN — prop bảng kẹp giấy, không có ảnh mới."
+    }
+  ],
+  "jewelry_gate_removed": "Các trường 'prop':'jewelry' và jewelry-gate trong generate-compare-content.mjs giờ vô tác dụng (không action nào còn prop). Có thể dọn code sau, không gấp.",
+  "actions": [
+    {
+      "id": "wow",
+      "file": "wow.svg",
+      "emotion": "surprised",
+      "tags": [
+        "wow",
+        "ngạc nhiên",
+        "phấn khích",
+        "hai tay xoè ngang mặt",
+        "miệng há to",
+        "mắt mở to"
+      ],
+      "use_case": "Beat hook/payoff khi muốn nhấn mạnh điều bất ngờ, gây chú ý ngay đầu hoặc cuối video.",
+      "variants": [
+        "wow-alt"
+      ],
+      "frame": {
+        "frame_class": "full",
+        "head_top": 13,
+        "head_cx": 140,
+        "chin_y": 110,
+        "head_h": 97,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "thinking",
+      "file": "thinking.svg",
+      "emotion": "thinking",
+      "tags": [
+        "suy nghĩ",
+        "tay chống cằm",
+        "tay kia khoanh đỡ khuỷu",
+        "phân vân",
+        "hoài nghi"
+      ],
+      "use_case": "Beat 'nút thắt' khi đặt câu hỏi mở đầu kiểu 'Sự khác nhau là gì?'.",
+      "frame": {
+        "frame_class": "full",
+        "head_top": 25,
+        "head_cx": 128,
+        "chin_y": 108,
+        "head_h": 83,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "idle-confident",
+      "file": "idle-confident.svg",
+      "emotion": "confident",
+      "tags": [
+        "hai tay đan trước bụng",
+        "đứng thoải mái",
+        "mỉm cười tự tin",
+        "idle",
+        "đứng nghỉ"
+      ],
+      "use_case": "Đoạn outro/hold, hoặc khi không có beat động tác cụ thể — giữ khung hình tự nhiên. Cũng là DEFAULT_POSE của web UI.",
+      "frame": {
+        "frame_class": "full",
+        "head_top": 18,
+        "head_cx": 149,
+        "chin_y": 102,
+        "head_h": 84,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "shocked-a",
+      "file": "shocked-a.svg",
+      "emotion": "shocked",
+      "tags": [
+        "bàn tay che kín miệng",
+        "sốc",
+        "bất ngờ",
+        "mắt mở to"
+      ],
+      "use_case": "Reveal một sự thật gây bất ngờ trong beat giải A/giải B.",
+      "variant_of": null,
+      "variants": [
+        "shocked-b"
+      ],
+      "frame": {
+        "frame_class": "full",
+        "head_top": 10,
+        "head_cx": 135,
+        "chin_y": 98,
+        "head_h": 88,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "shocked-b",
+      "file": "shocked-b.svg",
+      "emotion": "shocked",
+      "tags": [
+        "tay hờ trước miệng há",
+        "há hốc",
+        "sốc",
+        "bất ngờ"
+      ],
+      "use_case": "Giống shocked-a (mức 'hít hà' thay vì che kín) — dùng thay thế nếu cần đổi góc máy / mức biểu cảm.",
+      "variant_of": "shocked-a",
+      "frame": {
+        "frame_class": "full",
+        "head_top": 13,
+        "head_cx": 140,
+        "chin_y": 102,
+        "head_h": 89,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "thumbs-up-a",
+      "file": "thumbs-up-a.svg",
+      "emotion": "happy",
+      "tags": [
+        "thumbs-up",
+        "giơ ngón cái",
+        "đồng ý",
+        "khen ngợi",
+        "tích cực",
+        "tay kia chống hông"
+      ],
+      "use_case": "Beat payoff khi xác nhận câu trả lời đúng / khen ngợi. Gần nhất với 'happy' trong bộ ảnh.",
+      "variant_of": null,
+      "variants": [
+        "thumbs-up-b"
+      ],
+      "frame": {
+        "frame_class": "full",
+        "head_top": 20,
+        "head_cx": 135,
+        "chin_y": 105,
+        "head_h": 85,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "thumbs-up-b",
+      "file": "thumbs-up-b.svg",
+      "emotion": "happy",
+      "tags": [
+        "ra dấu OK",
+        "ngón cái chạm ngón trỏ",
+        "đồng ý",
+        "chuẩn",
+        "tích cực"
+      ],
+      "use_case": "Giống thumbs-up-a về nghĩa (tán thành/chuẩn) — dùng thay thế khi cần cử chỉ khác.",
+      "match_note": "KHỚP YẾU: ảnh là dấu OK 👌, không phải ngón cái.",
+      "variant_of": "thumbs-up-a",
+      "frame": {
+        "frame_class": "full",
+        "head_top": 18,
+        "head_cx": 135,
+        "chin_y": 110,
+        "head_h": 92,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "listening",
+      "file": "listening.svg",
+      "emotion": "curious",
+      "tags": [
+        "bàn tay khum sau tai",
+        "lắng nghe",
+        "chưa nghe rõ",
+        "nghiêng đầu"
+      ],
+      "use_case": "Khi mascot 'hỏi lại' khán giả hoặc mời tương tác/bình luận.",
+      "variants": [
+        "listening-alt"
+      ],
+      "frame": {
+        "frame_class": "full",
+        "head_top": 12,
+        "head_cx": 138,
+        "chin_y": 102,
+        "head_h": 90,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "shrug-a",
+      "file": "shrug-a.svg",
+      "emotion": "confused",
+      "tags": [
+        "nhún vai",
+        "hai bàn tay ngửa giơ ngang vai",
+        "rụt vai",
+        "thắc mắc",
+        "không chắc"
+      ],
+      "use_case": "Beat 'nút thắt' (Sự khác nhau là gì?) — đúng nhịp câu hỏi theo DESIGN.md.",
+      "variant_of": null,
+      "variants": [
+        "shrug-b"
+      ],
+      "frame": {
+        "frame_class": "full",
+        "head_top": 30,
+        "head_cx": 148,
+        "chin_y": 102,
+        "head_h": 72,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "shrug-b",
+      "file": "shrug-b.svg",
+      "emotion": "confused",
+      "tags": [
+        "nhún vai",
+        "hai bàn tay ngửa giơ ngang vai",
+        "rụt vai",
+        "thắc mắc",
+        "không chắc"
+      ],
+      "use_case": "Giống shrug-a (ảnh chụp liên tiếp, lệch góc nhẹ) — dùng thay thế nếu cần đổi góc máy.",
+      "variant_of": "shrug-a",
+      "frame": {
+        "frame_class": "full",
+        "head_top": 18,
+        "head_cx": 150,
+        "chin_y": 100,
+        "head_h": 82,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "offer-a",
+      "file": "offer-a.svg",
+      "emotion": "welcoming",
+      "tags": [
+        "một bàn tay ngửa mời tới trước",
+        "offer",
+        "giới thiệu",
+        "chào đón"
+      ],
+      "use_case": "Beat hook/intro khi 'giới thiệu' 2 khái niệm sắp so sánh.",
+      "variant_of": null,
+      "variants": [
+        "offer-b"
+      ],
+      "frame": {
+        "frame_class": "full",
+        "head_top": 18,
+        "head_cx": 145,
+        "chin_y": 108,
+        "head_h": 90,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "offer-b",
+      "file": "offer-b.svg",
+      "emotion": "welcoming",
+      "tags": [
+        "hai bàn tay ngửa mời tới trước",
+        "offer",
+        "giới thiệu",
+        "trình bày",
+        "chào đón"
+      ],
+      "use_case": "Giống offer-a — biến thể hai tay, hợp khi 'bày ra' cả hai vế cùng lúc.",
+      "variant_of": "offer-a",
+      "frame": {
+        "frame_class": "full",
+        "head_top": 15,
+        "head_cx": 150,
+        "chin_y": 108,
+        "head_h": 93,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "explain-a",
+      "file": "explain-a.svg",
+      "emotion": "explaining",
+      "tags": [
+        "giải thích",
+        "hai bàn tay ngửa ngang bụng",
+        "đang trình bày"
+      ],
+      "use_case": "Beat giải A/giải B khi đưa ra định nghĩa/giải thích khái niệm.",
+      "variant_of": null,
+      "variants": [
+        "explain-b"
+      ],
+      "frame": {
+        "frame_class": "full",
+        "head_top": 13,
+        "head_cx": 145,
+        "chin_y": 95,
+        "head_h": 82,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "explain-b",
+      "file": "explain-b.svg",
+      "emotion": "explaining",
+      "tags": [
+        "tay chống cằm",
+        "đang nói",
+        "cân nhắc",
+        "tay kia chống hông"
+      ],
+      "use_case": "Biến thể explain — hợp khi vừa nói vừa cân nhắc một điểm.",
+      "match_note": "KHỚP YẾU: ảnh đọc ra 'phân vân' hơn 'giải thích'. Cân nhắc chụp lại hoặc đổi id thành 'thinking-b'.",
+      "variant_of": "explain-a",
+      "frame": {
+        "frame_class": "full",
+        "head_top": 15,
+        "head_cx": 138,
+        "chin_y": 103,
+        "head_h": 88,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "wave",
+      "file": "wave.svg",
+      "emotion": "friendly",
+      "tags": [
+        "vẫy tay",
+        "bàn tay xoè ngang đầu",
+        "chào",
+        "hello",
+        "intro"
+      ],
+      "use_case": "Đầu video (beat hook) khi mascot 'chào' khán giả.",
+      "variants": [
+        "wave-alt"
+      ],
+      "frame": {
+        "frame_class": "full",
+        "head_top": 15,
+        "head_cx": 122,
+        "chin_y": 115,
+        "head_h": 100,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "confused",
+      "file": "confused.svg",
+      "emotion": "confused",
+      "tags": [
+        "gãi đầu",
+        "bối rối",
+        "nhíu mày",
+        "liếc lên",
+        "oops"
+      ],
+      "use_case": "Thể hiện sự nhầm lẫn phổ biến trước khi 'giải đáp' — hợp mở đầu beat nút thắt hoặc callback nhầm lẫn thường gặp.",
+      "frame": {
+        "frame_class": "full",
+        "head_top": 18,
+        "head_cx": 133,
+        "chin_y": 95,
+        "head_h": 77,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "stop",
+      "file": "stop.svg",
+      "emotion": "serious",
+      "tags": [
+        "bàn tay xoè chặn tới trước",
+        "khoan đã",
+        "dừng lại",
+        "đừng nhầm",
+        "phản bác",
+        "halt"
+      ],
+      "use_case": "Beat 'khoan đã / đừng vội kết luận' hoặc bác bỏ một hiểu lầm phổ biến trước khi giải thích đúng. POSE MỚI 2026-08-30 — không có trong bộ 26 cũ.",
+      "frame": {
+        "frame_class": "full",
+        "head_top": 22,
+        "head_cx": 124,
+        "chin_y": 105,
+        "head_h": 83,
+        "coord_space": "viewBox-300"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "listening-alt",
+      "file": "listening-alt.svg",
+      "emotion": "curious",
+      "tags": [
+        "bàn tay khum sau tai",
+        "lắng nghe",
+        "crop gần hơn"
+      ],
+      "use_case": "Biến thể phụ của 'listening' (chụp liên tiếp, crop gần / góc khác). KHÔNG vào pipeline auto-compare — người dựng tự chọn tay.",
+      "variant_of": "listening",
+      "frame": {
+        "head_top": 18,
+        "head_cx": 140,
+        "chin_y": 112,
+        "head_h": 94,
+        "coord_space": "viewBox-300",
+        "pipeline": "excluded (variant)"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "wow-alt",
+      "file": "wow-alt.svg",
+      "emotion": "surprised",
+      "tags": [
+        "hai tay xoè ngang mặt",
+        "miệng há",
+        "phấn khích",
+        "gần trùng wow"
+      ],
+      "use_case": "Biến thể phụ của 'wow' (gần trùng pose chính). KHÔNG vào pipeline auto-compare.",
+      "variant_of": "wow",
+      "frame": {
+        "head_top": 13,
+        "head_cx": 148,
+        "chin_y": 110,
+        "head_h": 97,
+        "coord_space": "viewBox-300",
+        "pipeline": "excluded (variant)"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "wave-alt",
+      "file": "wave-alt.svg",
+      "emotion": "friendly",
+      "tags": [
+        "bàn tay xoè ngang đầu",
+        "chào",
+        "gần trùng wave"
+      ],
+      "use_case": "Biến thể phụ của 'wave' (tay hạ thấp hơn một chút). KHÔNG vào pipeline auto-compare.",
+      "variant_of": "wave",
+      "frame": {
+        "head_top": 15,
+        "head_cx": 130,
+        "chin_y": 115,
+        "head_h": 100,
+        "coord_space": "viewBox-300",
+        "pipeline": "excluded (variant)"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "point-up-right",
+      "file": "point-up-right.svg",
+      "emotion": "confident",
+      "tags": [
+        "chỉ chéo lên phải",
+        "point-up-right",
+        "nhấn mạnh phía trên",
+        "hướng sự chú ý",
+        "tay phải"
+      ],
+      "use_case": "Dùng cho các cảnh cần chỉ/nhấn mạnh lên trên, ví dụ nhắc tới ưu điểm, tiêu đề, hoặc yếu tố nổi bật phía trên khung hình — nghiêng chéo phải, hợp khi yếu tố cần nhấn nằm lệch phải phía trên (ví dụ gần card-right hoặc góc phải tiêu đề).",
+      "frame": {
+        "frame_class": "full",
+        "head_top": 18,
+        "head_cx": 126,
+        "chin_y": 108,
+        "head_h": 90,
+        "coord_space": "viewBox-300",
+        "measured_note": "ước lượng bằng mắt — tay giơ cao khiến top-pixel tự động là ngón trỏ chứ không phải đỉnh đầu, không dùng phép đo silhouette-top như các pose khác"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    },
+    {
+      "id": "point-up-left",
+      "file": "point-up-left.svg",
+      "emotion": "confident",
+      "tags": [
+        "chỉ chéo lên trái",
+        "point-up-left",
+        "nhấn mạnh phía trên",
+        "hướng sự chú ý",
+        "tay trái"
+      ],
+      "use_case": "Dùng cho các cảnh cần chỉ/nhấn mạnh lên trên, ví dụ nhắc tới ưu điểm, tiêu đề, hoặc yếu tố nổi bật phía trên khung hình — nghiêng chéo trái, hợp khi yếu tố cần nhấn nằm lệch trái phía trên (ví dụ gần card-left hoặc góc trái tiêu đề).",
+      "frame": {
+        "frame_class": "full",
+        "head_top": 18,
+        "head_cx": 141,
+        "chin_y": 110,
+        "head_h": 92,
+        "coord_space": "viewBox-300",
+        "measured_note": "ước lượng bằng mắt — tay giơ cao khiến top-pixel tự động là ngón trỏ chứ không phải đỉnh đầu, không dùng phép đo silhouette-top như các pose khác"
+      },
+      "pose_adjust": {
+        "_shared": "HOST_BASE",
+        "x": 20,
+        "y": 0,
+        "scale": 1
+      }
+    }
+  ],
+  "frame_measure_note": "\"frame\" mỗi pose (head_top / head_cx / chin_y / head_h, hệ viewBox 300) = số đo tay để THAM KHẢO khi cân nhắc ngoại lệ — KHÔNG còn dùng để tính scale riêng như v4. Body CoM ~x140 (hơi lệch trái tâm 150) ở phần lớn pose; point-left-far CoM ~200, point-right-far ~98 (2 pose xoay người, cần nudge x)."
+}

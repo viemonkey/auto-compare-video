@@ -1,0 +1,19 @@
+{
+  "name": "vang-ta-vs-vang-tay",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "npx --yes hyperframes@0.7.58 preview",
+    "check": "npx --yes hyperframes@0.7.58 check --timeout=20000",
+    "render": "npx --yes hyperframes@0.7.58 render --workers=1",
+    "publish": "npx --yes hyperframes@0.7.58 publish",
+    "sync-channel": "node scripts/sync-channel.mjs",
+    "predev": "npm run sync-channel",
+    "precheck": "npm run sync-channel",
+    "prerender": "npm run sync-channel",
+    "prepublish": "npm run sync-channel"
+  },
+  "dependencies": {
+    "edge-tts-universal": "^1.4.0"
+  }
+}

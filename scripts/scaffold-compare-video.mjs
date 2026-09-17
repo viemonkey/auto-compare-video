@@ -26,7 +26,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
-import { runCompareContent, loadActionCatalog } from "./generate-compare-content.mjs";
+import { runCompareContent, loadActionCatalog, enforceContextImageLimits } from "./generate-compare-content.mjs";
+import { generateContextImage } from "./generate-context-image.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -126,15 +127,21 @@ function slugify(str) {
     .replace(/^-+|-+$/g, "");
 }
 
-function genUniqueSlug(labelLeft, labelRight) {
-  const base = `${slugify(labelLeft)}-vs-${slugify(labelRight)}`;
-  let slug = base;
+// videos/<slug>/ trùng tên -> thêm hậu tố số thứ tự thay vì báo lỗi dừng lại. Dùng cho cả
+// slug tự sinh từ label (genUniqueSlug) LẪN slug người dùng/caller truyền qua --slug (xem
+// chỗ gọi ở main()) — một lần dựng lại tình cờ trùng tên không đáng phải huỷ cả run.
+function ensureUniqueSlugDir(baseSlug) {
+  let slug = baseSlug;
   let n = 2;
   while (fs.existsSync(path.join(REPO_ROOT, "videos", slug))) {
-    slug = `${base}-${n}`;
+    slug = `${baseSlug}-${n}`;
     n++;
   }
   return slug;
+}
+
+function genUniqueSlug(labelLeft, labelRight) {
+  return ensureUniqueSlugDir(`${slugify(labelLeft)}-vs-${slugify(labelRight)}`);
 }
 
 function escapeHtml(str) {
@@ -255,6 +262,17 @@ function backfillPointFields(content, catalogFull) {
         "\n  restart server để Gemini tự viết tag ngắn gọn thay vì cắt máy móc từ câu thoại.\n",
     );
   }
+
+  // Chạy LẠI enforceContextImageLimits ở đây (không chỉ trong runCompareContent) vì content
+  // có thể đến từ --content <path> — 1 file cũ/viết tay có thể thiếu hẳn field
+  // needs_context_image/image_concept, hoặc có side đã được suy ra Ở TRÊN (side lúc này mới
+  // chắc chắn hợp lệ). Hàm này tự coerce field thiếu về false/"" nên không phá content cũ.
+  const { corrections: contextImageCorrections } = enforceContextImageLimits(content);
+  if (contextImageCorrections.length) {
+    console.warn(`\n⚠ Đã bỏ needs_context_image cho ${contextImageCorrections.length} point (giữ ảnh sản phẩm gốc):`);
+    for (const c of contextImageCorrections) console.warn(`  - "${c.point}": ${c.reason}`);
+  }
+
   return derived.length;
 }
 
@@ -334,6 +352,13 @@ function buildLines(content) {
       side: p.side,
       tag: p.tag,
       sub: p.sub || "",
+      // Giai đoạn 1 — ảnh minh hoạ ngữ cảnh (đã qua enforceContextImageLimits: side="both" và
+      // point vượt cap/liền kề cùng bên đã bị loại từ trước, nên tới đây side chắc chắn là
+      // "left"/"right" khi needsContextImage=true). contextImageFile được điền sau, ở
+      // generateContextImages() — null nghĩa là chưa sinh/sinh lỗi, giữ ảnh gốc.
+      needsContextImage: p.needs_context_image === true,
+      imageConcept: p.image_concept || "",
+      contextImageFile: null,
     });
   });
   const payoffText = `${label_left} hay ${label_right} — giờ thì bạn đã rõ rồi đấy!`;
@@ -405,11 +430,45 @@ function computeTiming(lines, durations) {
 }
 
 // ============================================================
+// Giai đoạn 1 — sinh ảnh minh hoạ ngữ cảnh (nếu point có needsContextImage=true) và ghi vào
+// videos/<slug>/assets/images/context-<n>.<ext>. KHÔNG throw khi 1 ảnh lỗi — generateContextImage
+// đã tự trả null + tự log cảnh báo; ở đây chỉ cần giữ contextImageFile=null để
+// buildTimelineBeatsJs biết mà bỏ qua setCardImage, giữ nguyên ảnh sản phẩm gốc cho point đó.
+// ============================================================
+async function generateContextImages(target, lines) {
+  const candidates = lines.filter((l) => l.needsContextImage);
+  // Log LUÔN chạy, kể cả 0 candidate — để phân biệt "hàm này không được gọi" (bug) với
+  // "hàm được gọi nhưng không có point nào cần ảnh" (đúng thiết kế, do content.points không
+  // có point nào needs_context_image=true sau enforceContextImageLimits — xem log ở
+  // generate-compare-content.mjs để biết đó là do Gemini hay do bị cắt).
+  console.log(`\n[generateContextImages] gọi với ${lines.length} dòng, ${candidates.length} dòng cần sinh ảnh minh hoạ.`);
+  if (candidates.length === 0) {
+    console.log("  (không có dòng nào needsContextImage=true — không gọi generateContextImage lần nào, giữ nguyên ảnh gốc cả video.)");
+    return;
+  }
+
+  const imgDir = path.join(target, "assets", "images");
+  for (const line of candidates) {
+    const outBase = path.join(imgDir, `context-${line.n}`);
+    console.log(`  → gọi generateContextImage cho point ${line.n} [${line.side}], concept: "${line.imageConcept}"`);
+    const result = await generateContextImage({ concept: line.imageConcept, outBase });
+    console.log(`  ← point ${line.n} trả về: ${result ? result : "null"}`);
+    if (result) {
+      line.contextImageFile = path.basename(result);
+      console.log(`  ✔ point ${line.n}: ${line.contextImageFile}`);
+    } else {
+      // generateContextImage đã tự console.warn lý do cụ thể — ở đây chỉ xác nhận fallback.
+      console.log(`  ⚠ point ${line.n}: giữ ảnh sản phẩm gốc (xem cảnh báo ở trên).`);
+    }
+  }
+}
+
+// ============================================================
 // Sinh khối JS timeline: pose swap + card active-emphasis theo từng beat.
 // (Nhãn 2 khái niệm cố định; text theo beat do caption karaoke lo — xem
 //  buildCaptionsJs + template.)
 // ============================================================
-function buildTimelineBeatsJs(lines) {
+function buildTimelineBeatsJs(lines, cardExts) {
   const chunks = [];
   const BEAT_TITLE = {
     hook: "HOOK",
@@ -446,6 +505,19 @@ function buildTimelineBeatsJs(lines) {
         `      tl.fromTo("#avatar-host", { scale: 1 }, { scale: 1.03, duration: 0.3, ease: "power2.out", yoyo: true, repeat: 1 }, ${at});`,
       );
     }
+
+    // Giai đoạn 1 — swap tạm ảnh card sang ảnh minh hoạ ngữ cảnh, rồi đổi lại ảnh sản phẩm gốc
+    // ngay khi sang dòng kế tiếp (luôn tồn tại — payoff luôn là dòng cuối cùng, không tự sinh
+    // bởi Gemini). enforceContextImageLimits đã đảm bảo side ở đây chỉ có thể là left/right.
+    if (line.contextImageFile) {
+      const revertFile = `card-${line.side}${cardExts[line.side]}`;
+      chunks.push(`      setCardImage("${line.side}", "${line.contextImageFile}", ${at});`);
+      const next = lines[i + 1];
+      if (next) {
+        chunks.push(`      setCardImage("${line.side}", "${revertFile}", VO[${next.n}].start);`);
+      }
+    }
+
     chunks.push("");
   });
 
@@ -479,7 +551,7 @@ function buildIndexHtml(target, content, lines, timingResult, cardExts) {
     })
     .join("\n");
 
-  const timelineBeatsJs = buildTimelineBeatsJs(lines);
+  const timelineBeatsJs = buildTimelineBeatsJs(lines, cardExts);
 
   html = html
     .replace(/__DOC_TITLE__/g, docTitle)
@@ -604,10 +676,27 @@ function patchGenerateVoLines(target, lines) {
   fs.writeFileSync(voPath, patched);
 }
 
-function writeBrief(target, content, sourceImages, corrections) {
+function writeBrief(target, content, sourceImages, corrections, contextImageCorrections, lines) {
   const pointsMd = content.points.map((p, i) => `${i + 1}. ${p.text} _(pose: \`${p.suggested_action}\`)_`).join("\n");
   const correctionsMd = corrections && corrections.length
     ? `\n## Điều chỉnh gate trang sức\n\n${corrections.length} suggested_action đã bị hạ cấp lúc sinh content vì chủ đề không phải trang sức/đá quý:\n\n${corrections.map((c) => `- "${c.point}": \`${c.from}\` → \`${c.to}\``).join("\n")}\n`
+    : "";
+  const generatedImages = (lines || []).filter((l) => l.contextImageFile);
+  const skippedContextImages = (lines || []).filter((l) => l.needsContextImage && !l.contextImageFile);
+  const contextImageMd = generatedImages.length || (contextImageCorrections && contextImageCorrections.length) || skippedContextImages.length
+    ? `\n## Ảnh minh hoạ ngữ cảnh (Giai đoạn 1 — sinh bằng Gemini image gen)\n\n${
+        generatedImages.length
+          ? generatedImages.map((l) => `- point ${l.n} (card \`${l.side}\`): \`assets/images/${l.contextImageFile}\` — concept: "${l.imageConcept}"`).join("\n") + "\n"
+          : "- Không có ảnh nào sinh thành công lần này.\n"
+      }${
+        skippedContextImages.length
+          ? `\nSinh lỗi/fallback, giữ ảnh sản phẩm gốc (xem log lúc chạy):\n${skippedContextImages.map((l) => `- point ${l.n}: "${l.text}"`).join("\n")}\n`
+          : ""
+      }${
+        contextImageCorrections && contextImageCorrections.length
+          ? `\nBị code cắt bớt trước khi gọi API (giới hạn cứng — xem \`enforceContextImageLimits\`):\n${contextImageCorrections.map((c) => `- "${c.point}": ${c.reason}`).join("\n")}\n`
+          : ""
+      }`
     : "";
   const md = `# Brief — ${content.label_left} vs ${content.label_right}
 
@@ -632,7 +721,7 @@ function writeBrief(target, content, sourceImages, corrections) {
 ## Nội dung tự sinh (Gemini, body beat)
 
 ${pointsMd}
-${correctionsMd}
+${correctionsMd}${contextImageMd}
 ## Notes
 
 - Layout 3-zone dùng chung \`../../DESIGN.md\`. **Nhịp kịch bản riêng cho template
@@ -657,18 +746,20 @@ ${correctionsMd}
 async function main() {
   const opts = parseArgs(process.argv.slice(2));
 
-  let content, corrections, sourceImages;
+  let content, corrections, contextImageCorrections, sourceImages;
   if (opts.contentPath) {
     console.log(`Dùng compare-content có sẵn: ${opts.contentPath} (bỏ qua gọi Gemini).`);
     const raw = JSON.parse(fs.readFileSync(opts.contentPath, "utf8"));
     content = raw;
     corrections = raw._meta?.corrections || [];
+    contextImageCorrections = raw._meta?.contextImageCorrections || [];
     sourceImages = raw._meta?.source_images || {};
   } else {
     console.log("Gọi Gemini (generate-compare-content.mjs) để sinh nội dung từ 2 ảnh...");
     const result = await runCompareContent({ left: opts.left, right: opts.right, topicHint: opts.topicHint });
     content = result.content;
     corrections = result.corrections;
+    contextImageCorrections = result.contextImageCorrections;
     sourceImages = result.source_images;
   }
 
@@ -676,15 +767,18 @@ async function main() {
   backfillPointFields(content, catalog.allIds);
   validateContent(content, catalog);
 
-  const slug = opts.slug || genUniqueSlug(content.label_left, content.label_right);
-  const target = path.join(REPO_ROOT, "videos", slug);
-  if (fs.existsSync(target)) {
-    fail(`videos/${slug}/ đã tồn tại — chọn --slug khác. Script này KHÔNG được ghi đè video có sẵn.`);
+  const requestedSlug = opts.slug || genUniqueSlug(content.label_left, content.label_right);
+  const slug = opts.slug ? ensureUniqueSlugDir(requestedSlug) : requestedSlug;
+  if (slug !== requestedSlug) {
+    console.log(`ℹ videos/${requestedSlug}/ đã tồn tại — dùng "${slug}" thay thế.`);
   }
+  const target = path.join(REPO_ROOT, "videos", slug);
 
   console.log(`\nSlug: ${slug}`);
   console.log(`Chủ đề: ${content.label_left} vs ${content.label_right}`);
   console.log(`Points: ${content.points.length}${corrections.length ? ` (${corrections.length} action đã bị hạ cấp jewelry-gate)` : ""}`);
+  const contextImageWanted = content.points.filter((p) => p.needs_context_image).length;
+  console.log(`Ảnh minh hoạ ngữ cảnh cần sinh: ${contextImageWanted}${contextImageCorrections.length ? ` (đã cắt bớt ${contextImageCorrections.length} theo giới hạn cứng)` : ""}`);
 
   // 1. scaffold cơ học (hyperframes init + wiring), tái dùng script có sẵn
   runScaffoldMjs(slug);
@@ -698,6 +792,11 @@ async function main() {
 
   // 3. dựng danh sách dòng thoại + pose
   const lines = buildLines(content);
+
+  // 3b. Giai đoạn 1 — sinh ảnh minh hoạ ngữ cảnh cho point nào cần (tối đa 2/video, đã ép ở
+  // enforceContextImageLimits). Lỗi ở đây KHÔNG chặn build — line.contextImageFile ở lại null.
+  console.log("\n▶ Bước 3b: generateContextImages() ...");
+  await generateContextImages(target, lines);
 
   // 4. copy action SVG thực sự dùng tới + actions.json tham chiếu
   const usedActions = copyUsedActions(target, lines);
@@ -735,7 +834,7 @@ async function main() {
   buildIndexHtml(target, content, lines, timingResult, cardExts);
 
   // 9. BRIEF.md
-  writeBrief(target, content, sourceImages, corrections);
+  writeBrief(target, content, sourceImages, corrections, contextImageCorrections, lines);
 
   // 10. check
   if (!opts.skipCheck) {

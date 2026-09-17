@@ -109,7 +109,13 @@ async function generateVieNeuSpeech(text, outPath) {
     "--text", text,
     "--out", outPath,
     "--voice", VIENEU_VOICE,
-  ]);
+  ], {
+    // infer_cli.py prints emoji (e.g. 🎤) to stdout/stderr. Python on Windows defaults
+    // those streams to the console's legacy code page (cp1252), which can't encode them
+    // and crashes with UnicodeEncodeError before any TTS work happens. Force UTF-8
+    // regardless of the console's code page — harmless on Unix where it's already UTF-8.
+    env: { ...process.env, PYTHONIOENCODING: "utf-8", PYTHONUTF8: "1" },
+  });
 }
 
 // TTS input uses phonetic Vietnamese spelling ("Đép" / "Đép Ốp") so Vbee

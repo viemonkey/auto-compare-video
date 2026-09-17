@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080, height=1920">
+    <title>So sánh — Vàng Vàng vs Vàng Trắng</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* Be Vietnam Pro / JetBrains Mono, embedded directly (not a Google Fonts <link>)
+         so the "vietnamese" unicode-range subset — precomposed tone-mark glyphs like
+         ệ, ẫ, ổ (U+1EA0-1EF9) — loads correctly. The compiler's pre-bundled embed for
+         these families only covers "latin", which drops Vietnamese diacritics.
+         Copied verbatim from videos/dev-vs-devops/index.html — see composition.md
+         "Giữ nguyên tuyệt đối" — do not edit per-video. */
+      @font-face {
+        font-family: "Be Vietnam Pro";
+        font-style: normal;
+        font-weight: 900;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HS0Im86Rb0bcw.woff2) format("woff2");
+        unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+      }
+      @font-face {
+        font-family: "Be Vietnam Pro";
+        font-style: normal;
+        font-weight: 900;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HS0Im81Rb0.woff2) format("woff2");
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8L6tTNVOVgaY.woff2) format("woff2");
+        unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8L6tTOlOV.woff2) format("woff2");
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+    </style>
+    <style>
+      :root {
+        --bg: #0d0a1a;
+        --panel: #17122c;
+        --panel-edge: #2b2350;
+        --fg: #f3f1ff;
+        --fg-dim: #9089b0;
+        --accent-pink: #ff4fa3;
+        --accent-cyan: #37e6c4;
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: var(--bg);
+        font-family: "Be Vietnam Pro", sans-serif;
+      }
+      #root {
+        position: relative;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background: var(--bg);
+      }
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* ---------- background decoratives ---------- */
+      .glow {
+        position: absolute;
+        border-radius: 50%;
+        filter: blur(60px);
+        pointer-events: none;
+      }
+      #glow-top {
+        width: 560px;
+        height: 560px;
+        left: 260px;
+        top: 120px;
+        background: radial-gradient(circle, rgba(255, 79, 163, 0.35) 0%, rgba(255, 79, 163, 0) 70%);
+      }
+      #glow-bottom {
+        width: 640px;
+        height: 640px;
+        left: 220px;
+        top: 1085px;
+        background: radial-gradient(circle, rgba(55, 230, 196, 0.28) 0%, rgba(55, 230, 196, 0) 70%);
+      }
+
+      /* ---------- top comparison zone (y 64-824) ---------- */
+      .card {
+        position: absolute;
+        top: 70px;
+        width: 400px;
+        height: 680px;
+        border-radius: 28px;
+        background: var(--panel);
+        border: 1px solid var(--panel-edge);
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-end;
+        padding-bottom: 40px;
+        transform-origin: 50% 50%;
+        will-change: transform, opacity;
+      }
+      #card-left {
+        left: 120px;
+      }
+      #card-right {
+        left: 560px;
+      }
+      .card-icon {
+        position: relative;
+        width: 100%;
+        height: 480px;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+      }
+      /* real uploaded photo, not a CSS/SVG placeholder icon — Auto Compare Video variant
+         of the card (see DESIGN.md "Avatar identity" / this template's own README).
+         object-fit: cover (not contain) — these are product/subject photos meant to fill
+         the frame edge-to-edge, unlike the avatar cutout below which needs contain. */
+      .card-image {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        border-radius: 20px 20px 0 0;
+      }
+      .card-label {
+        font-weight: 900;
+        font-size: 42px;
+        color: var(--accent-cyan);
+        text-transform: uppercase;
+        letter-spacing: 0.01em;
+        text-align: center;
+        padding: 0 16px;
+      }
+
+      /* VS badge */
+      #vs-badge {
+        position: absolute;
+        top: 355px;
+        left: 485px;
+        width: 110px;
+        height: 110px;
+        border-radius: 50%;
+        background: var(--accent-pink);
+        display: grid;
+        place-items: center;
+        box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+        z-index: 5;
+        transform-origin: 50% 50%;
+        will-change: transform, opacity;
+      }
+      #vs-badge span {
+        font-weight: 900;
+        font-size: 34px;
+        color: var(--bg);
+        letter-spacing: 0.02em;
+      }
+
+      /* ---------- middle caption zone (y 840-1300) ---------- */
+      #eyebrow {
+        position: absolute;
+        top: 838px;
+        left: 110px;
+        width: 860px;
+        text-align: center;
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700;
+        font-size: 22px;
+        letter-spacing: 0.14em;
+        color: var(--fg-dim);
+        opacity: 0;
+      }
+      #caption-zone {
+        position: absolute;
+        top: 900px;
+        left: 110px;
+        width: 860px;
+        height: 340px;
+      }
+      .caption-line {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        opacity: 0;
+      }
+      /* A single wrapper element around each line's mixed text + .kw spans —
+         .caption-line itself must not be the flex container of that mixed
+         content, or the browser splits the bare text runs and the .kw span
+         into separate anonymous flex items that each wrap independently
+         (rendering as broken side-by-side columns instead of one paragraph). */
+      .caption-line-text {
+        display: inline-block;
+        max-width: 100%;
+        text-align: center;
+        font-weight: 900;
+        font-size: 60px;
+        line-height: 1.22;
+        color: var(--fg);
+      }
+      .kw {
+        display: inline-block;
+        color: var(--accent-pink);
+        transform-origin: 50% 50%;
+        margin: 0 8px;
+      }
+
+      /* ---------- bottom avatar zone (y 1280-1920) ---------- */
+      /* Auto Compare Video pipeline (DESIGN.md "New videos" avatar mechanism): a single
+         <img> swapped by pose via assets/actions/actions.json — no CSS robot body parts.
+         Frame is the same 420x520 box/position as the CSS-robot generation for layout
+         consistency with the rest of the series; only what's INSIDE the box differs. */
+      #avatar-host {
+        position: absolute;
+        top: 1280px;
+        left: 330px;
+        width: 420px;
+        height: 520px;
+        opacity: 0;
+        overflow: hidden; /* clip the zoomed-in wrapper below to the box — see #host-img-zoom */
+        transform-origin: 50% 100%;
+      }
+      /* TEMP PATCH (quick fix for a demo deadline, not the real fix): the visible photo inside
+         each assets/actions/*.svg only fills a small clipped region of its own 768x1152 canvas
+         (~429x429px, see actions.json notes) — contain therefore renders the person tiny, most
+         of the box taken up by transparent canvas padding. This wrapper scales the whole thing
+         up; the parent's overflow:hidden crops away the dead padding so the person fills the
+         frame — at the cost of visibly upscaling already-small source pixels (some blur/
+         softness expected). The zoom lives on ITS OWN element, not #host-img directly, because
+         changePose() (see <script> below) tweens #host-img's own `scale` to an ABSOLUTE 1 on
+         every pose settle — putting the zoom there too would make GSAP silently overwrite it
+         back down to 1 (confirmed: first attempt did exactly this, zoom had ~no visible effect).
+         Real fix (deferred until after the demo): re-crop each SVG's viewBox to the actual
+         clipPath bounds so contain has no dead space to begin with — remove this wrapper once
+         that's done. */
+      #host-img-zoom {
+        width: 100%;
+        height: 100%;
+        transform: scale(2.4);
+        /* 50% 50%, not 50% 100% — the visible clipPath region in each SVG sits roughly
+           CENTERED in its 768x1152 canvas (~y 31%-69%), not at the bottom. Anchoring the
+           zoom at the box's bottom edge (confirmed by render) pushes the person upward as
+           it scales and crops the head off entirely. Center-anchoring keeps the person
+           roughly centered in the visible box after scaling instead. */
+        transform-origin: 50% 50%;
+      }
+      .host-avatar-img {
+        width: 100%;
+        height: 100%;
+        /* contain, not cover — source photos (assets/actions/*.svg, raster-in-svg) are a
+           taller 2:3 crop than this 420x520 (~0.808) frame; cover would crop head/feet. */
+        object-fit: contain;
+        object-position: bottom center;
+        transform-origin: 50% 100%;
+      }
+    </style>
+  </head>
+  <body>
+    <div data-hf-id="hf-acv0" id="root" data-composition-id="main" data-start="0" data-width="1080" data-height="1920" data-duration="45.1">
+      <section data-hf-id="hf-acv1" id="scene" class="clip" data-start="0" data-duration="45.1" data-track-index="1">
+        <div data-hf-id="hf-acv2" id="glow-top" class="glow"></div>
+        <div data-hf-id="hf-acv3" id="glow-bottom" class="glow"></div>
+
+        <!-- top: comparison cards — real uploaded photos -->
+        <div data-hf-id="hf-acv4" id="card-left" class="card">
+          <div data-hf-id="hf-acv5" class="card-icon">
+            <img data-hf-id="hf-acv6" class="card-image" src="assets/images/card-left.jpg" alt="Vàng Vàng" />
+          </div>
+          <div data-hf-id="hf-acv7" class="card-label">Vàng Vàng</div>
+        </div>
+        <div data-hf-id="hf-acv8" id="card-right" class="card">
+          <div data-hf-id="hf-acv9" class="card-icon">
+            <img data-hf-id="hf-acva" class="card-image" src="assets/images/card-right.jpg" alt="Vàng Trắng" />
+          </div>
+          <div data-hf-id="hf-acvb" class="card-label">Vàng Trắng</div>
+        </div>
+        <div data-hf-id="hf-acvc" id="vs-badge"><span data-hf-id="hf-acvd">VS</span></div>
+
+        <!-- middle: captions -->
+        <div data-hf-id="hf-acve" id="eyebrow">Cường IT</div>
+        <div data-hf-id="hf-acvf" id="caption-zone">
+          <div class="caption-line" id="line-1"><span class="caption-line-text">Đây là <span class="kw" style="color: var(--accent-cyan)">VÀNG VÀNG</span></span></div>
+          <div class="caption-line" id="line-2"><span class="caption-line-text">Đây là <span class="kw" style="color: var(--accent-cyan)">VÀNG TRẮNG</span></span></div>
+          <div class="caption-line" id="line-3"><span class="caption-line-text">Nên chọn nhẫn Vàng Vàng hay Vàng Trắng?</span></div>
+          <div class="caption-line" id="line-4"><span class="caption-line-text">Cùng là vàng nhưng sắc thái mang lại phong cách hoàn toàn khác biệt!</span></div>
+          <div class="caption-line" id="line-5"><span class="caption-line-text">Vàng vàng mang vẻ đẹp cổ điển, ấm áp và cực kỳ tôn da ấm châu Á.</span></div>
+          <div class="caption-line" id="line-6"><span class="caption-line-text">Vàng trắng lại hiện đại, thời thượng và tôn lên độ lấp lánh của đá.</span></div>
+          <div class="caption-line" id="line-7"><span class="caption-line-text">Vàng vàng rất bền màu, không cần xi mạ lại sau thời gian dài đeo.</span></div>
+          <div class="caption-line" id="line-8"><span class="caption-line-text">Vàng trắng cần xi mạ Rhodium định kỳ để giữ vẻ sáng bóng nguyên bản.</span></div>
+          <div class="caption-line" id="line-9"><span class="caption-line-text">Nếu thích kim cương nổi bật nhất, vàng trắng là sự kết hợp tuyệt vời.</span></div>
+          <div class="caption-line" id="line-10"><span class="caption-line-text">Bạn sẽ chọn nét truyền thống ấm áp hay sự hiện đại kiêu sa này?</span></div>
+          <div class="caption-line" id="line-11"><span class="caption-line-text"><span class="kw" style="color: var(--accent-cyan)">VÀNG VÀNG</span> hay <span class="kw" style="color: var(--accent-cyan)">VÀNG TRẮNG</span> — giờ thì bạn đã rõ rồi đấy!</span></div>
+        </div>
+
+        <!-- bottom: photo host, pose swapped via assets/actions/actions.json -->
+        <div data-hf-id="hf-acvg" id="avatar-host">
+          <div data-hf-id="hf-acvz" id="host-img-zoom">
+            <img data-hf-id="hf-acvh" id="host-img" class="host-avatar-img" src="assets/actions/wave.svg" alt="Host" />
+          </div>
+        </div>
+      </section>
+
+      <!-- narration: one clip per caption line, direct root children -->
+      <audio id="vo-1" src="assets/vo/line-1.mp3" data-start="0.55" data-duration="1.92" data-track-index="20"></audio>
+      <audio id="vo-2" src="assets/vo/line-2.mp3" data-start="2.79" data-duration="1.968" data-track-index="20"></audio>
+      <audio id="vo-3" src="assets/vo/line-3.mp3" data-start="5.178" data-duration="2.808" data-track-index="20"></audio>
+      <audio id="vo-4" src="assets/vo/line-4.mp3" data-start="8.406" data-duration="3.744" data-track-index="20"></audio>
+      <audio id="vo-5" src="assets/vo/line-5.mp3" data-start="12.47" data-duration="4.632" data-track-index="20"></audio>
+      <audio id="vo-6" src="assets/vo/line-6.mp3" data-start="17.422" data-duration="4.32" data-track-index="20"></audio>
+      <audio id="vo-7" src="assets/vo/line-7.mp3" data-start="22.062" data-duration="4.104" data-track-index="20"></audio>
+      <audio id="vo-8" src="assets/vo/line-8.mp3" data-start="26.486" data-duration="4.56" data-track-index="20"></audio>
+      <audio id="vo-9" src="assets/vo/line-9.mp3" data-start="31.366" data-duration="4.272" data-track-index="20"></audio>
+      <audio id="vo-10" src="assets/vo/line-10.mp3" data-start="35.958" data-duration="3.864" data-track-index="20"></audio>
+      <audio id="vo-11" src="assets/vo/line-11.mp3" data-start="40.242" data-duration="3.6" data-track-index="20"></audio>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // ---------- entrance ----------
+      tl.fromTo("#card-left", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power3.out" }, 0.0);
+      tl.fromTo("#card-right", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power3.out" }, 0.15);
+      tl.fromTo("#vs-badge", { scale: 0, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.4, ease: "power3.out" }, 0.45);
+      tl.fromTo("#avatar-host", { scale: 0.85, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power3.out" }, 0.1);
+      tl.fromTo("#eyebrow", { y: 12, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, 0.15);
+
+      // ---------- caption line helper (unchanged from the CSS-robot generation) ----------
+      // Pops a line in (spring-pop, y+fade) at the same moment its VO clip starts,
+      // holds through the real speech duration + a short buffer, exits fast
+      // (fade+lift). Pass outAt=null to hold the line with no exit (final line).
+      // Keyword spans get a quick color-set + scale punch timed to the line landing.
+      function showLine(id, inAt, outAt) {
+        tl.fromTo(id, { y: 24, opacity: 0 }, { y: 0, opacity: 1, duration: 0.35, ease: "power3.out" }, inAt);
+        if (outAt != null) {
+          tl.to(id, { y: -16, opacity: 0, duration: 0.2, ease: "power2.in" }, outAt);
+        }
+        const kws = document.querySelectorAll(id + " .kw");
+        kws.forEach((el, i) => {
+          tl.fromTo(
+            el,
+            { scale: 1 },
+            { scale: 1.15, duration: 0.14, ease: "power2.out", yoyo: true, repeat: 1 },
+            inAt + 0.2 + i * 0.08,
+          );
+        });
+      }
+
+      // ---------- avatar pose helper — photo swap, not CSS-robot rotation ----------
+      // Fade-out/swap-src/fade-in via tl.set({attr:{src}}) rather than tl.call() — a plain
+      // callback only fires while the playhead moves forward THROUGH that exact point, so a
+      // renderer that seeks directly to an arbitrary frame (not strictly sequential playback)
+      // can skip it and leave the wrong pose on screen. tl.set(...) is a real zero-duration
+      // tween GSAP re-evaluates correctly on any seek/scrub. Pattern proven in production by
+      // videos/kim-cuong-vs-than-da/index.html (rendered 3x) — copied, not reinvented.
+      function changePose(imageSrc, at) {
+        tl.to("#host-img", { opacity: 0.3, scale: 0.98, duration: 0.15, ease: "power2.in" }, at);
+        tl.set("#host-img", { attr: { src: imageSrc } }, at + 0.15);
+        tl.to("#host-img", { opacity: 1, scale: 1, duration: 0.25, ease: "power2.out" }, at + 0.15);
+      }
+
+      // ---------- VO-driven beat timing ----------
+      // Real TTS clip durations (assets/vo/durations.json) drive every beat — caption
+      // pop-in and avatar pose swap both key off each clip's actual [start, start+duration],
+      // not an estimate. See scripts/scaffold-compare-video.mjs for how VO/beats below were
+      // generated from compare-content.json (Gemini output) + the timing-gap formula in
+      // .claude/skills/create-video/references/script-and-timing.md.
+      const VO = {
+        1: { start: 0.55, dur: 1.92 },
+        2: { start: 2.79, dur: 1.968 },
+        3: { start: 5.178, dur: 2.808 },
+        4: { start: 8.406, dur: 3.744 },
+        5: { start: 12.47, dur: 4.632 },
+        6: { start: 17.422, dur: 4.32 },
+        7: { start: 22.062, dur: 4.104 },
+        8: { start: 26.486, dur: 4.56 },
+        9: { start: 31.366, dur: 4.272 },
+        10: { start: 35.958, dur: 3.864 },
+        11: { start: 40.242, dur: 3.6 },
+      };
+      const capOut = (n) => VO[n].start + VO[n].dur + 0.25;
+
+      // ---------- BEAT: HOOK ----------
+      changePose("assets/actions/wave.svg", VO[1].start);
+      showLine("#line-1", VO[1].start, capOut(1));
+
+      changePose("assets/actions/offer-a.svg", VO[2].start);
+      showLine("#line-2", VO[2].start, capOut(2));
+
+      // ---------- BEAT: QUESTION ----------
+      changePose("assets/actions/shrug-a.svg", VO[3].start);
+      showLine("#line-3", VO[3].start, capOut(3));
+
+      // ---------- BEAT: BODY (7 điểm so sánh, từ Gemini) ----------
+      changePose("assets/actions/offer-a.svg", VO[4].start);
+      showLine("#line-4", VO[4].start, capOut(4));
+
+      changePose("assets/actions/point-left-far.svg", VO[5].start);
+      tl.to("#card-left", { scale: 1.05, opacity: 1, duration: 0.4, ease: "power2.out" }, VO[5].start);
+      tl.to("#card-right", { scale: 0.96, opacity: 0.55, duration: 0.4, ease: "power2.out" }, VO[5].start);
+      showLine("#line-5", VO[5].start, capOut(5));
+
+      changePose("assets/actions/point-right-near.svg", VO[6].start);
+      tl.to("#card-right", { scale: 1.05, opacity: 1, duration: 0.4, ease: "power2.out" }, VO[6].start);
+      tl.to("#card-left", { scale: 0.96, opacity: 0.55, duration: 0.4, ease: "power2.out" }, VO[6].start);
+      showLine("#line-6", VO[6].start, capOut(6));
+
+      changePose("assets/actions/explain-a.svg", VO[7].start);
+      showLine("#line-7", VO[7].start, capOut(7));
+
+      changePose("assets/actions/explain-b.svg", VO[8].start);
+      showLine("#line-8", VO[8].start, capOut(8));
+
+      changePose("assets/actions/inspect-gem.svg", VO[9].start);
+      showLine("#line-9", VO[9].start, capOut(9));
+
+      changePose("assets/actions/present-ring.svg", VO[10].start);
+      showLine("#line-10", VO[10].start, capOut(10));
+
+      // ---------- BEAT: PAYOFF ----------
+      tl.to("#card-left", { scale: 1, opacity: 1, duration: 0.4, ease: "power2.out" }, VO[11].start);
+      tl.to("#card-right", { scale: 1, opacity: 1, duration: 0.4, ease: "power2.out" }, VO[11].start);
+      changePose("assets/actions/thumbs-up-a.svg", VO[11].start);
+      tl.fromTo("#avatar-host", { scale: 1 }, { scale: 1.04, duration: 0.3, ease: "power2.out", yoyo: true, repeat: 1 }, VO[11].start);
+      showLine("#line-11", VO[11].start, null); // giữ tới hết — không thoát, đây là payoff
+
+      // ---------- ambient background glows (finite, phase-opposed) ----------
+      const ROOT_DURATION = 45.1;
+      const glowCycle = 3.2;
+      const glowReps = Math.max(0, Math.floor(ROOT_DURATION / glowCycle) - 1);
+      tl.fromTo(
+        "#glow-top",
+        { opacity: 0.6 },
+        { opacity: 1, duration: glowCycle / 2, ease: "sine.inOut", yoyo: true, repeat: glowReps },
+        0,
+      );
+      tl.fromTo(
+        "#glow-bottom",
+        { opacity: 1 },
+        { opacity: 0.6, duration: glowCycle / 2, ease: "sine.inOut", yoyo: true, repeat: glowReps },
+        0,
+      );
+
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

@@ -1,0 +1,773 @@
+<!DOCTYPE html>
+<html lang="vi">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080, height=1920">
+    <title>So sánh — Kim cương vs Moissanite</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* Be Vietnam Pro / JetBrains Mono, embedded directly */
+      @font-face {
+        font-family: "Be Vietnam Pro";
+        font-style: normal;
+        font-weight: 900;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HS0Im86Rb0bcw.woff2) format("woff2");
+        unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+      }
+      @font-face {
+        font-family: "Be Vietnam Pro";
+        font-style: normal;
+        font-weight: 900;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/bevietnampro/v12/QdVMSTAyLFyeg_IDWvOJmVES_HS0Im81Rb0.woff2) format("woff2");
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        font-style: normal;
+        font-weight: 700;
+        font-display: swap;
+        src: url(https://fonts.gstatic.com/s/jetbrainsmono/v24/tDbY2o-flEEny0FZhsfKu5WU4zr3E_BX0PnT8RD8L6tTNVOVgaY.woff2) format("woff2");
+        unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+      }
+    </style>
+    <style>
+      :root {
+        --bg-fallback: #f5f4f6; /* sampled from assets/backgrounds/paper-crumpled.webp's top corner — edge/load fallback only, the image covers the frame */
+        --accent-yellow: #ffe600;
+        --dark-stroke: #000000;
+        --cap-idle: #ffffff;   /* running-caption word, not yet spoken / already spoken */
+        --cap-active: #ffe600;  /* running-caption word being spoken right now */
+      }
+      * {
+        margin: 0;
+        padding: 0;
+        box-sizing: border-box;
+      }
+      html,
+      body {
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        font-family: "Be Vietnam Pro", sans-serif;
+      }
+
+      /* Crumpled-paper backdrop (2026-09-07, replaces the marble jewelry-stand
+         theme). assets/backgrounds/paper-crumpled.webp is already 1080x1920 —
+         exactly this canvas, so `cover` renders it 1:1 with no crop/letterbox.
+         (Source: assets/backgrounds/pexels-photo-20818860.avif, 2480x3508,
+         centre-cropped to 9:16 and downscaled — see README.) This backdrop is
+         LIGHT, unlike the marble one: every headline/label/caption already
+         carries a heavy black -webkit-text-stroke so they still read, but
+         #eyebrow had to be recoloured off cream. Painted directly on #root: this
+         composition is standalone (not assembled from multiple frame.md
+         scenes) and uses no shader transitions/HDR, so a root-level fill is
+         safe here (see hyperframes-core § determinism-rules). Card/label/host
+         positions below are unchanged from the paper version. */
+      #root {
+        position: relative;
+        width: 1080px;
+        height: 1920px;
+        overflow: hidden;
+        background-color: var(--bg-fallback);
+        background-image: url("assets/backgrounds/paper-crumpled.webp");
+        background-size: cover;
+        background-position: center top;
+        background-repeat: no-repeat;
+      }
+
+      .clip {
+        position: absolute;
+        inset: 0;
+      }
+
+      /* ---------- top comparison zone ----------
+         Two parallel panels, 48px paper seam, ~96px paper margin each outer
+         edge. No VS badge, no card chrome — the photos are the graphic.
+         (2026-08-31 v3: shrunk to 420x456 and pushed down to top:165 so the
+         platform UI — follow button / channel name in the top ~150-200px —
+         and the phone's rounded corners don't clip the panels on social feeds.) */
+      .card {
+        position: absolute;
+        top: 360px; /* 2026-09-02 v3: pushed down so the comparison labels sit
+                       ABOVE the photos (Mousse/Panna-Cotta style) and still
+                       clear the TikTok top-UI / safe-area crop (~y0-230). */
+        width: 420px;
+        height: 372px;
+        overflow: hidden;
+        background: #000;
+        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+      }
+      #card-left {
+        left: 96px;
+      }
+      #card-right {
+        left: 564px;
+      }
+      .card-image {
+        position: absolute;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+      /* darkens the off-topic panel — fading .card itself would blend it into
+         the backdrop and wash it out instead */
+      .card-veil {
+        position: absolute;
+        inset: 0;
+        background: #0a0a12;
+        opacity: 0;
+        will-change: opacity;
+      }
+
+      /* ---------- beat labels (under each panel, on the backdrop) ----------
+         The reference clip carries NO sentence subtitles — the voiceover says
+         the sentence, the screen shows a short tag per side.
+         (2026-08-31 v3: columns pulled inside a 72px left/right safe margin and
+         the font stepped down so long Vietnamese tags wrap instead of bleeding
+         off the 1080px frame / being clipped by the social-feed crop.) */
+      #label-zone {
+        position: absolute;
+        top: 244px; /* 2026-09-02 v3: side tags now sit ABOVE the photos. Below
+                       the TikTok top-crop line (~y230), above .card (y360). */
+        left: 0;
+        width: 1080px;
+        height: 106px;
+      }
+      .beat-labels {
+        position: absolute;
+        inset: 0;
+        opacity: 0;
+      }
+      .lb-col {
+        position: absolute;
+        top: 0;
+        width: 444px;
+        text-align: center;
+      }
+      .lb-left {
+        left: 72px;
+      }
+      .lb-right {
+        left: 564px;
+      }
+      .lb-wide {
+        display: flex;
+        align-items: flex-start;
+        justify-content: center;
+        /* 2026-09-02 v3: the wide title (hook / question / CTA on beats 3,4,11,12)
+           is too tall for the 106px side-tag band above the photos — drop it into
+           the gap BELOW the photos (y ~742), where those beats show no running
+           caption anyway. inset:auto cancels .beat-labels' inset:0. */
+        inset: auto;
+        top: 498px;
+        left: 72px;
+        right: 72px;
+      }
+      .lb-wide .lb-col {
+        position: static;
+        width: 936px;
+      }
+      .lb-1,
+      .lb-2 {
+        font-family: "Be Vietnam Pro", sans-serif;
+        font-weight: 900;
+        font-style: italic;
+        text-transform: uppercase;
+        line-height: 1.08;
+        overflow-wrap: break-word;
+        -webkit-text-stroke: 4px var(--dark-stroke);
+        paint-order: stroke fill;
+        text-shadow:
+          3px 3px 0 #000,
+          -3px -3px 0 #000,
+          3px -3px 0 #000,
+          -3px 3px 0 #000;
+      }
+      .lb-1 {
+        font-size: 46px;
+        letter-spacing: -0.01em;
+        color: var(--accent-yellow);
+      }
+      .lb-wide .lb-1 {
+        font-size: 60px;
+      }
+      /* The wide block carries the Gemini title, which the schema only caps at
+         120 chars — without these tiers a long one wraps past the label zone
+         and lands on the host's head. Applied by scaffold-compare-video.mjs. */
+      .lb-wide.lb-tight .lb-1 {
+        font-size: 46px;
+      }
+      .lb-wide.lb-tighter .lb-1 {
+        font-size: 38px;
+        -webkit-text-stroke: 3px var(--dark-stroke);
+      }
+      .lb-wide.lb-tightest .lb-1 {
+        font-size: 32px;
+        -webkit-text-stroke: 3px var(--dark-stroke);
+      }
+      .lb-2 {
+        margin-top: 3px;
+        font-size: 22px;
+        color: #ffffff;
+        -webkit-text-stroke: 3px var(--dark-stroke);
+      }
+      .lb-wide .lb-2 {
+        font-size: 36px;
+      }
+
+      /* channel tag — kept for scripts/sync-channel.mjs, parked in the corner
+         (2026-08-31 v3: nudged inside the 64px safe margin. 2026-09-07: back to
+         dark ink + a white halo — the cream #f2ead8 was for the marble
+         backdrop's dark navy top corner and vanishes on the crumpled-paper
+         backdrop, which reads ~#f5f4f6 up there.) */
+      #eyebrow {
+        position: absolute;
+        top: 44px;
+        left: 64px;
+        font-family: "JetBrains Mono", monospace;
+        font-weight: 700;
+        font-size: 22px;
+        letter-spacing: 0.14em;
+        color: #2f2b26;
+        text-shadow: 0 1px 2px rgba(255, 255, 255, 0.85);
+        opacity: 0;
+        z-index: 6;
+      }
+
+      /* ---------- bottom host zone (Host HuyK) ----------
+         The 2026-08 pose set is a 1:1 (square) 300x300 SVG canvas, each a
+         waist-up photo cropped so the body reaches the frame bottom. All poses
+         render at ONE shared size/position (see HOST_BASE in the script) so the
+         body doesn't pulse between beats in motion — full rationale there. */
+      #avatar-host {
+        position: absolute;
+        top: 866px;
+        left: 0;
+        width: 1080px;
+        height: 1054px;
+        opacity: 0;
+        overflow: hidden;
+        transform-origin: 50% 100%;
+      }
+      #host-fx {
+        position: absolute;
+        inset: 0;
+        transform-origin: 50% 12%;
+        /* 2026-09-01: was `will-change: transform, opacity`. The composited
+           layer that promoted was getting dropped + re-rasterised by the
+           headless compositor during long static pose holds, popping one
+           frame of the host at a slightly-wrong raster (~18.70s / ~28.07s in
+           the 2026-08-31 render, both "point" poses — widest silhouettes so
+           the blip cleared the frame-diff threshold). Keep only opacity
+           promoted; nothing animates this element's transform any more. */
+        will-change: opacity;
+      }
+      .host-avatar-img {
+        position: absolute;
+        /* 2026-09-04 "chạm viền dưới": ảnh host = đúng bề ngang khung (1080), đáy
+           ảnh trùng mép dưới khung (top -26 = 1054 container - 1080). Pose PNG đã
+           căn người sát đáy → chân đế bóng người nằm đúng y1920, host chiếm trọn
+           dải dưới, không còn hở sàn. #avatar-host{overflow:hidden} cắt 26px tràn
+           lên trên. GSAP vẫn drive x/y/scale (transform-origin 50% 0). */
+        top: -26px;
+        left: 50%;
+        width: 1080px;
+        height: 1080px;       /* MUST stay square — the pose assets are 1:1 */
+        margin-left: -540px;  /* centre */
+        transform-origin: 50% 0;
+      }
+
+      /* ---------- running captions (TikTok/CapCut style) ----------
+         2026-09-02 v3: side tags moved ABOVE the photos, so the gap BELOW the
+         photos (photos end ~y732, host head ~y880) is now free for the caption.
+         Single-line phrases (<=4 words). The word being spoken turns
+         --cap-active and scales up. Per-word timing = assets/vo/words.json
+         (Edge TTS boundaries). Plain GSAP-driven divs like #lb-*, no
+         class="clip". Shares the y-band with .lb-wide, but those beats (3/4/11/12)
+         show no running caption. */
+      #caption-zone {
+        position: absolute;
+        top: 744px;
+        left: 40px;
+        width: 1000px;
+        height: 96px;
+        z-index: 8;
+      }
+      .cap-line {
+        position: absolute;
+        inset: 0;
+        opacity: 0; /* plain opacity (not autoAlpha) — parent opacity:0 hides the
+                       whole subtree regardless of a child phrase's visibility */
+      }
+      .cap-phrase {
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        transform: translateY(-50%);
+        text-align: center;
+        white-space: nowrap; /* phrases are chunked <=4 words so they always fit one line */
+        opacity: 0;
+        visibility: hidden;
+      }
+      .cap-wd {
+        display: inline-block;
+        font-family: "Be Vietnam Pro", sans-serif;
+        font-weight: 900;
+        font-size: 44px;
+        line-height: 1.1;
+        color: var(--cap-idle);
+        -webkit-text-stroke: 5px var(--dark-stroke);
+        paint-order: stroke fill;
+        text-shadow:
+          3px 3px 0 #000,
+          -2px -2px 0 #000,
+          2px -2px 0 #000,
+          -2px 2px 0 #000;
+        transform-origin: 50% 65%;
+        /* Breathing room so the scaled-up active word (scale:1.13, see the karaoke
+           tl.set below) doesn't crowd its neighbours. 6px used to be the value here,
+           but -webkit-text-stroke (5px, painted outside the glyph outline) already eats
+           most of that at rest, so ANY word touched its neighbour once scaled — not
+           just long ones (confirmed: "Kim" against "cương", "Moissanite" against "đá"/
+           "cực"). 16px leaves enough margin for the stroke + the ~13% scale bleed. */
+        margin: 0 16px;
+      }
+    </style>
+  </head>
+  <body>
+    <div data-hf-id="hf-acv0" id="root" data-composition-id="main" data-start="0" data-width="1080" data-height="1920" data-duration="48.6">
+      <section data-hf-id="hf-acv1" id="scene" class="clip" data-start="0" data-duration="48.6" data-track-index="1">
+
+        <!-- top: full-bleed comparison panels -->
+        <div data-hf-id="hf-acv4" id="card-left" class="card" data-layout-allow-overflow="true">
+          <img data-hf-id="hf-acv6" class="card-image" src="assets/images/card-left.jpg" alt="Kim cương" />
+          <div data-hf-id="hf-acv5" class="card-veil"></div>
+        </div>
+        <div data-hf-id="hf-acv8" id="card-right" class="card" data-layout-allow-overflow="true">
+          <img data-hf-id="hf-acva" class="card-image" src="assets/images/card-right.jpg" alt="Moissanite" />
+          <div data-hf-id="hf-acv9" class="card-veil"></div>
+        </div>
+
+        <div data-hf-id="hf-acve" id="eyebrow">HuyK</div>
+
+        <!-- FIXED comparison titles above each photo (Mousse/Panna-Cotta style).
+             2026-09-03: one static pair for the whole video — the video's subject
+             is "Vàng vàng vs Vàng trắng" from the start; the per-beat detail is
+             carried by the running caption below, so these never change. -->
+        <div data-hf-id="hf-acvf" id="label-zone">
+          <div class="beat-labels" id="lb-fixed">
+            <div class="lb-col lb-left"><div class="lb-1">Kim cương</div></div>
+            <div class="lb-col lb-right"><div class="lb-1">Moissanite</div></div>
+          </div>
+        </div>
+
+        <!-- bottom: photo host HuyK -->
+        <div data-hf-id="hf-acvg" id="avatar-host">
+          <div data-hf-id="hf-acvz" id="host-fx" data-layout-allow-overflow="true">
+            <img data-hf-id="hf-acvh" id="host-img" class="host-avatar-img" src="assets/actions/point-up-left.svg" alt="Host" />
+          </div>
+        </div>
+
+        <!-- running captions: word-by-word karaoke, built at load from CAPTIONS -->
+        <div data-hf-id="hf-acvc" id="caption-zone" data-layout-allow-overflow="true"></div>
+      </section>
+
+      <!-- narration: audio clips -->
+      <audio id="vo-1" src="assets/vo/line-1.mp3" data-start="0.55" data-duration="1.2" data-track-index="20"></audio>
+      <audio id="vo-2" src="assets/vo/line-2.mp3" data-start="1.89" data-duration="1.12" data-track-index="20"></audio>
+      <audio id="vo-3" src="assets/vo/line-3.mp3" data-start="3.15" data-duration="3.36" data-track-index="20"></audio>
+      <audio id="vo-4" src="assets/vo/line-4.mp3" data-start="6.65" data-duration="5.12" data-track-index="20"></audio>
+      <audio id="vo-5" src="assets/vo/line-5.mp3" data-start="11.91" data-duration="5.44" data-track-index="20"></audio>
+      <audio id="vo-6" src="assets/vo/line-6.mp3" data-start="17.49" data-duration="5.2" data-track-index="20"></audio>
+      <audio id="vo-7" src="assets/vo/line-7.mp3" data-start="22.83" data-duration="6.16" data-track-index="20"></audio>
+      <audio id="vo-8" src="assets/vo/line-8.mp3" data-start="29.13" data-duration="4.56" data-track-index="20"></audio>
+      <audio id="vo-9" src="assets/vo/line-9.mp3" data-start="33.83" data-duration="5.44" data-track-index="20"></audio>
+      <audio id="vo-10" src="assets/vo/line-10.mp3" data-start="39.41" data-duration="4.72" data-track-index="20"></audio>
+      <audio id="vo-11" src="assets/vo/line-11.mp3" data-start="44.27" data-duration="3.12" data-track-index="20"></audio>
+    </div>
+
+    <script>
+      window.__timelines = window.__timelines || {};
+      const tl = gsap.timeline({ paused: true });
+
+      // ---------- entrance ----------
+      tl.fromTo("#card-left", { opacity: 0 }, { opacity: 1, duration: 0.45, ease: "power2.out" }, 0.0);
+      tl.fromTo("#card-right", { opacity: 0 }, { opacity: 1, duration: 0.45, ease: "power2.out" }, 0.15);
+      tl.fromTo("#avatar-host", { scale: 0.94, opacity: 0 }, { scale: 1, opacity: 1, duration: 0.5, ease: "power3.out" }, 0.1);
+      tl.fromTo("#eyebrow", { y: 8, opacity: 0 }, { y: 0, opacity: 0.55, duration: 0.4, ease: "power3.out" }, 0.15);
+
+      // Fixed comparison titles above the photos — fade in once with the cards,
+      // hold for the whole video (they never change; per-beat detail is the caption).
+      tl.fromTo("#lb-fixed", { y: 14, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, 0.28);
+
+      // ---------- running captions (word-by-word karaoke) ----------
+      // [word, start-sec] per line, from assets/vo/words.json (Edge TTS word
+      // boundaries), starts relative to each clip's trimmed audio.
+      // Injected by scaffold-compare-video.mjs from assets/vo/words.json.
+      const CAPTIONS = {
+        1: [["Đây",0],["là",0.3],["Kim",0.6],["cương.",0.9]],
+        2: [["Đây",0],["là",0.373],["Moissanite.",0.746]],
+        3: [["Nhìn",0],["lướt",0.24],["qua",0.48],["giống",0.72],["hệt",0.96],["nhau,",1.2],["nhưng",1.44],["đây",1.68],["là",1.92],["hai",2.16],["loại",2.4],["đá",2.64],["khác",2.88],["biệt!",3.12]],
+        4: [["Kim",0],["cương",0.256],["tự",0.512],["nhiên",0.768],["được",1.024],["cấu",1.28],["tạo",1.536],["hoàn",1.792],["toàn",2.048],["từ",2.304],["carbon,",2.56],["hình",2.816],["thành",3.072],["sâu",3.328],["trong",3.584],["lòng",3.84],["đất",4.096],["hàng",4.352],["tỷ",4.608],["năm.",4.864]],
+        5: [["Còn",0],["Moissanite",0.286],["thực",0.572],["chất",0.858],["là",1.144],["khoáng",1.43],["vật",1.716],["Silicon",2.002],["Carbide,",2.288],["hầu",2.574],["hết",2.86],["hiện",3.146],["nay",3.432],["đều",3.718],["được",4.004],["tổng",4.29],["hợp",4.576],["nhân",4.862],["tạo.",5.148]],
+        6: [["Kim",0],["cương",0.236],["giữ",0.472],["ngôi",0.708],["vương",0.944],["về",1.18],["độ",1.416],["cứng",1.652],["với",1.888],["điểm",2.124],["10",2.36],["tuyệt",2.596],["đối",2.832],["trên",3.068],["thang",3.304],["đo",3.54],["Mohs,",3.776],["không",4.012],["thể",4.248],["bị",4.484],["trầy",4.72],["xước.",4.956]],
+        7: [["Moissanite",0],["bám",0.324],["sát",0.648],["nút",0.972],["với",1.296],["độ",1.62],["cứng",1.944],["9.25,",2.268],["cực",2.592],["kỳ",2.916],["bền",3.24],["bỉ",3.564],["và",3.888],["chỉ",4.212],["chịu",4.536],["thua",4.86],["mỗi",5.184],["kim",5.508],["cương.",5.832]],
+        8: [["Kim",0],["cương",0.24],["phản",0.48],["xạ",0.72],["ánh",0.96],["sáng",1.2],["trắng",1.44],["thanh",1.68],["lịch,",1.92],["lấp",2.16],["lánh",2.4],["tự",2.64],["nhiên",2.88],["và",3.12],["không",3.36],["bị",3.6],["quá",3.84],["chói",4.08],["mắt.",4.32]],
+        9: [["Trong",0],["khi",0.259],["đó,",0.518],["Moissanite",0.777],["có",1.036],["độ",1.295],["khúc",1.554],["xạ",1.813],["kép,",2.072],["tạo",2.331],["ra",2.59],["hiệu",2.849],["ứng",3.108],["lấp",3.367],["lánh",3.626],["cầu",3.885],["vồng",4.144],["cực",4.403],["mạnh",4.662],["dưới",4.921],["nắng.",5.18]],
+        10: [["Về",0],["giá",0.248],["cả,",0.496],["Moissanite",0.744],["chỉ",0.992],["bằng",1.24],["khoảng",1.488],["một",1.736],["phần",1.984],["mười",2.232],["so",2.48],["với",2.728],["kim",2.976],["cương",3.224],["tự",3.472],["nhiên",3.72],["cùng",3.968],["kích",4.216],["thước.",4.464]],
+        11: [["Kim",0],["cương",0.284],["hay",0.568],["Moissanite",0.852],["giờ",1.136],["thì",1.42],["bạn",1.704],["đã",1.988],["rõ",2.272],["rồi",2.556],["đấy!",2.84]],
+      };
+
+      // Group a line's words into single-line on-screen phrases: <=4 words and
+      // <=20 chars (fits the narrow gap band without wrapping), and prefer to
+      // break right after a word that ends a clause (, : . ! ?).
+      function chunkPhrases(words) {
+        const isClause = (s) => /[,.:;!?]$/.test(s);
+        const out = [];
+        let cur = [];
+        let chars = 0;
+        for (let i = 0; i < words.length; i++) {
+          cur.push(words[i]);
+          chars += words[i][0].length + 1;
+          const clause = isClause(words[i][0]);
+          const nextClause = i + 1 < words.length && isClause(words[i + 1][0]);
+          // break after a clause-ender (>=2 words); else at 4 words / ~22 chars —
+          // but if the NEXT word ends a clause, take it too (up to 5) so a short
+          // tail like "biệt:" / "hơn." isn't orphaned onto its own line.
+          if (
+            (clause && cur.length >= 2) ||
+            chars >= 22 ||
+            cur.length >= 5 ||
+            (cur.length >= 4 && !nextClause)
+          ) {
+            out.push(cur);
+            cur = [];
+            chars = 0;
+          }
+        }
+        if (cur.length) out.push(cur);
+        return out;
+      }
+
+      // Build the caption DOM once at load (deterministic — no fetch/date/random).
+      const capZone = document.getElementById("caption-zone");
+      const capRefs = {};
+      for (const n of Object.keys(CAPTIONS)) {
+        const lineEl = document.createElement("div");
+        lineEl.className = "cap-line";
+        lineEl.id = "cap-" + n;
+        const phrases = chunkPhrases(CAPTIONS[n]).map((pw) => {
+          const pEl = document.createElement("div");
+          pEl.className = "cap-phrase";
+          const wds = pw.map((w) => {
+            const s = document.createElement("span");
+            s.className = "cap-wd";
+            s.textContent = w[0];
+            pEl.appendChild(s);
+            pEl.appendChild(document.createTextNode(" "));
+            return { el: s, at: w[1] };
+          });
+          lineEl.appendChild(pEl);
+          return { el: pEl, wds };
+        });
+        capZone.appendChild(lineEl);
+        capRefs[n] = { lineEl, phrases };
+      }
+
+      function showCaption(n) {
+        const { lineEl, phrases } = capRefs[n];
+        const base = VO[n].start;
+        const words = CAPTIONS[n];
+        const firstAbs = base + words[0][1];
+        const nextLineStart = VO[n + 1] ? VO[n + 1].start : base + VO[n].dur + 0.6;
+        const lineEnd = Math.min(base + words[words.length - 1][1] + 0.75, nextLineStart - 0.05);
+
+        tl.set(lineEl, { opacity: 1 }, firstAbs - 0.1);
+        tl.to(lineEl, { opacity: 0, duration: 0.18, ease: "power2.in" }, lineEnd);
+
+        phrases.forEach((ph, pi) => {
+          const phStart = base + ph.wds[0].at;
+          const phEnd = phrases[pi + 1] ? base + phrases[pi + 1].wds[0].at : lineEnd + 0.18;
+          // CapCut-style hard swap: one phrase on screen at a time, no crossfade
+          // (the word highlight carries the motion). A small pop-in on the group.
+          tl.set(ph.el, { visibility: "visible", opacity: 1 }, phStart - 0.04);
+          tl.fromTo(ph.el, { y: 12 }, { y: 0, duration: 0.16, ease: "power3.out" }, phStart - 0.04);
+          tl.set(ph.el, { visibility: "hidden", opacity: 0 }, phEnd - 0.03);
+          ph.wds.forEach((wd, wi) => {
+            const on = base + wd.at;
+            const off = ph.wds[wi + 1] ? base + ph.wds[wi + 1].at : phEnd - 0.03;
+            tl.set(wd.el, { color: "var(--cap-active)", scale: 1.13 }, on);
+            tl.set(wd.el, { color: "var(--cap-idle)", scale: 1 }, off);
+          });
+        });
+      }
+
+      // ---------- avatar pose helper ----------
+      // 2026-08-31 v5 — SHARED FIXED PLACEMENT (motion-stable). v4 scaled each
+      // pose to normalise head size (0.85–1.22); that locked the head but made
+      // the whole BODY visibly grow/shrink on every pose change — a "zoom pulse"
+      // that reads as jarring when the video plays. v5 gives EVERY pose the same
+      // size and position (HOST_BASE), so the body silhouette holds still
+      // between beats. All 24 source photos are bottom-aligned (silhouette
+      // reaches the frame bottom), so one shared y keeps every waist planted;
+      // the trade is that heads land ~50–75px apart in height and ~15% apart in
+      // size, following each photo's own framing. POSE_ADJUST holds x/y nudges
+      // ONLY (never scale) for the handful of poses whose body sits far
+      // off-centre or whose reach would clip — keep it as short as possible.
+      // Measured head box + body CoM per pose: assets/actions/actions.json "frame".
+      const HOST_BASE = { x: 20, y: 0, scale: 1.0 };
+      // 2026-09-01: empty — beats 7/8 switched off point-left-far/point-right-far
+      // (removed poses) to point-up-left/point-up-right, which sit fine at HOST_BASE.
+      const POSE_ADJUST = {};
+
+      function poseFor(name) {
+        const e = POSE_ADJUST[name] || {};
+        return {
+          // Poses are raster-in-SVG (assets/actions/*.svg — see actions.json).
+          // The SVG <mask>+feColorMatrix path can be re-rasterised
+          // nondeterministically by a multi-worker headless compositor during
+          // long static holds → a multi-frame host "pop"; render with
+          // `--workers=1` (baked into this video's `npm run render`).
+          attr: { src: "assets/actions/" + name + ".svg" },
+          x: e.x ?? HOST_BASE.x,
+          y: e.y ?? HOST_BASE.y,
+          scale: HOST_BASE.scale, // shared across every pose — never set per-pose
+          transformOrigin: "50% 0",
+        };
+      }
+
+      function changePose(name, at) {
+        // 2026-09-01: dropped the `scale: 0.985 -> 1` bounce on #host-fx (kept
+        // only the opacity dip). Animating a transform on this element forced
+        // a composited layer whose raster the headless compositor would drop
+        // and rebuild mid-hold, popping one bad frame of the host. Opacity-only
+        // keeps the beat-change cross-dissolve without a transform layer.
+        tl.to("#host-fx", { opacity: 0.25, duration: 0.15, ease: "power2.in" }, at);
+        tl.set("#host-img", poseFor(name), at + 0.15);
+        tl.to("#host-fx", { opacity: 1, duration: 0.25, ease: "power2.out" }, at + 0.15);
+      }
+
+      // Swap the photo in one panel. The reference clip changes its B-roll on
+      // every beat; drop more files into assets/images/ and call this per beat.
+      function setCardImage(side, file, at) {
+        const sel = "#card-" + side + " .card-image";
+        tl.to(sel, { opacity: 0, duration: 0.16, ease: "power2.in" }, at);
+        tl.set(sel, { attr: { src: "assets/images/" + file } }, at + 0.16);
+        tl.to(sel, { opacity: 1, duration: 0.24, ease: "power2.out" }, at + 0.16);
+      }
+      void setCardImage;
+
+      // Panel focus — darken the side the host is not talking about.
+      function focus(side, at) {
+        const veil = (s) => "#card-" + s + " .card-veil";
+        const lit = side === "both" ? ["left", "right"] : [side];
+        const dim = side === "both" ? [] : [side === "left" ? "right" : "left"];
+        lit.forEach((s) => tl.to(veil(s), { opacity: 0, duration: 0.35, ease: "power2.out" }, at));
+        dim.forEach((s) => tl.to(veil(s), { opacity: 0.55, duration: 0.35, ease: "power2.out" }, at));
+      }
+
+      // Retimed after trimming ~0.2s lead + ~0.8s trailing silence off every
+      // line-*.mp3 (TTS padding) and a flat timeline gap — see generate-vo.mjs.
+      // Values mirror assets/vo/durations.json; injected by scaffold-compare-video.mjs.
+      const VO = {
+        1: { start: 0.55, dur: 1.2 },
+        2: { start: 1.89, dur: 1.12 },
+        3: { start: 3.15, dur: 3.36 },
+        4: { start: 6.65, dur: 5.12 },
+        5: { start: 11.91, dur: 5.44 },
+        6: { start: 17.49, dur: 5.2 },
+        7: { start: 22.83, dur: 6.16 },
+        8: { start: 29.13, dur: 4.56 },
+        9: { start: 33.83, dur: 5.44 },
+        10: { start: 39.41, dur: 4.72 },
+        11: { start: 44.27, dur: 3.12 },
+      };
+
+      // Pose set: khung vuông cố định, không transform per-pose — xem
+      // .host-avatar-img + const POSE_ADJUST trong index.html.
+      tl.set("#host-img", poseFor("point-up-left"), 0);
+
+      // ---------- BEAT: HOOK ----------
+      changePose("point-up-left", VO[1].start);
+      focus("left", VO[1].start);
+
+      changePose("point-up-right", VO[2].start);
+      focus("right", VO[2].start);
+
+
+      // ---------- BEAT: QUESTION ----------
+      changePose("thinking", VO[3].start);
+      focus("both", VO[3].start);
+
+
+      // ---------- BEAT: BODY (7 điểm so sánh, từ Gemini) ----------
+      changePose("explain-a", VO[4].start);
+      focus("left", VO[4].start);
+      setCardImage("left", "context-4.png", VO[4].start);
+      setCardImage("left", "card-left.jpg", VO[5].start);
+
+      changePose("explain-b", VO[5].start);
+      focus("right", VO[5].start);
+
+      changePose("point-up-left", VO[6].start);
+      focus("left", VO[6].start);
+
+      changePose("point-up-right", VO[7].start);
+      focus("right", VO[7].start);
+
+      changePose("explain-a", VO[8].start);
+      focus("left", VO[8].start);
+
+      changePose("shocked-a", VO[9].start);
+      focus("right", VO[9].start);
+
+      changePose("shrug-a", VO[10].start);
+      focus("both", VO[10].start);
+
+
+      // ---------- BEAT: PAYOFF ----------
+      changePose("thumbs-up-a", VO[11].start);
+      tl.fromTo("#avatar-host", { scale: 1 }, { scale: 1.03, duration: 0.3, ease: "power2.out", yoyo: true, repeat: 1 }, VO[11].start);
+
+      // ---------- running captions ----------
+      // Fixed titles above the photos never change, so every spoken line gets
+      // its own running caption in the gap between the photos and the host.
+      for (const n of Object.keys(CAPTIONS).map(Number)) showCaption(n);
+
+      const ROOT_DURATION = 48.6;
+      window.__timelines["main"] = tl;
+    </script>
+
+    <!-- Standalone player, for opening this file straight in a browser.
+         Hidden unless the URL carries ?preview — the renderer loads the bare
+         file, so this never gets baked into the MP4. -->
+    <style>
+      #hf-standalone-player {
+        display: none;
+        position: fixed;
+        bottom: 30px;
+        left: 50%;
+        transform: translateX(-50%);
+        z-index: 99999;
+        align-items: center;
+        gap: 16px;
+        background: rgba(23, 18, 44, 0.95);
+        border: 1px solid #2b2350;
+        padding: 12px 24px;
+        border-radius: 40px;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+        color: #f3f1ff;
+        font-family: system-ui, -apple-system, sans-serif;
+      }
+      #hf-standalone-player.hf-preview-on {
+        display: flex;
+      }
+      #hf-play-btn {
+        background: #37e6c4;
+        color: #0d0a1a;
+        border: none;
+        padding: 10px 22px;
+        border-radius: 20px;
+        font-weight: 900;
+        cursor: pointer;
+        font-size: 14px;
+        box-shadow: 0 4px 15px rgba(55, 230, 196, 0.4);
+      }
+      #hf-standalone-player input[type="range"] {
+        width: 280px;
+        accent-color: #37e6c4;
+        cursor: pointer;
+      }
+      #hf-standalone-player span {
+        font-size: 13px;
+        font-family: monospace;
+        font-weight: bold;
+        color: #37e6c4;
+      }
+    </style>
+    <div id="hf-standalone-player">
+      <button id="hf-play-btn">▶ PLAY VIDEO</button>
+      <input type="range" id="hf-scrubber" min="0" max="48.6" step="0.05" value="0">
+      <span id="hf-time-display">0.0s / 48.6s</span>
+    </div>
+
+    <script>
+      (function () {
+        const player = document.getElementById("hf-standalone-player");
+                // Hide the bar under browser automation only: the renderer and
+        // `hyperframes snapshot` both report navigator.webdriver === true (verified),
+        // so it never lands in an MP4, while a real browser tab still gets controls.
+        // ?preview forces it on if you ever need it in a headless context.
+        if (navigator.webdriver && !/(^|[?&])preview(=|&|$)/.test(location.search)) return;
+        player.classList.add("hf-preview-on");
+
+        const btn = document.getElementById("hf-play-btn");
+        const scrubber = document.getElementById("hf-scrubber");
+        const timeDisplay = document.getElementById("hf-time-display");
+        const audios = Array.from(document.querySelectorAll("audio"));
+        const ROOT_DURATION = 48.6;
+
+        let isPlaying = false;
+
+        function updateUI() {
+          const t = tl.time();
+          scrubber.value = t;
+          timeDisplay.textContent = t.toFixed(1) + "s / " + ROOT_DURATION.toFixed(1) + "s";
+        }
+
+        function syncAudio() {
+          const currentTime = tl.time();
+          audios.forEach((audio) => {
+            const start = parseFloat(audio.getAttribute("data-start"));
+            const dur = parseFloat(audio.getAttribute("data-duration"));
+            const end = start + dur;
+
+            if (isPlaying && currentTime >= start && currentTime <= end) {
+              if (audio.paused) {
+                audio.currentTime = currentTime - start;
+                audio.play().catch(() => {});
+              }
+            } else if (!audio.paused) {
+              audio.pause();
+            }
+          });
+        }
+
+        tl.eventCallback("onUpdate", () => {
+          updateUI();
+          syncAudio();
+        });
+
+        tl.eventCallback("onComplete", () => {
+          isPlaying = false;
+          btn.textContent = "▶ REPLAY";
+          audios.forEach((a) => a.pause());
+        });
+
+        btn.addEventListener("click", () => {
+          if (isPlaying) {
+            tl.pause();
+            isPlaying = false;
+            btn.textContent = "▶ PLAY VIDEO";
+            audios.forEach((a) => a.pause());
+          } else {
+            if (tl.time() >= ROOT_DURATION - 0.2) tl.restart();
+            else tl.play();
+            isPlaying = true;
+            btn.textContent = "⏸ PAUSE";
+          }
+        });
+
+        scrubber.addEventListener("input", (e) => {
+          tl.time(parseFloat(e.target.value));
+          updateUI();
+          syncAudio();
+        });
+      })();
+    </script>
+  </body>
+</html>

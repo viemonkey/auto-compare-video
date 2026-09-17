@@ -328,7 +328,13 @@
           2px -2px 0 #000,
           -2px 2px 0 #000;
         transform-origin: 50% 65%;
-        margin: 0 6px; /* breathing room so the scaled-up active word doesn't crowd its neighbours */
+        /* Breathing room so the scaled-up active word (scale:1.13, see the karaoke
+           tl.set below) doesn't crowd its neighbours. 6px used to be the value here,
+           but -webkit-text-stroke (5px, painted outside the glyph outline) already eats
+           most of that at rest, so ANY word touched its neighbour once scaled — not
+           just long ones (confirmed: "Kim" against "cương", "Moissanite" against "đá"/
+           "cực"). 16px leaves enough margin for the stroke + the ~13% scale bleed. */
+        margin: 0 16px;
       }
     </style>
   </head>

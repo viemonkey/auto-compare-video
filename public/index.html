@@ -104,6 +104,20 @@
           <input type="text" id="topic-hint" class="input-text" placeholder="Ví dụ: Đồ trang sức kim hoàn, hoặc Công nghệ lập trình..." />
         </div>
 
+        <!-- Content Angle Selector -->
+        <div class="form-group" style="margin-bottom: 16px;">
+          <label for="content-angle">🎯 Chọn góc độ nội dung (để tạo nhiều video khác góc độ từ cùng 1 cặp ảnh):</label>
+          <select id="content-angle" class="input-text" style="font-weight: 700; background-color: var(--panel);">
+            <!-- Loaded dynamically from /api/content-angles, wrapped with "auto" + "custom" -->
+          </select>
+        </div>
+
+        <!-- Custom Content Angle Description (shown only when "Khác" is selected) -->
+        <div id="content-angle-custom-container" class="topic-hint-group hidden">
+          <label for="content-angle-custom-text">✏️ Mô tả góc độ nội dung riêng của bạn:</label>
+          <textarea id="content-angle-custom-text" class="input-text" rows="3" placeholder="Ví dụ: So sánh theo giá trị đầu tư lâu dài, hoặc theo cảm nhận khi đeo trên tay..."></textarea>
+        </div>
+
         <!-- Video Theme Selector -->
         <div class="form-group" style="margin-bottom: 16px;">
           <label for="video-theme">🎨 Giao diện & Phong cách Video (TikTok Match):</label>

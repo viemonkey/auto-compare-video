@@ -1,0 +1,227 @@
+{
+  "$schema_version": 1,
+  "character": "huyk",
+  "generated_at": "2026-08-29",
+  "source_note": "Ảnh chụp thật của host 'HuyK' (tạp dề nâu thêu tên), nền đã tách trong suốt. KHÔNG phải vector SVG — mỗi file là 1 ảnh PNG raster nhúng base64 bên trong khung SVG (kỹ thuật export phổ biến của công cụ tách nền/AI dùng <mask>+feColorMatrix). Đuôi .svg giữ nguyên vì trình duyệt/HyperFrames render được thẳng, nhưng không có path/stroke vector nào để đổi màu qua CSS.",
+  "asset_format": {
+    "type": "raster-in-svg (PNG wrapped in <svg><mask>...<image xlink:href=\"data:image/png;base64,...\">)",
+    "viewBox": "0 0 768 1151.999944",
+    "declared_width_height": "1024x1536",
+    "aspect_ratio": "2:3 (~0.667 width/height)",
+    "avatar_host_frame": "#avatar-host hiện tại là 420x520 (~0.808 width/height) — khung RỘNG hơn/THẤP hơn tỉ lệ ảnh gốc",
+    "fit_recommendation": "object-fit: contain (không phải cover) để không cắt mất đầu/chân — ảnh sẽ có khoảng trống 2 bên trong khung 420x520. Đã kiểm tra: chạy được (không lỗi), chưa chuẩn pixel theo yêu cầu bước 3 của người dùng — cần chỉnh crop/scale khi 'chuẩn hoá' ở lần sau.",
+    "file_size_range": "~46KB – 108KB / file (base64 PNG, nặng hơn nhiều so với SVG vector thật)"
+  },
+  "notes": [
+    "26/26 file đã đổi tên theo action nhận diện qua tư thế trong ảnh — xem báo cáo đối chiếu đầy đủ trong chat, không lặp lại ở đây.",
+    "8 file là biến thể gần trùng pose (chụp liên tiếp, lệch góc/crop nhẹ): point-up-a/b, shocked-a/b, thumbs-up-a/b, offer-a/b, explain-a/b, shrug-a/b — giữ cả 2 theo yêu cầu, đánh dấu bằng field 'variant_of'. Người dựng video tự chọn bản đẹp hơn khi cần.",
+    "3 file gắn prop kim hoàn thật sự (inspect-gem, present-ring, show-item — có cầm kính lúp/hộp nhẫn/viên đá trong ảnh) được gắn 'prop: jewelry' và use_case giới hạn — theo xác nhận của người dùng, các pose này sẽ dùng thật cho video chủ đề trang sức/đá quý/kim cương, KHÔNG phải placeholder bỏ đi. present-clipboard đã kiểm tra lại: KHÔNG cầm vật phẩm trang sức nào (chỉ bảng kẹp giấy trắng) nên KHÔNG gắn prop:jewelry — dùng chung được cho mọi topic.",
+    "Không có action 'nod' (gật đầu) hay 'happy' (cười tươi đơn giản, không kèm cử chỉ tay) riêng biệt trong 26 ảnh gốc — 'thumbs-up-a/b' là ảnh gần nhất với 'happy'. Cần bổ sung ảnh riêng nếu muốn có 'nod' đúng nghĩa.",
+    "Đây là bộ test-run theo đúng yêu cầu — CHƯA chuẩn hoá màu sắc/crop/kích thước, chỉ đủ để chạy thử luồng."
+  ],
+  "actions": [
+    {
+      "id": "wow",
+      "file": "wow.svg",
+      "emotion": "surprised",
+      "tags": ["wow", "ngạc nhiên", "sốc nhẹ", "giơ hai tay lên mặt", "miệng há"],
+      "use_case": "Beat hook/payoff khi muốn nhấn mạnh điều bất ngờ, gây chú ý ngay đầu hoặc cuối video."
+    },
+    {
+      "id": "thinking",
+      "file": "thinking.svg",
+      "emotion": "thinking",
+      "tags": ["suy nghĩ", "gãi đầu", "phân vân", "đắn đo", "thinking"],
+      "use_case": "Beat 'nút thắt' khi đặt câu hỏi mở đầu kiểu 'Sự khác nhau là gì?'."
+    },
+    {
+      "id": "point-right-near",
+      "file": "point-right-near.svg",
+      "emotion": "neutral",
+      "tags": ["chỉ tay phải", "point-right", "tay gập gần thân"],
+      "use_case": "Nhắc đến/giải thích đối tượng bên phải (card-right); tay gập gần thân, hợp khung hẹp."
+    },
+    {
+      "id": "point-right-far",
+      "file": "point-right-far.svg",
+      "emotion": "neutral",
+      "tags": ["chỉ tay phải", "point-right", "tay duỗi thẳng", "xa thân"],
+      "use_case": "Nhắc đến/nhấn mạnh đối tượng bên phải (card-right); tay duỗi thẳng, dứt khoát hơn point-right-near."
+    },
+    {
+      "id": "point-left-far",
+      "file": "point-left-far.svg",
+      "emotion": "neutral",
+      "tags": ["chỉ tay trái", "point-left", "tay duỗi thẳng"],
+      "use_case": "Nhắc đến/giải thích đối tượng bên trái (card-left). Chưa có bản 'gần thân' tương ứng cho phía trái (không có ảnh nguồn)."
+    },
+    {
+      "id": "point-up-a",
+      "file": "point-up-a.svg",
+      "emotion": "serious",
+      "tags": ["chỉ ngón trỏ lên", "point-up", "nhấn mạnh ý", "nghiêm túc"],
+      "use_case": "Liệt kê điểm đầu tiên / nhấn mạnh một luận điểm quan trọng trong beat giải A/giải B.",
+      "variant_of": null,
+      "variants": ["point-up-b"]
+    },
+    {
+      "id": "point-up-b",
+      "file": "point-up-b.svg",
+      "emotion": "serious",
+      "tags": ["chỉ ngón trỏ lên", "point-up", "nhấn mạnh ý", "nghiêm túc"],
+      "use_case": "Giống point-up-a (ảnh chụp liên tiếp, lệch góc nhẹ) — dùng thay thế nếu cần đổi góc máy giữa 2 dòng liền kề.",
+      "variant_of": "point-up-a"
+    },
+    {
+      "id": "walk",
+      "file": "walk.svg",
+      "emotion": "neutral",
+      "tags": ["đi bộ", "walk", "di chuyển", "transition"],
+      "use_case": "Đoạn chuyển cảnh / intro khi mascot 'bước vào khung hình'."
+    },
+    {
+      "id": "inspect-gem",
+      "file": "inspect-gem.svg",
+      "emotion": "curious",
+      "tags": ["kính lúp", "soi đá quý", "kiểm tra", "thẩm định", "jewelry", "kim hoàn"],
+      "use_case": "CHỈ dùng cho video chủ đề trang sức/đá quý/kim cương — beat giải A/giải B khi mô tả cách thẩm định/kiểm tra đá quý.",
+      "prop": "jewelry"
+    },
+    {
+      "id": "present-ring",
+      "file": "present-ring.svg",
+      "emotion": "proud",
+      "tags": ["hộp nhẫn", "trình bày sản phẩm", "present-ring", "jewelry", "kim hoàn"],
+      "use_case": "CHỈ dùng cho video chủ đề trang sức/đá quý/kim cương — beat payoff khi 'chốt' giới thiệu sản phẩm nhẫn/trang sức.",
+      "prop": "jewelry"
+    },
+    {
+      "id": "show-item",
+      "file": "show-item.svg",
+      "emotion": "confident",
+      "tags": ["cầm viên đá", "giơ lên cận cảnh", "show-item", "jewelry", "kim hoàn"],
+      "use_case": "CHỈ dùng cho video chủ đề trang sức/đá quý/kim cương — khi cần cận cảnh vật phẩm minh hoạ.",
+      "prop": "jewelry"
+    },
+    {
+      "id": "present-clipboard",
+      "file": "present-clipboard.svg",
+      "emotion": "informative",
+      "tags": ["clipboard", "bảng kẹp giấy", "trình bày báo cáo", "present-clipboard", "số liệu", "checklist"],
+      "use_case": "Dùng chung cho mọi topic khi cần 'trình bày số liệu/ghi chú/checklist' — ảnh chỉ cầm bảng kẹp giấy trắng, không có vật phẩm trang sức, nên không giới hạn theo chủ đề."
+    },
+    {
+      "id": "idle-confident",
+      "file": "idle-confident.svg",
+      "emotion": "confident",
+      "tags": ["tay chống hông", "tự tin", "idle", "đứng nghỉ"],
+      "use_case": "Đoạn outro/hold, hoặc khi không có beat động tác cụ thể — giữ khung hình tự nhiên."
+    },
+    {
+      "id": "shocked-a",
+      "file": "shocked-a.svg",
+      "emotion": "shocked",
+      "tags": ["che miệng", "sốc", "bất ngờ", "shocked"],
+      "use_case": "Reveal một sự thật gây bất ngờ trong beat giải A/giải B.",
+      "variant_of": null,
+      "variants": ["shocked-b"]
+    },
+    {
+      "id": "shocked-b",
+      "file": "shocked-b.svg",
+      "emotion": "shocked",
+      "tags": ["che miệng", "sốc", "bất ngờ", "shocked"],
+      "use_case": "Giống shocked-a (ảnh chụp liên tiếp, lệch góc nhẹ) — dùng thay thế nếu cần đổi góc máy giữa 2 dòng liền kề.",
+      "variant_of": "shocked-a"
+    },
+    {
+      "id": "thumbs-up-a",
+      "file": "thumbs-up-a.svg",
+      "emotion": "happy",
+      "tags": ["thumbs-up", "đồng ý", "khen ngợi", "tích cực", "happy"],
+      "use_case": "Beat payoff khi xác nhận câu trả lời đúng / khen ngợi. Gần nhất với 'happy' trong bộ ảnh hiện có.",
+      "variant_of": null,
+      "variants": ["thumbs-up-b"]
+    },
+    {
+      "id": "thumbs-up-b",
+      "file": "thumbs-up-b.svg",
+      "emotion": "happy",
+      "tags": ["thumbs-up", "đồng ý", "khen ngợi", "tích cực", "happy"],
+      "use_case": "Giống thumbs-up-a, crop gần hơn (bán thân) — hợp khi cần nhấn mạnh biểu cảm khuôn mặt hơn dáng đứng.",
+      "variant_of": "thumbs-up-a"
+    },
+    {
+      "id": "listening",
+      "file": "listening.svg",
+      "emotion": "curious",
+      "tags": ["tay khum tai", "lắng nghe", "listening", "chưa nghe rõ"],
+      "use_case": "Khi mascot 'hỏi lại' khán giả hoặc mời tương tác/bình luận."
+    },
+    {
+      "id": "shrug-a",
+      "file": "shrug-a.svg",
+      "emotion": "confused",
+      "tags": ["nhún vai", "thắc mắc", "shrug", "không chắc"],
+      "use_case": "Beat 'nút thắt' (Sự khác nhau là gì?) — đúng nhịp câu hỏi theo DESIGN.md.",
+      "variant_of": null,
+      "variants": ["shrug-b"]
+    },
+    {
+      "id": "shrug-b",
+      "file": "shrug-b.svg",
+      "emotion": "confused",
+      "tags": ["nhún vai", "thắc mắc", "shrug", "không chắc"],
+      "use_case": "Giống shrug-a (ảnh chụp liên tiếp, lệch góc nhẹ) — dùng thay thế nếu cần đổi góc máy giữa 2 dòng liền kề.",
+      "variant_of": "shrug-a"
+    },
+    {
+      "id": "offer-a",
+      "file": "offer-a.svg",
+      "emotion": "welcoming",
+      "tags": ["mời tay mở", "offer", "giới thiệu", "chào đón"],
+      "use_case": "Beat hook/intro khi 'giới thiệu' 2 khái niệm sắp so sánh.",
+      "variant_of": null,
+      "variants": ["offer-b"]
+    },
+    {
+      "id": "offer-b",
+      "file": "offer-b.svg",
+      "emotion": "welcoming",
+      "tags": ["mời tay mở", "offer", "giới thiệu", "chào đón"],
+      "use_case": "Giống offer-a (ảnh chụp liên tiếp, góc khác) — dùng thay thế nếu cần đổi góc máy giữa 2 dòng liền kề.",
+      "variant_of": "offer-a"
+    },
+    {
+      "id": "explain-a",
+      "file": "explain-a.svg",
+      "emotion": "explaining",
+      "tags": ["giải thích", "ngón trỏ lên", "đang nói", "explain", "aha"],
+      "use_case": "Beat giải A/giải B khi đưa ra định nghĩa/giải thích khái niệm.",
+      "variant_of": null,
+      "variants": ["explain-b"]
+    },
+    {
+      "id": "explain-b",
+      "file": "explain-b.svg",
+      "emotion": "explaining",
+      "tags": ["giải thích", "ngón trỏ lên", "đang nói", "explain", "aha"],
+      "use_case": "Giống explain-a (ảnh chụp liên tiếp, lệch góc nhẹ) — dùng thay thế nếu cần đổi góc máy giữa 2 dòng liền kề.",
+      "variant_of": "explain-a"
+    },
+    {
+      "id": "wave",
+      "file": "wave.svg",
+      "emotion": "friendly",
+      "tags": ["vẫy tay", "chào", "wave", "hello", "intro"],
+      "use_case": "Đầu video (beat hook) khi mascot 'chào' khán giả."
+    },
+    {
+      "id": "confused",
+      "file": "confused.svg",
+      "emotion": "confused",
+      "tags": ["ôm đầu", "bối rối", "confused", "oops"],
+      "use_case": "Thể hiện sự nhầm lẫn phổ biến trước khi 'giải đáp' — hợp mở đầu beat nút thắt hoặc callback nhầm lẫn thường gặp."
+    }
+  ]
+}

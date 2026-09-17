@@ -23,6 +23,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { CONTENT_ANGLES } from "../config/content-angles.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -67,13 +68,17 @@ if (!GEMINI_API_KEY) {
 // ============================================================
 function parseArgs(argv) {
   const positional = [];
-  const opts = { out: null, topicHint: null };
+  const opts = { out: null, topicHint: null, contentAngleId: null, customAngleText: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--out") {
       opts.out = argv[++i];
     } else if (a === "--topic-hint") {
       opts.topicHint = argv[++i];
+    } else if (a === "--content-angle-id") {
+      opts.contentAngleId = argv[++i];
+    } else if (a === "--custom-angle-text") {
+      opts.customAngleText = argv[++i];
     } else if (!a.startsWith("--")) {
       positional.push(a);
     } else {
@@ -83,7 +88,8 @@ function parseArgs(argv) {
   }
   if (positional.length !== 2) {
     console.error(
-      "Usage: node scripts/generate-compare-content.mjs <left-image> <right-image> [--out <path>] [--topic-hint <text>]",
+      "Usage: node scripts/generate-compare-content.mjs <left-image> <right-image> [--out <path>] " +
+        "[--topic-hint <text>] [--content-angle-id <id>] [--custom-angle-text <text>]",
     );
     process.exit(1);
   }
@@ -91,6 +97,34 @@ function parseArgs(argv) {
   opts.right = positional[1];
   opts.out = opts.out || path.join(process.cwd(), "compare-content.json");
   return opts;
+}
+
+// ============================================================
+// Content angle — góc độ nội dung chọn ở Bước 1, xem config/content-angles.mjs.
+//
+// "auto" (hoặc rỗng/không truyền) -> không thêm gì, giữ nguyên hành vi cũ (Gemini tự chọn).
+// "custom" -> dùng nguyên văn customAngleText người dùng tự gõ (bắt buộc phải có nội dung).
+// id khác -> tra CONTENT_ANGLES, dùng promptInstruction tương ứng.
+// ============================================================
+function resolveAngleInstruction(contentAngleId, customAngleText) {
+  const id = (contentAngleId || "auto").trim();
+  if (!id || id === "auto") return null;
+
+  if (id === "custom") {
+    const text = (customAngleText || "").trim();
+    if (!text) {
+      throw new Error('contentAngleId="custom" nhưng customAngleText rỗng — cần mô tả góc độ tự chọn.');
+    }
+    return text;
+  }
+
+  const angle = CONTENT_ANGLES.find((a) => a.id === id);
+  if (!angle) {
+    throw new Error(
+      `contentAngleId "${id}" không khớp id nào trong config/content-angles.mjs (auto/custom/${CONTENT_ANGLES.map((a) => a.id).join("/")}).`,
+    );
+  }
+  return angle.promptInstruction;
 }
 
 // ============================================================
@@ -211,7 +245,9 @@ JSON trả về LUÔN LUÔN có đủ 5 field sau — không được bỏ bớt
       "side": "left | right | both",
       "tag": "nhãn NGẮN hiện trên màn hình, 1-3 từ, tối đa 18 ký tự",
       "sub": "dòng phụ dưới nhãn, tối đa 26 ký tự, để chuỗi rỗng \"\" nếu không cần",
-      "suggested_action": "<id>"
+      "suggested_action": "<id>",
+      "needs_context_image": false,
+      "image_concept": ""
     }
   ]
 }
@@ -242,12 +278,24 @@ ${actionLines}
 - Các action có đánh dấu "[CHỈ DÙNG CHO CHỦ ĐỀ TRANG SỨC/ĐÁ QUÝ/KIM CƯƠNG]" ở trên CHỈ được
   gợi ý khi chủ đề thật sự là trang sức/đá quý/kim cương/kim hoàn. Nếu chủ đề không liên
   quan, TUYỆT ĐỐI không dùng các id đó — chọn action trung tính khác phù hợp ngữ cảnh.
+
+- "needs_context_image": true CHỈ khi point nhắc tới một BỐI CẢNH/HIỆN TƯỢNG cụ thể mà một
+  ảnh minh hoạ RIÊNG (khác với ảnh sản phẩm trái/phải đang so sánh) sẽ giúp hiểu rõ hơn — ví
+  dụ point nói "kim cương hình thành từ áp suất cực lớn trong lòng đất" thì minh hoạ được bằng
+  cảnh địa chất/khai thác, không phải bản thân viên kim cương. Nếu point chỉ mô tả đặc điểm
+  của chính vật thể trái/phải (ảnh sản phẩm đã đủ để minh hoạ) thì để false. Hầu hết point nên
+  là false — chỉ đánh true cho 1-2 point có bối cảnh thật sự đáng minh hoạ thêm trong cả video
+  (hệ thống sẽ tự cắt bớt nếu bạn đánh dấu nhiều hơn 2, và tự bỏ với point có "side":"both").
+- "image_concept": khi needs_context_image=true, mô tả NGẮN bằng tiếng Anh (tối đa ~20 từ) cảnh
+  cần vẽ, càng cụ thể/trực quan càng tốt (vd "diamond crystal forming under extreme pressure
+  deep underground, geological cross-section"). Khi needs_context_image=false, để chuỗi rỗng "".
 - Không thêm field nào ngoài schema trên. Không thêm text trước/sau JSON.`;
 }
 
-function buildUserPrompt(topicHint) {
+function buildUserPrompt(topicHint, angleInstruction) {
   const hint = topicHint ? `\n\nGợi ý ngữ cảnh thêm từ người dùng: ${topicHint}` : "";
-  return `Ảnh 1 (bên trái) và ảnh 2 (bên phải) đính kèm là 2 chủ thể cần so sánh cho video.${hint}`;
+  const angle = angleInstruction ? `\n\nGóc độ nội dung yêu cầu cho video này: ${angleInstruction}` : "";
+  return `Ảnh 1 (bên trái) và ảnh 2 (bên phải) đính kèm là 2 chủ thể cần so sánh cho video.${hint}${angle}`;
 }
 
 // ============================================================
@@ -285,7 +333,7 @@ function buildResponseSchema(allIds) {
           type: "object",
           // Every field required, for the same reason the top-level ones are:
           // without `required` the model returns partial objects and stops.
-          required: ["text", "side", "tag", "sub", "suggested_action"],
+          required: ["text", "side", "tag", "sub", "suggested_action", "needs_context_image", "image_concept"],
           properties: {
             text: { type: "string", maxLength: 160 },
             side: { type: "string", enum: ["left", "right", "both"] },
@@ -294,6 +342,11 @@ function buildResponseSchema(allIds) {
             tag: { type: "string", maxLength: 18 },
             sub: { type: "string", maxLength: 26 },
             suggested_action: { type: "string", enum: allIds },
+            // Giai đoạn 1 — ảnh minh hoạ ngữ cảnh (xem enforceContextImageLimits): model tự đề
+            // xuất, code hậu kiểm/cắt bớt sau, không tin tưởng tuyệt đối vào việc model tự giác
+            // giới hạn số lượng — cùng triết lý với enforceJewelryGating ở trên.
+            needs_context_image: { type: "boolean" },
+            image_concept: { type: "string", maxLength: 200 },
           },
         },
       },
@@ -303,7 +356,7 @@ function buildResponseSchema(allIds) {
 
 class NonRetryableError extends Error {}
 
-async function callGeminiOnce({ left, right, topicHint, catalog }) {
+async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalog }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
   const body = {
     systemInstruction: { parts: [{ text: buildSystemPrompt(catalog) }] },
@@ -311,7 +364,7 @@ async function callGeminiOnce({ left, right, topicHint, catalog }) {
       {
         role: "user",
         parts: [
-          { text: buildUserPrompt(topicHint) },
+          { text: buildUserPrompt(topicHint, angleInstruction) },
           { inlineData: { mimeType: left.mimeType, data: left.data } },
           { inlineData: { mimeType: right.mimeType, data: right.data } },
         ],
@@ -431,6 +484,12 @@ function parseAndValidate(rawText, catalog) {
         `points[${i}].suggested_action = "${p.suggested_action}" không khớp id nào trong actions.json.`,
       );
     }
+    if (typeof p.needs_context_image !== "boolean") {
+      throw new Error(`points[${i}].needs_context_image phải là boolean.`);
+    }
+    if (typeof p.image_concept !== "string") {
+      throw new Error(`points[${i}].image_concept phải là string (dùng "" nếu needs_context_image=false).`);
+    }
   }
 
   return parsed;
@@ -457,6 +516,52 @@ function enforceJewelryGating(content, catalog, topicHint) {
       corrections.push({ point: p.text, from: original, to: fallback, reason: "topic không phải trang sức/đá quý" });
     }
   }
+  return { content, corrections };
+}
+
+// Giai đoạn 1 — giới hạn cứng bằng CODE, không tin vào việc model tự giác tuân theo hướng dẫn
+// prompt (giống enforceJewelryGating ở trên): tối đa 2 point/video được sinh ảnh minh hoạ ngữ
+// cảnh (kiểm soát chi phí gọi API ảnh), point "side":"both" luôn bị loại (không rõ swap card
+// bên nào), và 2 point KẾ NHAU cùng bên trái/phải không được cùng lúc minh hoạ (setCardImage
+// swap-vào ở point sau và swap-lại-ảnh-gốc ở point trước có thể rơi trùng thời điểm trên cùng
+// 1 card — xem scaffold-compare-video.mjs § buildTimelineBeatsJs).
+const MAX_CONTEXT_IMAGES = 2;
+
+function enforceContextImageLimits(content) {
+  const corrections = [];
+  let kept = 0;
+  let lastKeptIndex = -1;
+  let lastKeptSide = null;
+
+  content.points.forEach((p, idx) => {
+    if (typeof p.needs_context_image !== "boolean") p.needs_context_image = false;
+    if (typeof p.image_concept !== "string") p.image_concept = "";
+    if (!p.needs_context_image) return;
+
+    if (p.side === "both") {
+      corrections.push({ point: p.text, reason: `side="both" không nhận ảnh minh hoạ ngữ cảnh (không rõ swap card bên nào)` });
+      p.needs_context_image = false;
+      p.image_concept = "";
+      return;
+    }
+    if (kept >= MAX_CONTEXT_IMAGES) {
+      corrections.push({ point: p.text, reason: `vượt giới hạn ${MAX_CONTEXT_IMAGES} ảnh minh hoạ/video — giữ ảnh sản phẩm gốc` });
+      p.needs_context_image = false;
+      p.image_concept = "";
+      return;
+    }
+    if (idx === lastKeptIndex + 1 && p.side === lastKeptSide) {
+      corrections.push({ point: p.text, reason: `liền kề point minh hoạ trước, cùng bên "${p.side}" — bỏ qua tránh xung đột swap ảnh` });
+      p.needs_context_image = false;
+      p.image_concept = "";
+      return;
+    }
+
+    kept++;
+    lastKeptIndex = idx;
+    lastKeptSide = p.side;
+  });
+
   return { content, corrections };
 }
 
@@ -491,17 +596,44 @@ async function generateWithRetry(args) {
 // real error objects instead of parsed stdout). The CLI `main()` below is a thin wrapper
 // around this same function — no behavior duplication between the two entry points.
 // ============================================================
-async function runCompareContent({ left, right, topicHint } = {}) {
+async function runCompareContent({ left, right, topicHint, contentAngleId, customAngleText } = {}) {
   const catalog = loadActionCatalog();
   const leftImg = loadImage(left, "trái");
   const rightImg = loadImage(right, "phải");
+  const angleInstruction = resolveAngleInstruction(contentAngleId, customAngleText);
 
-  const content = await generateWithRetry({ left: leftImg, right: rightImg, topicHint, catalog });
+  const content = await generateWithRetry({ left: leftImg, right: rightImg, topicHint, angleInstruction, catalog });
+
+  // Log chẩn đoán: Gemini tự đánh dấu bao nhiêu point cần ảnh minh hoạ NGAY SAU khi nhận
+  // response, TRƯỚC mọi hậu kiểm (jewelry gate / cap 2 ảnh / liền-kề-cùng-bên) — để phân biệt
+  // "Gemini không đánh dấu point nào" (đúng thiết kế, tuỳ chủ đề — vd chủ đề không có bối cảnh
+  // gì đáng minh hoạ thêm ngoài 2 sản phẩm) với "có lỗi khiến ảnh bị cắt/không sinh" (xem log
+  // enforceContextImageLimits ngay dưới, và log generateContextImages ở scaffold-compare-video.mjs).
+  const rawFlagged = content.points.filter((p) => p.needs_context_image);
+  console.log(
+    `[generate-compare-content] Gemini đánh dấu needs_context_image=true cho ${rawFlagged.length}/${content.points.length} point:`,
+  );
+  if (rawFlagged.length === 0) {
+    console.log("  (không có point nào — Gemini cho rằng chủ đề này không cần ảnh minh hoạ ngữ cảnh riêng)");
+  } else {
+    for (const p of rawFlagged) {
+      console.log(`  - [${p.side}] "${p.text}" -> image_concept: "${p.image_concept}"`);
+    }
+  }
+
   const { corrections } = enforceJewelryGating(content, catalog, topicHint);
+  const { corrections: contextImageCorrections } = enforceContextImageLimits(content);
+
+  const keptFlagged = content.points.filter((p) => p.needs_context_image);
+  console.log(
+    `[generate-compare-content] Sau enforceContextImageLimits: còn lại ${keptFlagged.length} point sẽ được gọi sinh ảnh` +
+      (contextImageCorrections.length ? ` (đã cắt ${contextImageCorrections.length} — xem lý do ở log corrections trên).` : "."),
+  );
 
   return {
     content,
     corrections,
+    contextImageCorrections,
     model: GEMINI_MODEL,
     source_images: {
       left: left.startsWith("data:") ? "<inline base64>" : path.resolve(left),
@@ -520,10 +652,12 @@ async function main() {
   console.log(`Left image:  ${opts.left}`);
   console.log(`Right image: ${opts.right}`);
 
-  const { content, corrections, model, source_images } = await runCompareContent({
+  const { content, corrections, contextImageCorrections, model, source_images } = await runCompareContent({
     left: opts.left,
     right: opts.right,
     topicHint: opts.topicHint,
+    contentAngleId: opts.contentAngleId,
+    customAngleText: opts.customAngleText,
   });
 
   if (corrections.length) {
@@ -532,10 +666,24 @@ async function main() {
       console.warn(`  - "${c.point}": ${c.from} -> ${c.to}`);
     }
   }
+  if (contextImageCorrections.length) {
+    console.warn(`Đã bỏ needs_context_image cho ${contextImageCorrections.length} point:`);
+    for (const c of contextImageCorrections) {
+      console.warn(`  - "${c.point}": ${c.reason}`);
+    }
+  }
 
   const output = {
     ...content,
-    _meta: { generated_at: new Date().toISOString(), model, source_images, corrections },
+    _meta: {
+      generated_at: new Date().toISOString(),
+      model,
+      source_images,
+      corrections,
+      contextImageCorrections,
+      content_angle_id: opts.contentAngleId || "auto",
+      custom_angle_text: opts.contentAngleId === "custom" ? opts.customAngleText || "" : "",
+    },
   };
 
   fs.mkdirSync(path.dirname(opts.out), { recursive: true });
@@ -563,4 +711,4 @@ if (isMainModule) {
   });
 }
 
-export { runCompareContent, loadActionCatalog, GEMINI_MODEL };
+export { runCompareContent, loadActionCatalog, enforceContextImageLimits, resolveAngleInstruction, GEMINI_MODEL };

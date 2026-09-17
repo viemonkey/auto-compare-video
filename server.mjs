@@ -28,9 +28,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
+import { CONTENT_ANGLES } from "./config/content-angles.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const PORT = Number(process.env.PORT) || 3000;
+const PORT = Number(process.env.PORT) || 3002;
 
 const PUBLIC_DIR = path.join(__dirname, "public");
 const ASSETS_DIR = path.join(__dirname, "assets");
@@ -137,6 +138,10 @@ app.get("/api/vieneu-voices", (_req, res) => {
   }
 });
 
+app.get("/api/content-angles", (_req, res) => {
+  res.json({ angles: CONTENT_ANGLES });
+});
+
 // ------------------------------------------------------------------
 // Helper: chạy 1 script node, gom stdout+stderr
 // ------------------------------------------------------------------
@@ -198,6 +203,16 @@ app.post("/api/generate-content", async (req, res) => {
   const hint = String(req.body?.topicHint || "").trim();
   if (hint) args.push("--topic-hint", hint);
 
+  const contentAngleId = String(req.body?.contentAngleId || "").trim();
+  if (contentAngleId) args.push("--content-angle-id", contentAngleId);
+  if (contentAngleId === "custom") {
+    const customAngleText = String(req.body?.customAngleText || "").trim();
+    if (!customAngleText) {
+      return res.status(400).json({ error: 'contentAngleId="custom" nhưng thiếu customAngleText.' });
+    }
+    args.push("--custom-angle-text", customAngleText);
+  }
+
   const { code, out } = await runNode(args);
   if (code !== 0 || !fs.existsSync(outPath)) {
     return res.status(500).json({ error: out.trim().split("\n").slice(-6).join("\n") || "Gemini thất bại." });
@@ -219,6 +234,18 @@ app.post("/api/generate-content", async (req, res) => {
 // ------------------------------------------------------------------
 const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
+// videos/<slug>/ trùng tên -> thêm hậu tố số thứ tự thay vì báo lỗi dừng lại (vd nhiều video
+// khác góc độ nội dung, cùng 1 cặp ảnh, dễ trùng slug gốc).
+function ensureUniqueSlug(baseSlug) {
+  let slug = baseSlug;
+  let n = 2;
+  while (fs.existsSync(path.join(VIDEOS_DIR, slug))) {
+    slug = `${baseSlug}-${n}`;
+    n++;
+  }
+  return slug;
+}
+
 app.post("/api/create-video", async (req, res) => {
   res.writeHead(200, {
     "Content-Type": "text/event-stream",
@@ -237,15 +264,19 @@ app.post("/api/create-video", async (req, res) => {
 
   let contentPath = null;
   try {
-    const { content, slug, topicHint, ttsProvider, vieneuVoice, vieneuRefPath } = req.body || {};
+    const { content, slug: rawSlug, topicHint, ttsProvider, vieneuVoice, vieneuRefPath } = req.body || {};
     const leftPath = assertInsideUploads(req.body?.leftPath, "leftPath");
     const rightPath = assertInsideUploads(req.body?.rightPath, "rightPath");
 
-    if (!slug || !SLUG_RE.test(slug)) {
-      return fail(`slug "${slug}" không hợp lệ — chỉ a-z, 0-9 và dấu gạch ngang (không dấu tiếng Việt).`);
+    if (!rawSlug || !SLUG_RE.test(rawSlug)) {
+      return fail(`slug "${rawSlug}" không hợp lệ — chỉ a-z, 0-9 và dấu gạch ngang (không dấu tiếng Việt).`);
     }
-    if (fs.existsSync(path.join(VIDEOS_DIR, slug))) {
-      return fail(`videos/${slug}/ đã tồn tại — đổi slug khác (script không ghi đè video có sẵn).`);
+    // Nhiều góc độ nội dung khác nhau cho CÙNG 1 cặp ảnh dễ ra trùng slug gốc (vd cùng
+    // buildSlug() nhưng người dùng gõ tay giống nhau) — tự thêm hậu tố -2, -3... thay vì
+    // chặn đứng, để không phải quay lại sửa tay mỗi lần thử góc độ khác.
+    const slug = ensureUniqueSlug(rawSlug);
+    if (slug !== rawSlug) {
+      say(`ℹ slug "${rawSlug}" đã tồn tại — dùng "${slug}" thay thế.`);
     }
     if (!content || !Array.isArray(content.points) || content.points.length === 0) {
       return fail("Thiếu nội dung kịch bản (content.points rỗng).");
