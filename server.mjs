@@ -396,6 +396,11 @@ app.post("/api/create-video", async (req, res) => {
 function archiveAndCleanup(slug, renderWebPath, say) {
   const src = path.join(__dirname, renderWebPath.replace(/^\//, ""));
   const dest = path.join(OUTPUT_DIR, `${slug}${path.extname(src)}`);
+  // Theo dõi riêng "đã rename xong chưa" — nếu rename thành công nhưng bước xoá
+  // videos/<slug>/ sau đó lỗi (thường do Windows khoá file), vẫn phải trả về link
+  // output/ thật. Trả nhầm renderWebPath cũ ở đây từng khiến UI đưa link 404 (file
+  // đã dời đi rồi) dù MP4 nằm an toàn ở output/.
+  let movedTo = null;
 
   try {
     const size = fs.statSync(src).size;
@@ -406,13 +411,18 @@ function archiveAndCleanup(slug, renderWebPath, say) {
     if (!fs.existsSync(dest) || fs.statSync(dest).size !== size) {
       throw new Error("MP4 không đến nơi nguyên vẹn");
     }
+    movedTo = `/output/${path.basename(dest)}`;
 
     // chỉ xoá SAU khi đã xác nhận MP4 nằm an toàn ở output/
     fs.rmSync(path.join(VIDEOS_DIR, slug), { recursive: true, force: true });
-    say(`✔ Đã lưu: /output/${path.basename(dest)}  (${(size / 1048576).toFixed(1)} MB)`);
+    say(`✔ Đã lưu: ${movedTo}  (${(size / 1048576).toFixed(1)} MB)`);
     say(`  Đã xoá videos/${slug}/ — chỉ giữ MP4. Muốn giữ source: KEEP_PROJECT=1`);
-    return `/output/${path.basename(dest)}`;
+    return movedTo;
   } catch (e) {
+    if (movedTo) {
+      say(`⚠ MP4 đã lưu an toàn ở ${movedTo} nhưng không xoá được videos/${slug}/ (${e.message}) — giữ lại source.`);
+      return movedTo;
+    }
     say(`⚠ Không dọn được (${e.message}) — giữ nguyên videos/${slug}/ cho an toàn.`);
     return renderWebPath;
   }
