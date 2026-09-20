@@ -279,13 +279,18 @@ ${actionLines}
   gợi ý khi chủ đề thật sự là trang sức/đá quý/kim cương/kim hoàn. Nếu chủ đề không liên
   quan, TUYỆT ĐỐI không dùng các id đó — chọn action trung tính khác phù hợp ngữ cảnh.
 
-- "needs_context_image": true CHỈ khi point nhắc tới một BỐI CẢNH/HIỆN TƯỢNG cụ thể mà một
-  ảnh minh hoạ RIÊNG (khác với ảnh sản phẩm trái/phải đang so sánh) sẽ giúp hiểu rõ hơn — ví
-  dụ point nói "kim cương hình thành từ áp suất cực lớn trong lòng đất" thì minh hoạ được bằng
-  cảnh địa chất/khai thác, không phải bản thân viên kim cương. Nếu point chỉ mô tả đặc điểm
-  của chính vật thể trái/phải (ảnh sản phẩm đã đủ để minh hoạ) thì để false. Hầu hết point nên
-  là false — chỉ đánh true cho 1-2 point có bối cảnh thật sự đáng minh hoạ thêm trong cả video
-  (hệ thống sẽ tự cắt bớt nếu bạn đánh dấu nhiều hơn 2, và tự bỏ với point có "side":"both").
+- "needs_context_image": ĐÁNH DẤU MẠNH DẠN — true cho BẤT KỲ point nào nhắc tới một yếu tố có
+  thể minh hoạ trực quan bằng 1 ảnh RIÊNG (khác ảnh sản phẩm trái/phải đang so sánh), gồm cả:
+  tính chất vật lý (độ cứng, độ bền, phản ứng hoá học, cấu trúc tinh thể...), nguồn gốc/xuất xứ,
+  quy trình hình thành/chế tác/khai thác, hiện tượng đi kèm, hoặc 1 phép so sánh hình ảnh cụ thể
+  (vd "cứng gấp 3 lần" minh hoạ được bằng cảnh so sánh trực quan độ cứng). Ví dụ: point nói "kim
+  cương hình thành từ áp suất cực lớn trong lòng đất" -> true, minh hoạ cảnh địa chất/khai thác.
+  Chỉ để false cho point THỰC SỰ trừu tượng/không có gì để vẽ riêng — kết luận chung chung, lời
+  khuyên chọn mua, hoặc point chỉ lặp lại đặc điểm bề ngoài của chính vật thể trái/phải (ảnh sản
+  phẩm đã đủ minh hoạ, vẽ thêm cũng chỉ là ảnh sản phẩm khác góc). MỤC TIÊU: đa số video nên có
+  khoảng 3-5 point (trong tổng 4-8 point) được đánh true — coi false là NGOẠI LỆ cho point không
+  có gì đáng vẽ, không phải mặc định. Đừng tự giới hạn số lượng vì sợ vượt cap — hệ thống tự cắt
+  bớt nếu bạn đánh dấu quá nhiều (hiện cho phép tối đa 5/video), và tự bỏ point có "side":"both".
 - "image_concept": khi needs_context_image=true, mô tả NGẮN bằng tiếng Anh (tối đa ~20 từ) cảnh
   cần vẽ, càng cụ thể/trực quan càng tốt (vd "diamond crystal forming under extreme pressure
   deep underground, geological cross-section"). Khi needs_context_image=false, để chuỗi rỗng "".
@@ -520,12 +525,14 @@ function enforceJewelryGating(content, catalog, topicHint) {
 }
 
 // Giai đoạn 1 — giới hạn cứng bằng CODE, không tin vào việc model tự giác tuân theo hướng dẫn
-// prompt (giống enforceJewelryGating ở trên): tối đa 2 point/video được sinh ảnh minh hoạ ngữ
-// cảnh (kiểm soát chi phí gọi API ảnh), point "side":"both" luôn bị loại (không rõ swap card
-// bên nào), và 2 point KẾ NHAU cùng bên trái/phải không được cùng lúc minh hoạ (setCardImage
-// swap-vào ở point sau và swap-lại-ảnh-gốc ở point trước có thể rơi trùng thời điểm trên cùng
-// 1 card — xem scaffold-compare-video.mjs § buildTimelineBeatsJs).
-const MAX_CONTEXT_IMAGES = 2;
+// prompt (giống enforceJewelryGating ở trên): tối đa MAX_CONTEXT_IMAGES point/video được sinh
+// ảnh minh hoạ ngữ cảnh (kiểm soát chi phí gọi API ảnh — 2026-09-18 nâng 2 -> 5 theo yêu cầu
+// tăng mật độ ảnh minh hoạ, đi kèm sửa prompt để Gemini mạnh dạn đánh true hơn), point
+// "side":"both" luôn bị loại (không rõ swap card bên nào), và 2 point KẾ NHAU cùng bên
+// trái/phải không được cùng lúc minh hoạ (setCardImage swap-vào ở point sau và
+// swap-lại-ảnh-gốc ở point trước có thể rơi trùng thời điểm trên cùng 1 card — xem
+// scaffold-compare-video.mjs § buildTimelineBeatsJs).
+const MAX_CONTEXT_IMAGES = 5;
 
 function enforceContextImageLimits(content) {
   const corrections = [];
@@ -605,7 +612,7 @@ async function runCompareContent({ left, right, topicHint, contentAngleId, custo
   const content = await generateWithRetry({ left: leftImg, right: rightImg, topicHint, angleInstruction, catalog });
 
   // Log chẩn đoán: Gemini tự đánh dấu bao nhiêu point cần ảnh minh hoạ NGAY SAU khi nhận
-  // response, TRƯỚC mọi hậu kiểm (jewelry gate / cap 2 ảnh / liền-kề-cùng-bên) — để phân biệt
+  // response, TRƯỚC mọi hậu kiểm (jewelry gate / cap MAX_CONTEXT_IMAGES ảnh / liền-kề-cùng-bên) — để phân biệt
   // "Gemini không đánh dấu point nào" (đúng thiết kế, tuỳ chủ đề — vd chủ đề không có bối cảnh
   // gì đáng minh hoạ thêm ngoài 2 sản phẩm) với "có lỗi khiến ảnh bị cắt/không sinh" (xem log
   // enforceContextImageLimits ngay dưới, và log generateContextImages ở scaffold-compare-video.mjs).

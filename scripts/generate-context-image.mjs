@@ -1,15 +1,23 @@
 // Auto Compare Video — Giai đoạn 1 (MVP): sinh ảnh minh hoạ ngữ cảnh bằng Gemini image
-// generation, cho tối đa 2 point/video được đánh dấu needs_context_image=true — giới hạn cứng
-// đó áp dụng ở scripts/generate-compare-content.mjs (enforceContextImageLimits), KHÔNG phải ở
-// đây; module này chỉ biết sinh 1 ảnh cho 1 concept, gọi bao nhiêu lần là quyết định của caller.
+// generation, cho tối đa MAX_CONTEXT_IMAGES point/video được đánh dấu needs_context_image=true
+// (mặc định 5 — xem enforceContextImageLimits) — giới hạn cứng đó áp dụng ở
+// scripts/generate-compare-content.mjs, KHÔNG phải ở đây; module này chỉ biết sinh 1 ảnh cho
+// 1 concept, gọi bao nhiêu lần là quyết định của caller.
 //
 // Đây là tính năng PHỤ — KHÔNG được phép làm hỏng cả video khi lỗi. Mọi lỗi (thiếu API key,
 // network, timeout, safety block, response rỗng...) đều trả về null thay vì throw; caller
 // (scripts/scaffold-compare-video.mjs) giữ nguyên ảnh sản phẩm gốc khi nhận null.
 //
+// 2026-09-18: thêm retry ngắn (MAX_ATTEMPTS, xem callImageGenOnce/generateContextImage bên
+// dưới) sau khi phát hiện batch nhiều video liên tiếp trong 1 phiên có thể dồn dập chạm
+// rate-limit free-tier của IMAGE_GEN_API_KEY — trước đây "chỉ gọi 1 lần/point" nghĩa là 1 lần
+// 429 thoáng qua là mất ảnh vĩnh viễn cho point đó, im lặng (chỉ console.warn, không có log
+// bền — xem server.mjs § log file). Chỉ lỗi TẠM THỜI (network/timeout/429/5xx/response thiếu
+// ảnh) mới được retry; lỗi do thiếu key/sai key/bị safety block/400 thì dừng ngay (retry không
+// đổi kết quả).
+//
 // Phạm vi CHƯA làm ở giai đoạn 1 (xem kiến trúc đã duyệt) — để giai đoạn sau:
 //   - Cache ảnh đã sinh (tránh gọi API trùng concept).
-//   - Retry / backoff khi lỗi tạm thời (chỉ gọi 1 lần/point).
 //   - Đa provider (chỉ Gemini — tận dụng hạ tầng .env đã có).
 //   - Watermark đánh dấu ảnh AI-generated.
 //
@@ -82,30 +90,21 @@ const EXT_BY_MIME = {
   "image/webp": ".webp",
 };
 
-/**
- * Sinh 1 ảnh minh hoạ ngữ cảnh từ mô tả ngắn (field image_concept của 1 point, tiếng Anh).
- * KHÔNG BAO GIỜ throw — mọi lỗi trả về null kèm 1 dòng console.warn để biết point nào bị rớt
- * ảnh, đúng yêu cầu "không chặn build video".
- *
- * @param {{ concept: string, outBase: string }} args
- *   concept: mô tả ngắn cảnh cần minh hoạ.
- *   outBase: đường dẫn output KHÔNG kèm đuôi file — đuôi do mimeType Gemini trả về quyết định.
- * @returns {Promise<string|null>} đường dẫn file đã ghi (kèm đuôi), hoặc null nếu lỗi/fallback.
- */
-async function generateContextImage({ concept, outBase }) {
-  const label = outBase ? path.basename(outBase) : "(?)";
+// 1 lần gọi ban đầu + tối đa 1 retry — ảnh minh hoạ ngữ cảnh là tính năng phụ, không đáng để
+// user chờ thêm nhiều vòng retry như Gemini text (MAX_ATTEMPTS=3 ở generate-compare-content.mjs),
+// nhưng 1 retry là đủ để sống sót qua 1 lần 429/503 thoáng qua giữa batch nhiều video liên tiếp.
+const MAX_ATTEMPTS = 2;
+const RETRY_DELAY_MS = 1500;
 
-  if (!concept || !concept.trim()) {
-    console.warn(`⚠ [generate-context-image] "${label}": image_concept rỗng — bỏ qua, giữ ảnh gốc.`);
-    return null;
-  }
-  if (!IMAGE_GEN_API_KEY) {
-    console.warn(
-      `⚠ [generate-context-image] "${label}": thiếu IMAGE_GEN_API_KEY trong .env — bỏ qua, giữ ảnh gốc.`,
-    );
-    return null;
-  }
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
 
+// Lỗi KHÔNG đáng retry: thiếu/sai key, bị safety block, request sai format — gọi lại cũng ra
+// cùng kết quả, retry chỉ tốn thời gian.
+class NonRetryableImageGenError extends Error {}
+
+async function callImageGenOnce({ concept, outBase, label }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_GEN_MODEL}:generateContent?key=${IMAGE_GEN_API_KEY}`;
   const body = {
     contents: [{ role: "user", parts: [{ text: STYLE_PREFIX + concept.trim() }] }],
@@ -128,42 +127,38 @@ async function generateContextImage({ concept, outBase }) {
   } catch (err) {
     const reason =
       err.name === "AbortError" ? `timeout sau ${REQUEST_TIMEOUT_MS / 1000}s` : `network: ${err.message}`;
-    console.warn(`⚠ [generate-context-image] "${label}": gọi API thất bại (${reason}) — giữ ảnh gốc.`);
-    return null;
+    throw new Error(`gọi API thất bại (${reason})`); // retryable
   } finally {
     clearTimeout(timeout);
   }
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    console.warn(
-      `⚠ [generate-context-image] "${label}": HTTP ${res.status} — ${errText.slice(0, 300)} — giữ ảnh gốc.`,
-    );
-    return null;
+    // 401/403 (key sai/thiếu quyền) và 400 (request sai format) — retry vô ích.
+    if (res.status === 401 || res.status === 403 || res.status === 400) {
+      throw new NonRetryableImageGenError(`HTTP ${res.status} — ${errText.slice(0, 300)}`);
+    }
+    // 429 (rate limit) / 5xx (lỗi tạm thời phía server) — đáng retry.
+    throw new Error(`HTTP ${res.status} — ${errText.slice(0, 300)}`);
   }
 
   let json;
   try {
     json = await res.json();
   } catch {
-    console.warn(`⚠ [generate-context-image] "${label}": response không phải JSON hợp lệ — giữ ảnh gốc.`);
-    return null;
+    throw new Error("response không phải JSON hợp lệ"); // retryable — có thể do response cụt giữa chừng
   }
 
   const blockReason = json?.promptFeedback?.blockReason;
   if (blockReason) {
-    console.warn(`⚠ [generate-context-image] "${label}": bị safety block (${blockReason}) — giữ ảnh gốc.`);
-    return null;
+    throw new NonRetryableImageGenError(`bị safety block (${blockReason})`);
   }
 
   const parts = json?.candidates?.[0]?.content?.parts || [];
   const imagePart = parts.find((p) => p.inlineData?.data);
   if (!imagePart) {
     const finishReason = json?.candidates?.[0]?.finishReason || "unknown";
-    console.warn(
-      `⚠ [generate-context-image] "${label}": response không có ảnh (finishReason: ${finishReason}) — giữ ảnh gốc.`,
-    );
-    return null;
+    throw new Error(`response không có ảnh (finishReason: ${finishReason})`); // retryable
   }
 
   const mimeType = imagePart.inlineData.mimeType || "image/png";
@@ -174,11 +169,56 @@ async function generateContextImage({ concept, outBase }) {
     fs.mkdirSync(path.dirname(outPath), { recursive: true });
     fs.writeFileSync(outPath, Buffer.from(imagePart.inlineData.data, "base64"));
   } catch (err) {
-    console.warn(`⚠ [generate-context-image] "${label}": ghi file thất bại (${err.message}) — giữ ảnh gốc.`);
-    return null;
+    // Lỗi ghi đĩa (quyền/dung lượng) sẽ lặp lại y hệt ở lần retry — không đáng thử lại.
+    throw new NonRetryableImageGenError(`ghi file thất bại (${err.message})`);
   }
 
   return outPath;
+}
+
+/**
+ * Sinh 1 ảnh minh hoạ ngữ cảnh từ mô tả ngắn (field image_concept của 1 point, tiếng Anh).
+ * KHÔNG BAO GIỜ throw — mọi lỗi trả về null kèm 1 dòng console.warn để biết point nào bị rớt
+ * ảnh, đúng yêu cầu "không chặn build video". Retry tối đa 1 lần cho lỗi tạm thời (xem
+ * callImageGenOnce/NonRetryableImageGenError).
+ *
+ * @param {{ concept: string, outBase: string }} args
+ *   concept: mô tả ngắn cảnh cần minh hoạ.
+ *   outBase: đường dẫn output KHÔNG kèm đuôi file — đuôi do mimeType Gemini trả về quyết định.
+ * @returns {Promise<string|null>} đường dẫn file đã ghi (kèm đuôi), hoặc null nếu lỗi/fallback.
+ */
+async function generateContextImage({ concept, outBase }) {
+  const label = outBase ? path.basename(outBase) : "(?)";
+
+  if (!concept || !concept.trim()) {
+    console.warn(`⚠ [generate-context-image] "${label}": image_concept rỗng — bỏ qua, giữ ảnh gốc.`);
+    return null;
+  }
+  if (!IMAGE_GEN_API_KEY) {
+    console.warn(
+      `⚠ [generate-context-image] "${label}": thiếu IMAGE_GEN_API_KEY trong .env — bỏ qua, giữ ảnh gốc.`,
+    );
+    return null;
+  }
+
+  let lastErr;
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      return await callImageGenOnce({ concept, outBase, label });
+    } catch (err) {
+      lastErr = err;
+      if (err instanceof NonRetryableImageGenError) break;
+      if (attempt < MAX_ATTEMPTS) {
+        console.warn(
+          `⚠ [generate-context-image] "${label}": lần ${attempt}/${MAX_ATTEMPTS} thất bại (${err.message}) — thử lại...`,
+        );
+        await sleep(RETRY_DELAY_MS);
+      }
+    }
+  }
+
+  console.warn(`⚠ [generate-context-image] "${label}": ${lastErr.message} — giữ ảnh gốc.`);
+  return null;
 }
 
 // ============================================================

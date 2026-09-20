@@ -793,8 +793,9 @@ async function main() {
   // 3. dựng danh sách dòng thoại + pose
   const lines = buildLines(content);
 
-  // 3b. Giai đoạn 1 — sinh ảnh minh hoạ ngữ cảnh cho point nào cần (tối đa 2/video, đã ép ở
-  // enforceContextImageLimits). Lỗi ở đây KHÔNG chặn build — line.contextImageFile ở lại null.
+  // 3b. Giai đoạn 1 — sinh ảnh minh hoạ ngữ cảnh cho point nào cần (tối đa MAX_CONTEXT_IMAGES/
+  // video, đã ép ở enforceContextImageLimits). Lỗi ở đây KHÔNG chặn build — line.contextImageFile
+  // ở lại null.
   console.log("\n▶ Bước 3b: generateContextImages() ...");
   await generateContextImages(target, lines);
 

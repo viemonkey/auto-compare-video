@@ -41,8 +41,25 @@ const UPLOAD_DIR = path.join(ASSETS_DIR, "uploads");
 const TEMP_DIR = path.join(ASSETS_DIR, "temp");
 // kho thành phẩm — xem archiveAndCleanup()
 const OUTPUT_DIR = path.join(__dirname, "output");
+// 2026-09-18: trước đây log chỉ chảy qua SSE tới trình duyệt rồi mất khi đóng tab — không
+// chẩn đoán lại được sự cố (vd 1 batch nhiều video liên tiếp needs_context_image không ra ảnh
+// nào, không có cách nào xem lại vì sao). Giờ mọi dòng log của /api/generate-content và
+// /api/create-video đều ghi thêm ra đây, xem writeRunLog().
+const LOG_DIR = path.join(OUTPUT_DIR, "logs");
+// content JSON gốc từ Gemini (kèm needs_context_image/image_concept từng point) +  BRIEF.md
+// sau khi scaffold xong — archiveAndCleanup() xoá sạch videos/<slug>/ sau khi render thành
+// công nên đây là bản sao DUY NHẤT còn sống sót của 2 thứ đó, xem persistContentRecord().
+const CONTENT_ARCHIVE_DIR = path.join(OUTPUT_DIR, "content");
 
-for (const d of [UPLOAD_DIR, TEMP_DIR, OUTPUT_DIR]) fs.mkdirSync(d, { recursive: true });
+for (const d of [UPLOAD_DIR, TEMP_DIR, OUTPUT_DIR, LOG_DIR, CONTENT_ARCHIVE_DIR]) fs.mkdirSync(d, { recursive: true });
+
+function writeRunLog(name, text) {
+  try {
+    fs.writeFileSync(path.join(LOG_DIR, name), text);
+  } catch (e) {
+    console.error(`⚠ Không ghi được log ${name}: ${e.message}`);
+  }
+}
 
 const app = express();
 app.use(express.json({ limit: "5mb" }));
@@ -214,6 +231,11 @@ app.post("/api/generate-content", async (req, res) => {
   }
 
   const { code, out } = await runNode(args);
+  // Log NGAY cả khi thành công — đây là nơi duy nhất còn lại dòng chẩn đoán "Gemini đánh dấu
+  // needs_context_image=true cho X/N point" (xem generate-compare-content.mjs), một khi client
+  // rời trang thì output/logs/ là chỗ duy nhất còn xem lại được.
+  writeRunLog(`generate-content-${Date.now()}.log`, `ARGS: ${args.join(" ")}\n\n${out}`);
+
   if (code !== 0 || !fs.existsSync(outPath)) {
     return res.status(500).json({ error: out.trim().split("\n").slice(-6).join("\n") || "Gemini thất bại." });
   }
@@ -254,7 +276,13 @@ app.post("/api/create-video", async (req, res) => {
     "X-Accel-Buffering": "no",
   });
   const send = (payload) => res.write(`data: ${JSON.stringify(payload)}\n\n`);
-  const say = (message) => send({ message });
+  // runLog tích luỹ MỌI dòng say() của cả request này — ghi ra output/logs/ ở finally, bất kể
+  // thành công hay lỗi, để xem lại được sau khi tab trình duyệt đã đóng (xem writeRunLog()).
+  const runLog = [];
+  const say = (message) => {
+    runLog.push(message);
+    send({ message });
+  };
 
   const fail = (message) => {
     say(`✖ ${message}`);
@@ -263,6 +291,7 @@ app.post("/api/create-video", async (req, res) => {
   };
 
   let contentPath = null;
+  let slugForLog = null;
   try {
     const { content, slug: rawSlug, topicHint, ttsProvider, vieneuVoice, vieneuRefPath } = req.body || {};
     const leftPath = assertInsideUploads(req.body?.leftPath, "leftPath");
@@ -275,6 +304,7 @@ app.post("/api/create-video", async (req, res) => {
     // buildSlug() nhưng người dùng gõ tay giống nhau) — tự thêm hậu tố -2, -3... thay vì
     // chặn đứng, để không phải quay lại sửa tay mỗi lần thử góc độ khác.
     const slug = ensureUniqueSlug(rawSlug);
+    slugForLog = slug;
     if (slug !== rawSlug) {
       say(`ℹ slug "${rawSlug}" đã tồn tại — dùng "${slug}" thay thế.`);
     }
@@ -286,6 +316,10 @@ app.post("/api/create-video", async (req, res) => {
 
     contentPath = path.join(TEMP_DIR, `content-${Date.now()}.json`);
     fs.writeFileSync(contentPath, JSON.stringify(content, null, 2));
+    // Bản sao BỀN của content JSON gốc (needs_context_image/image_concept từng point) — TEMP_DIR
+    // chỉ tồn tại trong request này (xoá ở finally), còn videos/<slug>/ có thể bị
+    // archiveAndCleanup() xoá sạch sau khi render xong. Đây mới là bản duy nhất còn sống lâu dài.
+    fs.writeFileSync(path.join(CONTENT_ARCHIVE_DIR, `${slug}.compare-content.json`), JSON.stringify(content, null, 2));
 
     const args = [
       path.join(SCRIPTS_DIR, "scaffold-compare-video.mjs"),
@@ -317,6 +351,19 @@ app.post("/api/create-video", async (req, res) => {
 
     const target = path.join(VIDEOS_DIR, slug);
     let renderUrl = null;
+
+    // Sao lưu BRIEF.md TRƯỚC khi archiveAndCleanup() có thể xoá sạch videos/<slug>/ ở dưới —
+    // đây là bản ghi NGƯỜI ĐỌC ĐƯỢC duy nhất còn lại của việc ảnh minh hoạ ngữ cảnh nào đã
+    // sinh/bị cắt cho video này (mục "Ảnh minh hoạ ngữ cảnh" — xem writeBrief() trong
+    // scaffold-compare-video.mjs), bổ sung cho compare-content.json thô đã lưu ở trên.
+    const briefSrc = path.join(target, "BRIEF.md");
+    if (fs.existsSync(briefSrc)) {
+      try {
+        fs.copyFileSync(briefSrc, path.join(CONTENT_ARCHIVE_DIR, `${slug}.BRIEF.md`));
+      } catch (e) {
+        say(`⚠ Không sao lưu được BRIEF.md: ${e.message}`);
+      }
+    }
 
     const wantRender = req.body?.render !== false && process.env.AUTO_RENDER !== "0";
     const keepProject = req.body?.keepProject === true || process.env.KEEP_PROJECT === "1";
@@ -374,6 +421,11 @@ app.post("/api/create-video", async (req, res) => {
     fail(e.message);
   } finally {
     if (contentPath) fs.rmSync(contentPath, { force: true });
+    // Ghi log bất kể thành công hay lỗi — trước đây toàn bộ output này chỉ có ở SSE, mất khi
+    // đóng tab. Dùng slugForLog (gán ngay khi slug xác định) vì `slug` có thể chưa tồn tại
+    // nếu request fail sớm (vd slug không hợp lệ) — khi đó rơi về mốc thời gian.
+    const name = slugForLog ? `${slugForLog}-${Date.now()}.log` : `create-video-failed-${Date.now()}.log`;
+    writeRunLog(name, runLog.join("\n"));
   }
 });
 
