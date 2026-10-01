@@ -1,0 +1,166 @@
+{
+  "error": "",
+  "title": {
+    "text": "Can you tell these two stunning blue gems apart?",
+    "vi": "Bạn có thể phân biệt được hai viên đá quý màu xanh tuyệt đẹp này không?"
+  },
+  "label_left": {
+    "text": "Aquamarine",
+    "vi": "Aquamarine"
+  },
+  "label_right": {
+    "text": "Blue Sapphire",
+    "vi": "Sapphire xanh"
+  },
+  "materials": [
+    "Aquamarine",
+    "Sapphire"
+  ],
+  "topicTags": [
+    "#gemstones",
+    "#gemstoneknowledge"
+  ],
+  "suggestedTags": [],
+  "points": [
+    {
+      "text": {
+        "text": "Aquamarine belongs to the beryl family, famous for its icy, pastel blue hues resembling seawater.",
+        "vi": "Aquamarine thuộc họ beryl, nổi tiếng với sắc xanh lam pastel như nước biển."
+      },
+      "side": "left",
+      "tag": {
+        "text": "Beryl Family",
+        "vi": "Họ Beryl"
+      },
+      "sub": {
+        "text": "Icy seawater blue",
+        "vi": "Xanh nước biển nhạt"
+      },
+      "suggested_action": "explain-a",
+      "needs_context_image": true,
+      "image_concept": "natural beryl crystal specimen in a light blue shade"
+    },
+    {
+      "text": {
+        "text": "Blue sapphire is a variety of corundum, known for its rich, deep royal blue color.",
+        "vi": "Sapphire xanh là một biến thể của corundum, nổi tiếng với màu xanh hoàng gia đậm đà."
+      },
+      "side": "right",
+      "tag": {
+        "text": "Corundum Family",
+        "vi": "Họ Corundum"
+      },
+      "sub": {
+        "text": "Deep royal blue",
+        "vi": "Xanh hoàng gia đậm"
+      },
+      "suggested_action": "explain-b",
+      "needs_context_image": true,
+      "image_concept": "rough blue sapphire crystal in corundum form"
+    },
+    {
+      "text": {
+        "text": "On the Mohs scale, aquamarine scores a respectable seven point five to eight, making it durable.",
+        "vi": "Trên thang đo Mohs, aquamarine đạt điểm khá tốt từ bảy phẩy năm đến tám, giúp nó khá bền."
+      },
+      "side": "left",
+      "tag": {
+        "text": "Mohs Hardness",
+        "vi": "Độ cứng Mohs"
+      },
+      "sub": {
+        "text": "7.5 to 8 score",
+        "vi": "Đạt 7.5 đến 8"
+      },
+      "suggested_action": "point-up-left",
+      "needs_context_image": true,
+      "image_concept": "Mohs hardness scale graphic highlighting 7.5 to 8"
+    },
+    {
+      "text": {
+        "text": "Sapphire is incredibly tough, scoring a nine on the Mohs scale, second only to diamond.",
+        "vi": "Sapphire cực kỳ cứng, đạt điểm chín trên thang Mohs, chỉ đứng sau kim cương."
+      },
+      "side": "right",
+      "tag": {
+        "text": "Ultra Durable",
+        "vi": "Cực kỳ bền"
+      },
+      "sub": {
+        "text": "9 on Mohs scale",
+        "vi": "Đạt 9 trên thang Mohs"
+      },
+      "suggested_action": "point-up-right",
+      "needs_context_image": true,
+      "image_concept": "Mohs hardness scale graphic highlighting 9 next to diamond"
+    },
+    {
+      "text": {
+        "text": "Aquamarine is often eye-clean, meaning it has excellent clarity with very few visible inclusions.",
+        "vi": "Aquamarine thường sạch mắt, nghĩa là nó có độ trong suốt tuyệt vời và rất ít tạp chất nhìn thấy được."
+      },
+      "side": "left",
+      "tag": {
+        "text": "Eye-Clean",
+        "vi": "Sạch mắt"
+      },
+      "sub": {
+        "text": "High clarity",
+        "vi": "Độ trong suốt cao"
+      },
+      "suggested_action": "explain-a",
+      "needs_context_image": false,
+      "image_concept": ""
+    },
+    {
+      "text": {
+        "text": "Sapphires commonly have natural inclusions, which gemologists use to verify their natural origin.",
+        "vi": "Sapphire thường có các tạp chất tự nhiên, thứ mà các nhà ngọc học dùng để xác minh nguồn gốc tự nhiên của chúng."
+      },
+      "side": "right",
+      "tag": {
+        "text": "Natural Inclusions",
+        "vi": "Tạp chất tự nhiên"
+      },
+      "sub": {
+        "text": "Fingerprint patterns",
+        "vi": "Dạng vân tay"
+      },
+      "suggested_action": "explain-b",
+      "needs_context_image": true,
+      "image_concept": "microscopic view of silk or fingerprint inclusions inside a sapphire"
+    },
+    {
+      "text": {
+        "text": "Choose aquamarine for a serene, light sparkle, or sapphire for timeless, intense blue durability.",
+        "vi": "Hãy chọn aquamarine để có ánh sáng lấp lánh nhẹ nhàng, hoặc sapphire để có độ bền màu xanh đậm vượt thời gian."
+      },
+      "side": "both",
+      "tag": {
+        "text": "Your Choice",
+        "vi": "Lựa chọn của bạn"
+      },
+      "sub": {
+        "text": "Light vs deep blue",
+        "vi": "Xanh nhạt vs xanh đậm"
+      },
+      "suggested_action": "thumbs-up-a",
+      "needs_context_image": false,
+      "image_concept": ""
+    }
+  ],
+  "locale": "en-US",
+  "_meta": {
+    "generated_at": "2026-10-01T09:24:35.119Z",
+    "model": "gemini-3.5-flash",
+    "source_images": {
+      "left": "videos/aquamarine-vs-sapphire/assets/images/card-left.jpg",
+      "right": "videos/aquamarine-vs-sapphire/assets/images/card-right.jpg"
+    },
+    "corrections": [],
+    "contextImageCorrections": [],
+    "warnings": [],
+    "content_angle_id": "auto",
+    "custom_angle_text": ""
+  }
+}

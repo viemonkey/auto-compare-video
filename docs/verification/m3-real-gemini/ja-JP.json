@@ -1,0 +1,166 @@
+{
+  "error": "",
+  "title": {
+    "text": "アクアマリンとサファイア、青い宝石の違いを知っていますか？",
+    "vi": "Bạn có biết sự khác biệt giữa Aquamarine và Sapphire, hai viên đá quý màu xanh này không?"
+  },
+  "label_left": {
+    "text": "アクアマリン",
+    "vi": "Aquamarine"
+  },
+  "label_right": {
+    "text": "サファイア",
+    "vi": "Sapphire"
+  },
+  "materials": [
+    "アクアマリン",
+    "サファイア"
+  ],
+  "topicTags": [
+    "#宝石",
+    "#宝石の違い"
+  ],
+  "suggestedTags": [],
+  "points": [
+    {
+      "text": {
+        "text": "アクアマリンはエメラルドと同じベリルという鉱物グループに属しています。",
+        "vi": "Aquamarine thuộc nhóm khoáng vật beryl, cùng họ với ngọc lục bảo."
+      },
+      "side": "left",
+      "tag": {
+        "text": "ベリル属",
+        "vi": "Họ Beryl"
+      },
+      "sub": {
+        "text": "緑柱石の一種",
+        "vi": "Một loại beryl"
+      },
+      "suggested_action": "explain-a",
+      "needs_context_image": true,
+      "image_concept": "A raw hexagonal light blue beryl crystal next to a green emerald crystal, showing their mineral relationship"
+    },
+    {
+      "text": {
+        "text": "一方のサファイアはコランダムという非常に硬い鉱物からできています。",
+        "vi": "Trong khi đó, sapphire được tạo thành từ corundum, một khoáng vật cực kỳ cứng."
+      },
+      "side": "right",
+      "tag": {
+        "text": "コランダム",
+        "vi": "Họ Corundum"
+      },
+      "sub": {
+        "text": "酸化アルミニウム",
+        "vi": "Nhôm oxit"
+      },
+      "suggested_action": "explain-b",
+      "needs_context_image": true,
+      "image_concept": "A rough hexagonal barrel-shaped sapphire crystal in its natural rock matrix"
+    },
+    {
+      "text": {
+        "text": "アクアマリンのモース硬度は7.5から8で、日常使いに適した硬さです。",
+        "vi": "Độ cứng Mohs của aquamarine là 7.5 đến 8, độ cứng thích hợp để đeo hàng ngày."
+      },
+      "side": "left",
+      "tag": {
+        "text": "硬度7.5-8",
+        "vi": "Độ cứng 7.5-8"
+      },
+      "sub": {
+        "text": "十分な耐久性",
+        "vi": "Đủ bền bỉ"
+      },
+      "suggested_action": "explain-a",
+      "needs_context_image": false,
+      "image_concept": ""
+    },
+    {
+      "text": {
+        "text": "サファイアはモース硬度が9と、ダイヤモンドに次ぐ非常に高い硬度を持ちます。",
+        "vi": "Sapphire có độ cứng Mohs là 9, sở hữu độ cứng cực cao chỉ đứng sau kim cương."
+      },
+      "side": "right",
+      "tag": {
+        "text": "硬度9",
+        "vi": "Độ cứng 9"
+      },
+      "sub": {
+        "text": "極めて頑丈",
+        "vi": "Cực kỳ bền bỉ"
+      },
+      "suggested_action": "shocked-a",
+      "needs_context_image": true,
+      "image_concept": "A diagram of the Mohs hardness scale showing sapphire at level 9, just below diamond at 10"
+    },
+    {
+      "text": {
+        "text": "アクアマリンの澄んだ水色は、微量に含まれる鉄分によるものとされています。",
+        "vi": "Màu xanh nước biển trong vắt của aquamarine được cho là do chứa một lượng nhỏ sắt."
+      },
+      "side": "left",
+      "tag": {
+        "text": "鉄分による青",
+        "vi": "Xanh do sắt"
+      },
+      "sub": {
+        "text": "透き通る水色",
+        "vi": "Xanh nước trong"
+      },
+      "suggested_action": "explain-b",
+      "needs_context_image": false,
+      "image_concept": ""
+    },
+    {
+      "text": {
+        "text": "サファイアの深い青色は、鉄とチタンの絶妙な組み合わせで生まれます。",
+        "vi": "Màu xanh lam đậm của sapphire được sinh ra từ sự kết hợp tinh tế giữa sắt và titan."
+      },
+      "side": "right",
+      "tag": {
+        "text": "鉄とチタン",
+        "vi": "Sắt và titan"
+      },
+      "sub": {
+        "text": "深みのある青",
+        "vi": "Xanh lam đậm"
+      },
+      "suggested_action": "explain-a",
+      "needs_context_image": false,
+      "image_concept": ""
+    },
+    {
+      "text": {
+        "text": "優しい水色のアクアマリンと、気品ある濃紺のサファイア、どちらが好みですか？",
+        "vi": "Aquamarine xanh nước biển dịu nhẹ và sapphire xanh navy quý phái, bạn thích loại nào hơn?"
+      },
+      "side": "both",
+      "tag": {
+        "text": "青の魅力",
+        "vi": "Sức hút sắc xanh"
+      },
+      "sub": {
+        "text": "個性の違い",
+        "vi": "Khác biệt cá tính"
+      },
+      "suggested_action": "thumbs-up-a",
+      "needs_context_image": false,
+      "image_concept": ""
+    }
+  ],
+  "locale": "ja-JP",
+  "_meta": {
+    "generated_at": "2026-10-01T09:25:45.445Z",
+    "model": "gemini-3.5-flash",
+    "source_images": {
+      "left": "videos/aquamarine-vs-sapphire/assets/images/card-left.jpg",
+      "right": "videos/aquamarine-vs-sapphire/assets/images/card-right.jpg"
+    },
+    "corrections": [],
+    "contextImageCorrections": [],
+    "warnings": [],
+    "content_angle_id": "auto",
+    "custom_angle_text": ""
+  }
+}

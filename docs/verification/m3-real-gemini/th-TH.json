@@ -1,0 +1,184 @@
+{
+  "error": "",
+  "title": {
+    "text": "อความารีน กับ แซฟไฟร์ ต่างกันยังไงนะ?",
+    "vi": "Aquamarine và Sapphire khác nhau như thế nào nhỉ?"
+  },
+  "label_left": {
+    "text": "อความารีน",
+    "vi": "Aquamarine"
+  },
+  "label_right": {
+    "text": "แซฟไฟร์",
+    "vi": "Sapphire"
+  },
+  "materials": [
+    "อความารีน",
+    "แซฟไฟร์"
+  ],
+  "topicTags": [
+    "#อัญมณี",
+    "#ความรู้เรื่องอัญมณี"
+  ],
+  "suggestedTags": [],
+  "points": [
+    {
+      "text": {
+        "text": "เห็นสีน้ำเงินสวยๆ แบบนี้ รู้ไหมว่าสองเม็ดนี้ต่างกันยังไง?",
+        "vi": "Nhìn sắc xanh tuyệt đẹp thế này, bạn có biết hai viên này khác nhau thế nào không?"
+      },
+      "side": "both",
+      "tag": {
+        "text": "สีน้ำเงินสวย",
+        "vi": "Sắc xanh đẹp"
+      },
+      "sub": {
+        "text": "ต่างกันยังไง",
+        "vi": "Khác nhau thế nào"
+      },
+      "suggested_action": "shrug-a",
+      "needs_context_image": false,
+      "image_concept": ""
+    },
+    {
+      "text": {
+        "text": "ฝั่งซ้ายคืออความารีน อัญมณีสีฟ้าใสในตระกูลเบริล",
+        "vi": "Bên trái là Aquamarine, loại đá quý màu xanh lam trong suốt thuộc họ Beryl."
+      },
+      "side": "left",
+      "tag": {
+        "text": "อความารีน",
+        "vi": "Aquamarine"
+      },
+      "sub": {
+        "text": "ตระกูลเบริล",
+        "vi": "Họ Beryl"
+      },
+      "suggested_action": "point-up-left",
+      "needs_context_image": true,
+      "image_concept": "Beryl mineral crystal in natural rock formation, light blue hexagonal crystal"
+    },
+    {
+      "text": {
+        "text": "ส่วนฝั่งขวาคือแซฟไฟร์สีน้ำเงินเข้ม จากตระกูลคอรันดัม",
+        "vi": "Còn bên phải là Sapphire xanh lam đậm, thuộc họ Corundum."
+      },
+      "side": "right",
+      "tag": {
+        "text": "แซฟไฟร์",
+        "vi": "Sapphire"
+      },
+      "sub": {
+        "text": "ตระกูลคอรันดัม",
+        "vi": "Họ Corundum"
+      },
+      "suggested_action": "point-up-right",
+      "needs_context_image": true,
+      "image_concept": "Corundum mineral crystal, deep blue sapphire raw stone"
+    },
+    {
+      "text": {
+        "text": "อความารีนมีความแข็งระดับ 7.5 ถึง 8 ตามสเกลโมห์ส",
+        "vi": "Aquamarine có độ cứng từ 7.5 đến 8 trên thang Mohs."
+      },
+      "side": "left",
+      "tag": {
+        "text": "ความแข็ง 7.5-8",
+        "vi": "Độ cứng 7.5-8"
+      },
+      "sub": {
+        "text": "ทนทานดี",
+        "vi": "Độ bền tốt"
+      },
+      "suggested_action": "explain-a",
+      "needs_context_image": false,
+      "image_concept": ""
+    },
+    {
+      "text": {
+        "text": "แต่แซฟไฟร์แข็งแกร่งกว่ามาก สูงถึงระดับ 9 เป็นรองแค่เพชร",
+        "vi": "Nhưng Sapphire cứng hơn nhiều, đạt mức 9 và chỉ đứng sau kim cương."
+      },
+      "side": "right",
+      "tag": {
+        "text": "ความแข็ง 9",
+        "vi": "Độ cứng 9"
+      },
+      "sub": {
+        "text": "เป็นรองแค่เพชร",
+        "vi": "Chỉ sau kim cương"
+      },
+      "suggested_action": "shocked-a",
+      "needs_context_image": true,
+      "image_concept": "Mohs hardness scale graphic showing Sapphire at level 9 and Diamond at level 10"
+    },
+    {
+      "text": {
+        "text": "อความารีนสื่อถึงความสงบและการปกป้องจากท้องทะเล",
+        "vi": "Aquamarine tượng trưng cho sự bình yên và sự bảo hộ từ đại dương."
+      },
+      "side": "left",
+      "tag": {
+        "text": "พลังแห่งทะเล",
+        "vi": "Năng lượng biển"
+      },
+      "sub": {
+        "text": "ความสงบปลอดภัย",
+        "vi": "Bình yên an toàn"
+      },
+      "suggested_action": "explain-b",
+      "needs_context_image": true,
+      "image_concept": "Calm ocean waves with sunlight shining through, peaceful water background"
+    },
+    {
+      "text": {
+        "text": "แซฟไฟร์เป็นสัญลักษณ์ของความจริงใจและความสูงส่ง",
+        "vi": "Sapphire là biểu tượng của sự chân thành và lòng cao quý."
+      },
+      "side": "right",
+      "tag": {
+        "text": "ความสูงส่ง",
+        "vi": "Sự cao quý"
+      },
+      "sub": {
+        "text": "ความจริงใจ",
+        "vi": "Sự chân thành"
+      },
+      "suggested_action": "explain-a",
+      "needs_context_image": false,
+      "image_concept": ""
+    },
+    {
+      "text": {
+        "text": "ชอบสีฟ้าใสแบบน้ำทะเล หรือสีน้ำเงินเข้มหรูหรา เลือกแบบไหนดีนะ?",
+        "vi": "Bạn thích màu xanh lam trong vắt như nước biển hay màu xanh đậm sang trọng, chọn loại nào đây?"
+      },
+      "side": "both",
+      "tag": {
+        "text": "เลือกแบบไหนดี",
+        "vi": "Chọn loại nào"
+      },
+      "sub": {
+        "text": "ฟ้าใสหรือน้ำเงิน",
+        "vi": "Lam trong hay đậm"
+      },
+      "suggested_action": "thumbs-up-a",
+      "needs_context_image": false,
+      "image_concept": ""
+    }
+  ],
+  "locale": "th-TH",
+  "_meta": {
+    "generated_at": "2026-10-01T09:24:57.543Z",
+    "model": "gemini-3.5-flash",
+    "source_images": {
+      "left": "videos/aquamarine-vs-sapphire/assets/images/card-left.jpg",
+      "right": "videos/aquamarine-vs-sapphire/assets/images/card-right.jpg"
+    },
+    "corrections": [],
+    "contextImageCorrections": [],
+    "warnings": [],
+    "content_angle_id": "auto",
+    "custom_angle_text": ""
+  }
+}
