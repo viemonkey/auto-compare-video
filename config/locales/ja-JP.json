@@ -8,7 +8,7 @@
   "enabled": true,
   "slugSuffix": "ja",
   "styleSummary": "Lịch sự です/ます, câu ngắn, khiêm tốn, tránh khẳng định tuyệt đối",
-  "styleGuide": "- Giọng điệu: lịch sự, điềm đạm, khiêm tốn như người giới thiệu kiến thức cho khán giả Nhật. Dùng thể lịch sự です/ます (丁寧語) NHẤT QUÁN trong toàn bộ video; không trộn thể thường だ/である (ngoại lệ duy nhất: \"tag\"/\"sub\" trên màn hình là cụm danh từ ngắn).\n- Câu ngắn, mỗi câu 1 ý, khoảng 20-35 chữ; tránh câu lồng nhiều mệnh đề. Không dùng kính ngữ nặng (尊敬語/謙譲語 quá mức).\n- Mở đầu thu hút bằng câu hỏi gần gũi, ví dụ 「〇〇と△△、違いを知っていますか？」 hoặc 「〇〇と△△の違いは？」.\n- Tránh khẳng định tuyệt đối: không dùng 絶対, 必ず, 最高, 世界一, 一番 để khen sản phẩm; ưu tiên các cách nói giảm như 〜と言われています, 〜とされています, 〜傾向があります, 〜の場合が多いです.\n- Không dùng ngôn từ quảng cáo thổi phồng, không hứa hẹn giá trị đầu tư hay lợi nhuận, không so sánh giá cả kiểu \"rẻ/đắt\" tuyệt đối; nêu sự khác biệt dựa trên tính chất (độ cứng, màu sắc, độ bền, cách chăm sóc).\n- Tên đá quý/kim loại dùng đúng thuật ngữ trong glossary (katakana chuẩn như ダイヤモンド, アメジスト). Không chèn chữ Việt hay romaji vào câu.\n- Không dùng emoji. \"tag\"/\"sub\" không có dấu 。 ở cuối.",
+  "styleGuide": "- Giọng điệu: lịch sự, điềm đạm, khiêm tốn như người giới thiệu kiến thức cho khán giả Nhật. Dùng thể lịch sự です/ます (丁寧語) NHẤT QUÁN trong toàn bộ video; không trộn thể thường だ/である (ngoại lệ duy nhất: \"tag\"/\"sub\" trên màn hình là cụm danh từ ngắn).\n- Câu ngắn, mỗi câu 1 ý, khoảng 20-35 chữ; tránh câu lồng nhiều mệnh đề. Không dùng kính ngữ nặng (尊敬語/謙譲語 quá mức).\n- Mở đầu thu hút bằng câu hỏi gần gũi, ví dụ 「〇〇と△△、違いを知っていますか？」 hoặc 「〇〇と△△の違いは？」.\n- Tránh khẳng định tuyệt đối: không dùng 絶対, 必ず, 最高, 世界一, 一番 để khen sản phẩm; ưu tiên các cách nói giảm như 〜と言われています, 〜とされています, 〜傾向があります, 〜の場合が多いです.\n- Không dùng ngôn từ quảng cáo thổi phồng, không hứa hẹn giá trị đầu tư hay lợi nhuận, không so sánh giá cả kiểu \"rẻ/đắt\" tuyệt đối; nêu sự khác biệt dựa trên tính chất (độ cứng, màu sắc, độ bền, cách chăm sóc).\n- Tên đá quý/kim loại dùng đúng thuật ngữ trong glossary (katakana chuẩn như ダイヤモンド, アメジスト). Không chèn chữ Việt hay romaji vào câu.\n- Không dùng emoji. \"tag\"/\"sub\" không có dấu 。 ở cuối.\n- Ý nghĩa biểu tượng/tâm linh: ĐƯỢC PHÉP nêu như ý nghĩa biểu tượng, văn hoá — viết dạng 「〜を象徴するとされています」「〜の象徴と言われています」「〜と考えられてきました」. TUYỆT ĐỐI KHÔNG khẳng định công dụng: 運気が上がる, 守ってくれる, 病気が治る, お金持ちになる, 金運アップ, 厄除け… (xem các cụm bị cấm).\n- Phân biệt 硬度 (độ cứng, chống trầy — モース硬度) và 靭性 (độ dai, chống nứt vỡ — 割れにくさ). Khi nói về thang Mohs PHẢI dùng 「硬度」「硬い」, KHÔNG dùng 「頑丈」「丈夫」「強い」 với nghĩa độ cứng; chỉ dùng 「靭性」「割れにくい」 khi nói về khả năng chống vỡ.",
   "glossary": {
     "kim cương": "ダイヤモンド",
     "kim cương nhân tạo": "ラボグロウンダイヤモンド",
@@ -36,6 +36,8 @@
     "titanium": "チタン",
     "nhẫn cưới": "結婚指輪",
     "nhẫn đính hôn": "婚約指輪",
+    "độ cứng": "硬度（硬さ）",
+    "độ dai": { "term": "靭性（割れにくさ）", "ambiguous": true },
     "độ cứng Mohs": "モース硬度",
     "carat": "カラット",
     "tinh thể": { "term": "結晶", "ambiguous": true },
@@ -55,7 +57,7 @@
     "hashtagTotal": 25,
     "readingRate": 7
   },
-  "forbiddenPhrases": ["絶対", "必ず儲かる", "世界一", "100％本物", "最安値", "奇跡の"],
+  "forbiddenPhrases": ["絶対","必ず儲かる","世界一","100％本物","最安値","奇跡の","運気が上がる","運気アップ","守ってくれる","魔除け","厄除け","治る","病気が治る","金運","開運","幸運を呼ぶ","お金持ちになる"],
   "hashtags": "config/hashtags/ja-JP.json",
   "hashtagStyle": "native",
   "mixedGroup": "豆知識",

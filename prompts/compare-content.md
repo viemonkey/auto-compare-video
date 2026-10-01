@@ -74,8 +74,15 @@ JSON trả về LUÔN LUÔN có đủ 8 field sau — không được bỏ bớt
 {{#bilingual}}
 - SONG NGỮ — MỌI field hiển thị ("title", "label_left", "label_right" và "text"/"tag"/"sub" của từng point) KHÔNG phải chuỗi
   mà là object {"text": "<chữ bằng {{language}}, đúng như mô tả field ở trên>", "vi": "<nghĩa tiếng Việt>"}. "vi" là bản dịch SÁT NGHĨA
-  của đúng câu "text" đó bằng tiếng Việt tự nhiên, để người vận hành kiểm soát: KHÔNG làm cho hay hơn, KHÔNG thêm ý, KHÔNG bớt ý,
-  KHÔNG diễn giải lại. "sub" để trống thì {"text": "", "vi": ""}. Các field còn lại ("error", "materials", "topicTags",
+  TUYỆT ĐỐI của đúng chữ trong "text" (người vận hành dùng dòng này để kiểm soát nội dung — nó phải phản ánh ĐÚNG những gì "text" nói):
+  + Dịch từng từ, từng ý, theo thứ tự ý của câu gốc. KHÔNG làm cho hay hơn, KHÔNG thêm ý, KHÔNG bớt ý (kể cả sắc thái như "cực kỳ",
+    "khá"), KHÔNG diễn giải lại, KHÔNG gộp hay tách câu.
+  + KHÔNG thêm từ phân loại, giải thích hay chú thích mà chữ gốc không có. Chỉ nói "họ/nhóm/loại/khoáng vật" khi chữ gốc có từ tương ứng.
+  + Tên riêng, tên đá quý/kim loại, thuật ngữ quốc tế giữ nguyên dạng quen dùng (Aquamarine, Sapphire, Corundum, Mohs).
+  + ĐÚNG: "コランダム" -> "Corundum" | "Beryl family" -> "Họ Beryl" (chữ gốc có "family") | "硬度9" -> "Độ cứng 9".
+  + SAI: "コランダム" -> "Họ Corundum" (thêm từ phân loại "Họ") | "Corundum" -> "Khoáng vật corundum" (thêm "khoáng vật") |
+    "硬度9" -> "Rất cứng, độ cứng 9" (thêm ý) | "極めて頑丈" -> "Bền" (bớt sắc thái "cực kỳ").
+  "sub" để trống thì {"text": "", "vi": ""}. Các field còn lại ("error", "materials", "topicTags",
   "suggestedTags", "side", "suggested_action", "needs_context_image", "image_concept") giữ nguyên kiểu như mô tả ở trên.
 {{/bilingual}}
 - "text" là LỜI THOẠI (đọc lên, câu đầy đủ). "tag"/"sub" là CHỮ HIỆN TRÊN MÀN HÌNH — phải

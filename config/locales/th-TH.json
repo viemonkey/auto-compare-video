@@ -8,7 +8,7 @@
   "enabled": true,
   "slugSuffix": "th",
   "styleSummary": "Thân thiện, gần gũi, lịch sự vừa phải, câu ngắn dễ nghe",
-  "styleGuide": "- Giọng điệu: thân thiện, gần gũi như người bạn chia sẻ kiến thức, lịch sự vừa phải (ภาษาพูดสุภาพ), không quá trang trọng/ราชาศัพท์. Không dùng đuôi câu phân biệt giới (ครับ/ค่ะ/คะ) — dùng đuôi trung tính như นะ, เลย, ล่ะ để hợp với mọi giọng đọc.\n- Câu ngắn, dễ nghe khi đọc thành tiếng, mỗi câu 1 ý (khoảng 25-45 grapheme). Không dùng khoảng trắng thừa; dùng dấu cách giữa các cụm ý như người Thái viết caption.\n- Mở đầu thu hút bằng câu hỏi gần gũi, ví dụ \"รู้ไหมว่า … กับ … ต่างกันยังไง?\" hoặc \"… หรือ … ต่างกันตรงไหน?\".\n- Tránh khẳng định tuyệt đối và khoe khoang: không \"ที่สุดในโลก\", \"รับประกัน 100%\", \"ของแท้แน่นอน\"; không hứa hẹn โชคลาภ/ความเชื่อเรื่องดวง hay giá trị đầu tư.\n- Tên đá quý/kim loại dùng thuật ngữ người Thái quen dùng theo glossary (เพชร, ทับทิม, มรกต…). Không chèn chữ Việt; tên quốc tế đã quen dùng có thể giữ chữ Latin (เช่น Moissanite) nếu glossary không có.\n- Không dùng emoji.",
+  "styleGuide": "- Giọng điệu: thân thiện, gần gũi như người bạn chia sẻ kiến thức, lịch sự vừa phải (ภาษาพูดสุภาพ), không quá trang trọng/ราชาศัพท์. Không dùng đuôi câu phân biệt giới (ครับ/ค่ะ/คะ) — dùng đuôi trung tính như นะ, เลย, ล่ะ để hợp với mọi giọng đọc.\n- Câu ngắn, dễ nghe khi đọc thành tiếng, mỗi câu 1 ý (khoảng 25-45 grapheme). Không dùng khoảng trắng thừa; dùng dấu cách giữa các cụm ý như người Thái viết caption.\n- Mở đầu thu hút bằng câu hỏi gần gũi, ví dụ \"รู้ไหมว่า … กับ … ต่างกันยังไง?\" hoặc \"… หรือ … ต่างกันตรงไหน?\".\n- Tránh khẳng định tuyệt đối và khoe khoang: không \"ที่สุดในโลก\", \"รับประกัน 100%\", \"ของแท้แน่นอน\"; không hứa hẹn โชคลาภ/ความเชื่อเรื่องดวง hay giá trị đầu tư.\n- Tên đá quý/kim loại dùng thuật ngữ người Thái quen dùng theo glossary (เพชร, ทับทิม, มรกต…). Không chèn chữ Việt; tên quốc tế đã quen dùng có thể giữ chữ Latin (เช่น Moissanite) nếu glossary không có.\n- Không dùng emoji.\n- Ý nghĩa biểu tượng/tâm linh: ĐƯỢC PHÉP nêu như ý nghĩa biểu tượng/văn hoá — viết dạng \"ถือเป็นสัญลักษณ์ของ…\", \"เชื่อกันว่าเป็นตัวแทนของ…\", \"มักถูกเชื่อมโยงกับ…\". TUYỆT ĐỐI KHÔNG khẳng định công dụng: โชคลาภ, ปกป้อง, รักษาโรค, เสริมดวง, เรียกทรัพย์… (xem các cụm bị cấm).\n- Phân biệt ความแข็ง (độ cứng, chống trầy — สเกลโมห์ส) và ความเหนียว (độ dai, chống nứt vỡ — ทนต่อแรงกระแทก). Khi nói về thang Mohs PHẢI dùng \"ความแข็ง\"/\"แข็ง\", KHÔNG dùng \"ทนทาน\"/\"เหนียว\" với nghĩa độ cứng; chỉ dùng \"ความเหนียว\" khi nói về khả năng chống vỡ.",
   "glossary": {
     "kim cương": "เพชร",
     "kim cương nhân tạo": "เพชรสังเคราะห์ (แล็บโกรน)",
@@ -36,6 +36,8 @@
     "titanium": "ไทเทเนียม",
     "nhẫn cưới": "แหวนแต่งงาน",
     "nhẫn đính hôn": "แหวนหมั้น",
+    "độ cứng": "ความแข็ง",
+    "độ dai": { "term": "ความเหนียว", "ambiguous": true },
     "độ cứng Mohs": "ความแข็งตามสเกลโมห์ส",
     "carat": "กะรัต",
     "tinh thể": { "term": "ผลึก", "ambiguous": true },
@@ -55,7 +57,7 @@
     "hashtagTotal": 25,
     "readingRate": 10
   },
-  "forbiddenPhrases": ["ที่สุดในโลก", "รับประกัน 100%", "ของแท้แน่นอน", "รวยแน่นอน", "เสริมดวง"],
+  "forbiddenPhrases": ["ที่สุดในโลก","รับประกัน 100%","ของแท้แน่นอน","รวยแน่นอน","เสริมดวง","โชคลาภ","ปกป้อง","รักษาโรค","เสริมโชค","นำโชค","เรียกทรัพย์","เรียกเงิน","หายป่วย","ป้องกันสิ่งชั่วร้าย","ร่ำรวย"],
   "hashtags": "config/hashtags/th-TH.json",
   "hashtagStyle": "native",
   "mixedGroup": "ความรู้",

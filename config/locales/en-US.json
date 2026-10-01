@@ -8,7 +8,7 @@
   "enabled": true,
   "slugSuffix": "en",
   "styleSummary": "Direct, strong hook, conversational, no unverifiable marketing claims",
-  "styleGuide": "- Giọng điệu: trực diện, tự tin, trò chuyện như người Mỹ giải thích cho bạn bè; được dùng dạng viết tắt (it's, don't). Dùng tiếng Anh Mỹ (US spelling, carat, Mohs scale).\n- Hook mạnh ngay 5 từ đầu: một câu hỏi hoặc một sự thật bất ngờ, ví dụ \"Diamond or moissanite? Most people can't tell.\" / \"Why does amethyst fade in the sun?\".\n- Câu ngắn, mạnh, thể chủ động (active voice), mỗi câu 1 ý (khoảng 8-18 từ). Không dùng từ lóng thái quá, không dùng emoji.\n- Tránh tuyên bố quảng cáo không kiểm chứng và so sánh tuyệt đối: không \"best in the world\", \"guaranteed\", \"100% genuine\", \"investment-grade\". Dùng số liệu/tính chất kiểm chứng được (Mohs hardness, refractive index, carat) thay cho tính từ khen.\n- Không hứa hẹn giá trị đầu tư; không gọi hàng khác là \"fake\" hay \"cheap\" — nói \"lab-grown\", \"synthetic\", \"imitation\" đúng nghĩa.\n- Dùng đúng thuật ngữ trong glossary.",
+  "styleGuide": "- Giọng điệu: trực diện, tự tin, trò chuyện như người Mỹ giải thích cho bạn bè; được dùng dạng viết tắt (it's, don't). Dùng tiếng Anh Mỹ (US spelling, carat, Mohs scale).\n- Hook mạnh ngay 5 từ đầu: một câu hỏi hoặc một sự thật bất ngờ, ví dụ \"Diamond or moissanite? Most people can't tell.\" / \"Why does amethyst fade in the sun?\".\n- Câu ngắn, mạnh, thể chủ động (active voice), mỗi câu 1 ý (khoảng 8-18 từ). Không dùng từ lóng thái quá, không dùng emoji.\n- Tránh tuyên bố quảng cáo không kiểm chứng và so sánh tuyệt đối: không \"best in the world\", \"guaranteed\", \"100% genuine\", \"investment-grade\". Dùng số liệu/tính chất kiểm chứng được (Mohs hardness, refractive index, carat) thay cho tính từ khen.\n- Không hứa hẹn giá trị đầu tư; không gọi hàng khác là \"fake\" hay \"cheap\" — nói \"lab-grown\", \"synthetic\", \"imitation\" đúng nghĩa.\n- Dùng đúng thuật ngữ trong glossary.\n- Ý nghĩa biểu tượng/tâm linh: ĐƯỢC PHÉP nêu như ý nghĩa biểu tượng/văn hoá — viết dạng \"is said to symbolize…\", \"is traditionally seen as a symbol of…\", \"is often associated with…\". TUYỆT ĐỐI KHÔNG khẳng định công dụng: \"brings luck\", \"protects you\", \"heals\", \"attracts wealth\", \"makes you rich\"… (xem các cụm bị cấm).\n- Phân biệt hardness (độ cứng — chống trầy, thang Mohs) và toughness (độ dai — chống nứt vỡ khi va đập). Khi nói về thang Mohs PHẢI dùng \"hard\"/\"hardness\" (vd \"scores a 9 on the Mohs hardness scale\"), KHÔNG dùng \"tough\"/\"toughness\" cho thang Mohs; chỉ dùng \"tough/toughness\" khi nói về khả năng chống vỡ (vd \"jade is tougher than diamond\").",
   "glossary": {
     "kim cương": "diamond",
     "kim cương nhân tạo": "lab-grown diamond",
@@ -36,6 +36,8 @@
     "titanium": "titanium",
     "nhẫn cưới": "wedding band",
     "nhẫn đính hôn": "engagement ring",
+    "độ cứng": "hardness (hard)",
+    "độ dai": { "term": "toughness (tough)", "ambiguous": true },
     "độ cứng Mohs": "Mohs hardness",
     "carat": "carat",
     "tinh thể": { "term": "crystal", "ambiguous": true },
@@ -57,7 +59,7 @@
     "hashtagTotal": 25,
     "readingRate": 2.5
   },
-  "forbiddenPhrases": ["best in the world", "guaranteed", "100% genuine", "investment-grade", "miracle", "get rich"],
+  "forbiddenPhrases": ["best in the world","guaranteed","100% genuine","investment-grade","miracle","get rich","brings luck","bring you luck","brings good luck","protects you","will protect you","heals","healing power","cures","attracts wealth","brings wealth","makes you rich"],
   "hashtags": "config/hashtags/en-US.json",
   "hashtagStyle": "ascii",
   "mixedGroup": "jewelry tips",

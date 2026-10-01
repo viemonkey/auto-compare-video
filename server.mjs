@@ -30,7 +30,7 @@ import crypto from "node:crypto";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { CONTENT_ANGLES } from "./config/content-angles.mjs";
-import { COST_LEDGER_PATH, renameCostLedgerSlug } from "./scripts/lib/cost-ledger.mjs";
+import { COST_LEDGER_PATH, renameCostLedgerSlug, countsAsVideo } from "./scripts/lib/cost-ledger.mjs";
 import { getConfiguredPages } from "./scripts/lib/facebook-pages.mjs";
 import { graphVersion, inspectPages, isAutoPostEnabled, makeLogger, redactSecrets } from "./scripts/lib/fb-config.mjs";
 import { classifyError } from "./scripts/lib/fb-errors.mjs";
@@ -1034,7 +1034,9 @@ app.get("/api/cost-stats", (_req, res) => {
     }
     byTaskMap.set(task, (byTaskMap.get(task) || 0) + cost);
 
-    if (row.slug) {
+    // Dòng kiểm chứng (task "verification") vẫn nằm trong tổng/theo ngày/theo task ở trên nhưng KHÔNG phải video:
+    // bỏ khỏi thống kê theo video để không hiện thành "video ma".
+    if (countsAsVideo(row)) {
       if (!videoMap.has(row.slug)) {
         videoMap.set(row.slug, {
           slug: row.slug,

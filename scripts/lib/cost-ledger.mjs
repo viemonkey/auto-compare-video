@@ -21,6 +21,14 @@ export const COST_LEDGER_PATH = process.env.COST_LEDGER_PATH || path.join(OUTPUT
 // Đọc env cả lúc GHI (không chỉ lúc import) — test đặt COST_LEDGER_PATH sau khi module đã được import vẫn không ghi nhầm vào sổ thật.
 const ledgerPath = () => process.env.COST_LEDGER_PATH || COST_LEDGER_PATH;
 
+// Lần gọi kiểm chứng/thử nghiệm (slug tạm "_verify-…", "_hashtag-smoke-test…") KHÔNG phải video: ghi task "verification" (task gốc giữ ở
+// `subtask`) để thống kê theo video bỏ qua, nhưng vẫn cộng vào tổng chi phí.
+export const VERIFICATION_TASK = "verification";
+export const isVerificationSlug = (slug) => typeof slug === "string" && /^_(verify|hashtag-smoke-test)/.test(slug);
+
+/** Dòng sổ có thuộc 1 video thật không (có slug, không phải dòng kiểm chứng — kể cả dòng cũ chưa đổi task). */
+export const countsAsVideo = (row) => !!row.slug && row.task !== VERIFICATION_TASK && !isVerificationSlug(row.slug);
+
 /**
  * @param {object} entry
  * @param {string|null} entry.slug - videos/<slug>/ liên quan, hoặc null nếu chưa xác định
@@ -43,8 +51,8 @@ export function appendCostEntry(entry) {
     timestamp: new Date().toISOString(),
     slug: entry.slug || null,
     locale: entry.locale || null,
-    subtask: entry.subtask || null,
-    task: entry.task,
+    subtask: isVerificationSlug(entry.slug) ? entry.subtask || entry.task || null : entry.subtask || null,
+    task: isVerificationSlug(entry.slug) ? VERIFICATION_TASK : entry.task,
     model: entry.model,
     input_tokens: typeof entry.inputTokens === "number" ? entry.inputTokens : null,
     output_tokens: typeof entry.outputTokens === "number" ? entry.outputTokens : null,

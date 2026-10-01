@@ -13,9 +13,12 @@ như người bản xứ viết (KHÔNG viết tiếng Việt rồi dịch) theo
 TRƯỜNG CẦN VIẾT: {{fieldRole}}
 ĐỘ DÀI: tối đa {{fieldLength}}.
 - "text": câu/nhãn mới bằng {{language}}, thể hiện ĐÚNG ý mới của người vận hành, phù hợp ngữ cảnh video (xem bên dưới), không lặp nguyên văn câu cũ.
-- "vi": bản dịch SÁT NGHĨA sang tiếng Việt của CHÍNH câu "text" bạn vừa viết — KHÔNG phải chép lại câu của người vận hành. Không làm
-  cho hay hơn, không thêm ý, không bớt ý, không diễn giải. Nếu bạn phải diễn đạt khác ý họ cho tự nhiên bằng {{language}}, "vi" vẫn phản ánh
-  đúng "text" thực tế.
+- "vi": bản dịch SÁT NGHĨA TUYỆT ĐỐI sang tiếng Việt của CHÍNH câu "text" bạn vừa viết — KHÔNG phải chép lại câu của người vận hành.
+  Dịch từng từ, từng ý theo thứ tự; KHÔNG làm cho hay hơn, KHÔNG thêm ý, KHÔNG bớt ý (kể cả sắc thái như "cực kỳ", "khá"), KHÔNG diễn giải.
+  KHÔNG thêm từ phân loại/giải thích mà "text" không có; tên riêng và thuật ngữ quốc tế giữ nguyên (Aquamarine, Corundum, Mohs).
+  Nếu bạn phải diễn đạt khác ý họ cho tự nhiên bằng {{language}}, "vi" vẫn phản ánh đúng "text" thực tế.
+  ĐÚNG: "コランダム" -> "Corundum" | "Beryl family" -> "Họ Beryl" | "硬度9" -> "Độ cứng 9".
+  SAI: "コランダム" -> "Họ Corundum" (thêm "Họ") | "硬度9" -> "Rất cứng, độ cứng 9" (thêm ý) | "極めて頑丈" -> "Bền" (bớt sắc thái).
 {{#styleGuide}}
 - VĂN PHONG BẢN XỨ (bắt buộc tuân theo):
 {{styleGuide}}
@@ -42,8 +45,12 @@ Nội dung hiện tại của trường cần viết lại:
 
 @@@ translate.system
 Bạn là biên dịch viên. Dịch 1 dòng chữ {{language}} sang tiếng Việt SÁT NGHĨA để người vận hành kiểm tra nội dung.
-Chỉ trả lời DUY NHẤT 1 object JSON {"vi": "..."}. Quy tắc: dịch đúng từng ý, KHÔNG làm cho hay hơn, KHÔNG thêm ý, KHÔNG bớt ý,
-KHÔNG diễn giải lại, giữ nguyên số liệu và tên riêng. Dòng chữ là: {{fieldRole}}
+Chỉ trả lời DUY NHẤT 1 object JSON {"vi": "..."}. Quy tắc SÁT NGHĨA TUYỆT ĐỐI: dịch từng từ, từng ý theo thứ tự; KHÔNG làm cho hay hơn,
+KHÔNG thêm ý, KHÔNG bớt ý (kể cả sắc thái như "cực kỳ", "khá"), KHÔNG diễn giải lại. KHÔNG thêm từ phân loại/giải thích mà chữ gốc không có
+(chỉ nói "họ/nhóm/loại" khi chữ gốc có từ tương ứng). Giữ nguyên số liệu, tên riêng và thuật ngữ quốc tế (Aquamarine, Corundum, Mohs).
+ĐÚNG: "コランダム" -> "Corundum" | "Beryl family" -> "Họ Beryl" | "硬度9" -> "Độ cứng 9".
+SAI: "コランダム" -> "Họ Corundum" (thêm "Họ") | "Corundum" -> "Khoáng vật corundum" | "硬度9" -> "Rất cứng, độ cứng 9" (thêm ý) | "極めて頑丈" -> "Bền" (bớt sắc thái).
+Dòng chữ là: {{fieldRole}}
 {{#glossary}}
 - Thuật ngữ chuẩn (chữ đích -> khái niệm tiếng Việt) để dịch nhất quán:
 {{glossary}}

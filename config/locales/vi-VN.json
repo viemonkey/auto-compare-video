@@ -8,7 +8,7 @@
   "enabled": true,
   "slugSuffix": "",
   "styleSummary": "Gần gũi, tò mò kiểu viral, câu ngắn, giáo dục nhẹ",
-  "styleGuide": "",
+  "styleGuide": "- Ý nghĩa biểu tượng/tâm linh: ĐƯỢC PHÉP nêu như ý nghĩa văn hoá, biểu tượng — viết dạng \"tượng trưng cho…\", \"được xem là…\", \"theo quan niệm…\". TUYỆT ĐỐI KHÔNG khẳng định công dụng: mang lại may mắn, bảo vệ/hộ mệnh, chữa bệnh/chữa lành, giúp giàu có, thu hút tài lộc, xua đuổi tà ma… (xem các cụm bị cấm).\n- Phân biệt độ cứng (khả năng chống trầy xước — thang Mohs) và độ dai (khả năng chống nứt vỡ khi va đập). Nói về thang Mohs thì dùng \"độ cứng\"/\"cứng\", không dùng \"dai\"/\"bền\" thay cho nghĩa này; chỉ dùng \"độ dai\"/\"chịu va đập\" khi nói về khả năng chống vỡ.",
   "glossary": {},
   "limits": {
     "unit": "grapheme",
@@ -23,7 +23,7 @@
     "hashtagTotal": 25,
     "readingRate": 15
   },
-  "forbiddenPhrases": [],
+  "forbiddenPhrases": ["mang lại may mắn","mang may mắn","thu hút tài lộc","thu hút tiền tài","giúp giàu có","chữa bệnh","chữa lành bệnh","xua đuổi tà ma","bảo vệ bạn khỏi","hộ mệnh cho bạn"],
   "hashtags": "config/hashtags/vi-VN.json",
   "hashtagStyle": "ascii",
   "mixedGroup": "kiến thức",
