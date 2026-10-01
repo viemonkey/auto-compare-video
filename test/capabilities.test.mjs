@@ -8,7 +8,7 @@ import {
   validateEngine, validateTheme, loadEngines, loadThemes, listEngines, listThemes,
   enginesForLanguage, themeSupportsScript, themeSupportsLanguage, engineReadiness, checkRenderability, getDefaultTheme, defaultVoiceFor,
 } from "../scripts/lib/capabilities.mjs";
-import { listLocales, defaultLocaleCode, getLocale } from "../scripts/lib/locales.mjs";
+import { listLocales, defaultLocaleCode, getLocale, glossaryEntries } from "../scripts/lib/locales.mjs";
 import { buildComparePrompt, buildResponseSchema, schemaMaxLength } from "../scripts/lib/compare-prompt.mjs";
 import { loadHashtagConfig } from "../scripts/lib/hashtags.mjs";
 
@@ -216,7 +216,7 @@ test("prompt theo locale: có styleGuide/glossary/forbidden đúng locale (khi c
     } else {
       assert.ok(!/VĂN PHONG BẢN XỨ/.test(systemPrompt), `${l.code}: không có styleGuide thì không có khối văn phong`);
     }
-    for (const [concept, term] of Object.entries(l.glossary)) {
+    for (const { concept, term } of glossaryEntries(l)) {
       assert.ok(systemPrompt.includes(term) && systemPrompt.includes(concept), `${l.code}: glossary ${concept}`);
     }
     for (const p of l.forbiddenPhrases) assert.ok(systemPrompt.includes(`"${p}"`), `${l.code}: forbidden ${p}`);

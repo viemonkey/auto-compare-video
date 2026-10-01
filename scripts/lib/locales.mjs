@@ -35,6 +35,24 @@ const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const isStr = (v) => typeof v === "string";
 const isNonEmptyStr = (v) => isStr(v) && v.trim() !== "";
 const isPosInt = (v) => Number.isInteger(v) && v > 0;
+// Mục glossary: chuỗi thuật ngữ, hoặc object { term, ambiguous?, contexts? } cho khái niệm mơ hồ (vd "vàng" vừa là kim loại vừa là màu).
+const isGlossaryEntry = (v) =>
+  isNonEmptyStr(v) ||
+  (isObj(v) && isNonEmptyStr(v.term) && (v.ambiguous === undefined || typeof v.ambiguous === "boolean") &&
+    (v.contexts === undefined || (Array.isArray(v.contexts) && v.contexts.length > 0 && v.contexts.every(isNonEmptyStr))));
+
+/**
+ * Glossary dạng phẳng: [{ concept, term, ambiguous, contexts }].
+ * - ambiguous: true  -> khái niệm mơ hồ, KHÔNG bao giờ cảnh báo lệch thuật ngữ (vẫn đưa vào prompt);
+ * - contexts: [...]  -> chỉ kiểm khi dòng nghĩa tiếng Việt chứa 1 trong các cụm ngữ cảnh này.
+ */
+export function glossaryEntries(locale) {
+  return Object.entries(locale.glossary).map(([concept, v]) =>
+    typeof v === "string"
+      ? { concept, term: v, ambiguous: false, contexts: null }
+      : { concept, term: v.term, ambiguous: v.ambiguous === true, contexts: v.contexts ?? null },
+  );
+}
 
 /**
  * Kiểm tra 1 locale thô. Trả { locale, problems }: problems rỗng = hợp lệ.
@@ -62,8 +80,8 @@ export function validateLocale(raw, { repoRoot = REPO_ROOT } = {}) {
   need(isNonEmptyStr(raw.styleSummary), '"styleSummary" phải là chuỗi không rỗng (mô tả văn phong 1 dòng hiện ở UI)');
   need(isStr(raw.styleGuide), '"styleGuide" phải là chuỗi (có thể rỗng với thị trường mặc định)');
 
-  need(isObj(raw.glossary) && Object.values(raw.glossary).every(isNonEmptyStr) && Object.keys(raw.glossary).every((k) => k.trim()),
-    '"glossary" phải là object { "<khái niệm tiếng Việt>": "<thuật ngữ đích>" }');
+  need(isObj(raw.glossary) && Object.keys(raw.glossary).every((k) => k.trim()) && Object.values(raw.glossary).every(isGlossaryEntry),
+    '"glossary" phải là object { "<khái niệm tiếng Việt>": "<thuật ngữ đích>" | { "term": "...", "ambiguous"?: true, "contexts"?: ["<cụm tiếng Việt>"] } }');
 
   const lim = raw.limits;
   if (!isObj(lim)) {

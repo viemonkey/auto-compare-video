@@ -6,7 +6,7 @@
 import { RetryableError, NonRetryableError } from "./gemini-retry.mjs";
 import { resolveTopicTags, cleanTag, loadHashtagConfig, resolveMaterialGroups } from "./hashtags.mjs";
 import { stripDiacritics } from "./slug.mjs";
-import { getDefaultLocale, glossLocale, needsGloss } from "./locales.mjs";
+import { getDefaultLocale, glossLocale, glossaryEntries, needsGloss } from "./locales.mjs";
 import { CONTENT_FIELDS, POINT_FIELDS, isBilingualField, textOf, viOf, coerceField } from "../../public/shared/bilingual.mjs";
 import { measure } from "../../public/shared/text-length.mjs";
 
@@ -121,14 +121,18 @@ const UNIT_NAME = { grapheme: "ký tự", word: "từ" };
 
 // Nhắc tới khái niệm glossary trong dòng nghĩa tiếng Việt nhưng chữ đích không dùng thuật ngữ chuẩn. Khớp khái niệm DÀI
 // trước và gạch khỏi chuỗi (vd "thạch anh tím" trước "thạch anh") để không báo nhầm khái niệm con.
-function glossaryWarnings(text, vi, glossary) {
+// Khái niệm mơ hồ (glossary `ambiguous`) không bao giờ bị cảnh báo; khái niệm có `contexts` chỉ bị kiểm khi nghĩa chứa 1 cụm ngữ cảnh.
+function glossaryWarnings(text, vi, entries) {
   const out = [];
-  let rest = ` ${stripDiacritics(vi)} `;
+  const viFolded = ` ${stripDiacritics(vi)} `;
+  let rest = viFolded;
   const normText = nfkcLower(text);
-  for (const [concept, term] of Object.entries(glossary).sort((a, b) => b[0].length - a[0].length)) {
+  for (const { concept, term, ambiguous, contexts } of [...entries].sort((a, b) => b.concept.length - a.concept.length)) {
     const key = stripDiacritics(concept);
     if (!key || !rest.includes(key)) continue;
-    rest = rest.split(key).join(" ");
+    rest = rest.split(key).join(" "); // luôn gạch khỏi chuỗi để khái niệm con ngắn hơn không bị khớp lại
+    if (ambiguous) continue;
+    if (contexts && !contexts.some((c) => viFolded.includes(stripDiacritics(c)))) continue;
     // thuật ngữ có thể ghi kèm chú thích: "金（ゴールド）" -> chấp nhận cả "金" lẫn "ゴールド"
     const variants = [term, ...term.split(/[()（）]/).map((s) => s.trim()).filter(Boolean)].map(nfkcLower);
     if (!variants.some((v) => normText.includes(v))) {
@@ -159,7 +163,7 @@ export function warningsForField(kind, field, locale) {
     if (!vi) {
       add("missing-vi", "Thiếu dòng nghĩa tiếng Việt.");
     } else {
-      for (const g of glossaryWarnings(text, vi, locale.glossary)) {
+      for (const g of glossaryWarnings(text, vi, glossaryEntries(locale))) {
         add("glossary-term", `Nghĩa nhắc "${g.concept}" nhưng chữ không dùng thuật ngữ chuẩn "${g.term}".`, g);
       }
     }

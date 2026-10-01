@@ -5,7 +5,7 @@
 // giới hạn độ dài, ví dụ) nằm trong config/locales/<code>.json. File này chỉ nạp template và điền giá trị.
 import path from "node:path";
 import { loadTemplateFile, renderTemplate } from "./template.mjs";
-import { getDefaultLocale, glossLocale, needsGloss, REPO_ROOT } from "./locales.mjs";
+import { getDefaultLocale, glossLocale, glossaryEntries, needsGloss, REPO_ROOT } from "./locales.mjs";
 import { MAX_CONTEXT_IMAGES } from "./compare-content.mjs";
 
 export const PROMPT_TEMPLATE_PATH = process.env.PROMPT_TEMPLATE_PATH || path.join(REPO_ROOT, "prompts", "compare-content.md");
@@ -36,8 +36,8 @@ export function buildSystemPrompt(catalog, hashtagCfg, locale = getDefaultLocale
     hashtagCfg.topic.map((t) => renderTemplate(section(sections, "fragment.topicLine"), { tag: t.tag, group: t.group })).join("\n") ||
     section(sections, "fragment.topicEmpty");
 
-  const glossaryLines = Object.entries(locale.glossary)
-    .map(([concept, term]) => renderTemplate(section(sections, "fragment.glossaryLine"), { concept, term }))
+  const glossaryLines = glossaryEntries(locale)
+    .map(({ concept, term }) => renderTemplate(section(sections, "fragment.glossaryLine"), { concept, term }))
     .join("\n");
 
   return renderTemplate(section(sections, "system"), {

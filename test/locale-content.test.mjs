@@ -12,7 +12,7 @@ import { textOf, viOf, hasVi, coerceField, flattenContent, bilingual } from "../
 import {
   normalizeTag, loadHashtagConfig, planHashtags, resolveSpecificTags, resolveTopicTags, cleanTag, hashtagMeaning, withMeanings,
 } from "../scripts/lib/hashtags.mjs";
-import { getLocale, listLocales, needsGloss } from "../scripts/lib/locales.mjs";
+import { getLocale, listLocales, needsGloss, glossaryEntries, validateLocale } from "../scripts/lib/locales.mjs";
 import {
   parseAndValidate, collectContentWarnings, warningsForField, isJewelryTopic, enforceJewelryGating,
 } from "../scripts/lib/compare-content.mjs";
@@ -272,15 +272,47 @@ test("cảnh báo độ dài theo ĐƠN VỊ của locale: 'word' đếm từ, '
 
 test("cảnh báo glossary: dòng nghĩa nhắc khái niệm mà chữ đích không dùng thuật ngữ chuẩn", () => {
   const l = nativeLocale;
-  const [concept, term] = Object.entries(l.glossary).find(([c]) => c === "kim cương");
+  const { concept, term } = glossaryEntries(l).find((e) => e.concept === "kim cương");
   const bad = warningsForField("text", bilingual("宝石は硬いです", `${concept} rất cứng`), l);
   assert.ok(bad.some((x) => x.code === "glossary-term" && x.term === term), JSON.stringify(bad));
   const good = warningsForField("text", bilingual(`${term}は硬いです`, `${concept} rất cứng`), l);
   assert.ok(!good.some((x) => x.code === "glossary-term"));
   // khái niệm dài khớp trước: "thạch anh tím" không bị tính thêm là "thạch anh"
-  const amethyst = l.glossary["thạch anh tím"];
+  const amethyst = glossaryEntries(l).find((e) => e.concept === "thạch anh tím").term;
   const w = warningsForField("text", bilingual(`${amethyst}です`, "thạch anh tím"), l);
   assert.ok(!w.some((x) => x.code === "glossary-term"), JSON.stringify(w));
+});
+
+test("glossary: khái niệm mơ hồ (ambiguous) không cảnh báo thừa; có contexts thì chỉ kiểm trong ngữ cảnh đó", () => {
+  const l = nativeLocale;
+  const entries = glossaryEntries(l);
+  const gold = entries.find((e) => e.concept === "vàng");
+  assert.ok(gold && gold.contexts && gold.contexts.length, "mục 'vàng' khai báo contexts");
+  // 'vàng' là MÀU (không thuộc ngữ cảnh kim loại) -> không cảnh báo dù chữ đích không dùng thuật ngữ 'vàng'
+  assert.ok(!warningsForField("text", bilingual("黄色い花です", "Bông hoa màu vàng"), l).some((x) => x.code === "glossary-term"));
+  // 'vàng' là KIM LOẠI (ngữ cảnh vàng 18k) mà chữ đích lệch thuật ngữ -> cảnh báo
+  const bad = warningsForField("text", bilingual("黄色い指輪です", "Nhẫn vàng 18k"), l);
+  assert.ok(bad.some((x) => x.code === "glossary-term" && x.concept === "vàng"), JSON.stringify(bad));
+  // đúng thuật ngữ -> sạch
+  assert.ok(!warningsForField("text", bilingual(`${gold.term}の指輪です`, "Nhẫn vàng 18k"), l).some((x) => x.code === "glossary-term"));
+  // ambiguous: true -> không bao giờ cảnh báo
+  const amb = entries.filter((e) => e.ambiguous);
+  assert.ok(amb.length > 0);
+  for (const e of amb) {
+    assert.ok(!warningsForField("text", bilingual("無関係な文", `câu có ${e.concept}`), l).some((x) => x.concept === e.concept), e.concept);
+  }
+  // khái niệm mơ hồ vẫn nằm trong prompt (Gemini vẫn được hướng dẫn thuật ngữ)
+  const { systemPrompt } = buildComparePrompt({ catalog, hashtagCfg: loadHashtagConfig(l), locale: l });
+  for (const e of amb) assert.ok(systemPrompt.includes(e.term));
+});
+
+test("validateLocale: glossary nhận chuỗi hoặc { term, ambiguous?, contexts? }; sai dạng -> báo lỗi", () => {
+  const raw = JSON.parse(fs.readFileSync(nativeLocale.hashtagsPath.replace(/hashtags[\\/].*$/, "locales/") + nativeLocale.code + ".json", "utf8"));
+  const withGlossary = (g) => validateLocale({ ...raw, glossary: g });
+  assert.deepEqual(withGlossary({ "a": "b", "c": { term: "d", ambiguous: true }, "e": { term: "f", contexts: ["x y"] } }).problems, []);
+  for (const bad of [{ a: { ambiguous: true } }, { a: { term: "x", ambiguous: "yes" } }, { a: { term: "x", contexts: [] } }, { a: { term: "x", contexts: [3] } }, { a: 5 }, []]) {
+    assert.ok(withGlossary(bad).problems.some((p) => p.includes("glossary")), JSON.stringify(bad));
+  }
 });
 
 test("cảnh báo: thị trường tiếng Việt không đòi 'vi'; cụm cấm / độ dài vẫn kiểm", () => {
@@ -364,7 +396,7 @@ test("runCompareContent (mock Gemini): prompt/schema theo locale, nội dung son
     const { systemInstruction, generationConfig } = calls[0].body;
     const system = systemInstruction.parts[0].text;
     assert.ok(system.includes(l.styleGuide.trim()), "styleGuide của locale có trong prompt");
-    assert.ok(system.includes(Object.values(l.glossary)[0]), "glossary của locale có trong prompt");
+    assert.ok(system.includes(glossaryEntries(l)[0].term), "glossary của locale có trong prompt");
     assert.equal(generationConfig.responseSchema.properties.title.type, "object", "schema song ngữ");
 
     assert.equal(result.content.locale, l.code);
