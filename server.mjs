@@ -75,6 +75,7 @@ import {
   getDefaultTheme,
   enginesForLanguage,
   themeSupportsScript,
+  themeSupportsLanguage,
   engineReadiness,
   defaultVoiceFor,
   checkRenderability,
@@ -296,14 +297,12 @@ app.get("/api/tts-engines", (req, res) => {
 app.get("/api/themes", (req, res) => {
   const locale = getLocale(String(req.query.locale || getDefaultLocale().code));
   if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
-  const themes = listThemes().map((t) => ({
-    id: t.id,
-    name: t.name,
-    label: t.label,
-    scripts: t.scripts,
-    supported: themeSupportsScript(t, locale.script),
-    reason: themeSupportsScript(t, locale.script) ? "" : `chưa hỗ trợ chữ ${locale.script} (thiếu font)`,
-  }));
+  const themes = listThemes().map((t) => {
+    const reasons = [];
+    if (!themeSupportsScript(t, locale.script)) reasons.push(`chưa hỗ trợ chữ ${locale.script} (thiếu font)`);
+    if (!themeSupportsLanguage(t, locale.language)) reasons.push(`pipeline dựng video chưa hỗ trợ ${locale.displayName}`);
+    return { id: t.id, name: t.name, label: t.label, scripts: t.scripts, languages: t.languages, supported: reasons.length === 0, reason: reasons.join("; ") };
+  });
   res.json({ locale: locale.code, defaultTheme: getDefaultTheme()?.id ?? null, themes });
 });
 

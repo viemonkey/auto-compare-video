@@ -2,9 +2,13 @@
   "id": "dark",
   "name": "Cyber Dark",
   "label": "🌌 Cyber Dark (Nền Tím-Hồng-Cyan)",
-  "enabled": true,
+  "enabled": false,
   "order": 20,
   "scripts": [
     "Latn"
-  ]
+  ],
+  "languages": [
+    "vi"
+  ],
+  "note": "Chưa có biến thể giao diện này trong pipeline dựng (templates/auto-compare/index.html chỉ có nền giấy). Bật lại khi template hỗ trợ."
 }

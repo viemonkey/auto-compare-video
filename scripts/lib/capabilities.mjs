@@ -2,7 +2,8 @@
 //   - mỗi TTS engine (config/tts-engines/<id>.json) khai báo `languages` nó đọc được;
 //   - mỗi theme video (config/themes/<id>.json) khai báo `scripts` (hệ chữ) font của nó hỗ trợ;
 //   - locale KHÔNG liệt kê engine/theme, chỉ có `language` + `script`.
-// Locale render được khi có >= 1 engine hỗ trợ ngôn ngữ VÀ theme đang chọn hỗ trợ script. Không dùng cờ cứng.
+// Locale render được khi có >= 1 engine hỗ trợ ngôn ngữ VÀ theme hỗ trợ script (font) VÀ theme hỗ trợ language
+// (`languages` = ngôn ngữ mà pipeline dựng video của theme đó đã được kiểm chứng). Không dùng cờ cứng.
 // File lỗi -> log rõ + tắt mục đó, KHÔNG crash (giống config/locales).
 import fs from "node:fs";
 import path from "node:path";
@@ -60,6 +61,8 @@ export function validateTheme(raw) {
   need(raw.default === undefined || typeof raw.default === "boolean", '"default" phải là boolean');
   need(Array.isArray(raw.scripts) && raw.scripts.length > 0 && raw.scripts.every((s) => typeof s === "string" && /^[A-Z][a-z]{3}$/.test(s)),
     '"scripts" phải là mảng mã ISO 15924 (vd ["Latn"]), không rỗng');
+  need(Array.isArray(raw.languages) && raw.languages.length > 0 && raw.languages.every(isLangCode),
+    '"languages" phải là mảng mã ngôn ngữ mà pipeline dựng video đã kiểm chứng (vd ["vi"]), không rỗng');
   return problems.length ? { theme: null, problems } : { theme: Object.freeze({ ...raw }), problems };
 }
 
@@ -138,6 +141,7 @@ export function getDefaultTheme(themes = listThemes()) {
 
 export const enginesForLanguage = (language, engines = listEngines()) => engines.filter((e) => e.languages.includes(language));
 export const themeSupportsScript = (theme, script) => theme.scripts.includes(script);
+export const themeSupportsLanguage = (theme, language) => theme.languages.includes(language);
 
 /** Engine đã sẵn sàng chạy chưa (đủ biến môi trường / thư mục cài đặt)? Khai báo trong engine.requires. */
 export function engineReadiness(engine, { env = process.env, repoRoot = REPO_ROOT } = {}) {
@@ -154,7 +158,7 @@ export const defaultVoiceFor = (engine, localeCode) => engine.defaultVoices?.[lo
 
 /**
  * Locale `locale` có render được với theme `themeId` (mặc định: theme mặc định) không?
- * @returns {{renderable:boolean, engines:string[], themeId:string|null, blockers:Array<{kind:"tts"|"theme", message:string}>}}
+ * @returns {{renderable:boolean, engines:string[], themeId:string|null, blockers:Array<{kind:"tts"|"theme"|"pipeline", message:string}>}}
  */
 export function checkRenderability(locale, { themeId, engines = listEngines(), themes = listThemes() } = {}) {
   const blockers = [];
@@ -165,8 +169,13 @@ export function checkRenderability(locale, { themeId, engines = listEngines(), t
   const theme = (themeId && themes.find((t) => t.id === themeId)) || getDefaultTheme(themes);
   if (!theme) {
     blockers.push({ kind: "theme", message: "Không có giao diện video nào được cấu hình." });
-  } else if (!themeSupportsScript(theme, locale.script)) {
-    blockers.push({ kind: "theme", message: `Giao diện "${theme.name}" chưa hỗ trợ chữ ${locale.script} của ${locale.displayName} (thiếu font).` });
+  } else {
+    if (!themeSupportsScript(theme, locale.script)) {
+      blockers.push({ kind: "theme", message: `Giao diện "${theme.name}" chưa hỗ trợ chữ ${locale.script} của ${locale.displayName} (thiếu font).` });
+    }
+    if (!themeSupportsLanguage(theme, locale.language)) {
+      blockers.push({ kind: "pipeline", message: `Pipeline dựng video chưa hỗ trợ ${locale.displayName}.` });
+    }
   }
   return { renderable: blockers.length === 0, engines: supporting.map((e) => e.id), themeId: theme ? theme.id : null, blockers };
 }

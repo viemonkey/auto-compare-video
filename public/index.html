@@ -129,14 +129,9 @@
           <textarea id="content-angle-custom-text" class="input-text" rows="3" placeholder="Ví dụ: So sánh theo giá trị đầu tư lâu dài, hoặc theo cảm nhận khi đeo trên tay..."></textarea>
         </div>
 
-        <!-- Video Theme Selector -->
-        <div class="form-group" style="margin-bottom: 16px;">
-          <label for="video-theme">🎨 Giao diện & Phong cách Video (TikTok Match):</label>
-          <select id="video-theme" class="input-text" style="font-weight: 700; background-color: var(--panel);">
-            <!-- Loaded dynamically from /api/themes?locale= -->
-          </select>
-          <div id="theme-notice" class="locale-render-note hidden"></div>
-        </div>
+        <!-- Video theme selector intentionally absent: the build pipeline (templates/auto-compare) has a single theme,
+             so a dropdown would be a choice with no effect. Registry config/themes/*.json + GET /api/themes are kept
+             for when the template supports more themes. -->
 
         <!-- TTS Voice Engine Selector -->
         <div class="form-group" style="margin-bottom: 16px;">

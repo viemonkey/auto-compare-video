@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   validateEngine, validateTheme, loadEngines, loadThemes, listEngines, listThemes,
-  enginesForLanguage, themeSupportsScript, engineReadiness, checkRenderability, getDefaultTheme, defaultVoiceFor,
+  enginesForLanguage, themeSupportsScript, themeSupportsLanguage, engineReadiness, checkRenderability, getDefaultTheme, defaultVoiceFor,
 } from "../scripts/lib/capabilities.mjs";
 import { listLocales, defaultLocaleCode, getLocale } from "../scripts/lib/locales.mjs";
 import { buildComparePrompt, buildResponseSchema, schemaMaxLength } from "../scripts/lib/compare-prompt.mjs";
@@ -17,7 +17,7 @@ const tmp = () => fs.mkdtempSync(path.join(os.tmpdir(), "caps-"));
 
 // Test kiểm tra CẤU TRÚC và QUY TẮC, không kiểm tra số lượng cụ thể của dữ liệu config.
 const engineRaw = (over = {}) => ({ id: "e1", label: "E1", enabled: true, languages: ["xx"], modes: [{ id: "preset", label: "p" }], ...over });
-const themeRaw = (over = {}) => ({ id: "t1", name: "T1", label: "T 1", enabled: true, scripts: ["Latn"], ...over });
+const themeRaw = (over = {}) => ({ id: "t1", name: "T1", label: "T 1", enabled: true, scripts: ["Latn"], languages: ["xx"], ...over });
 
 test("validateEngine / validateTheme: hợp lệ và các lỗi thiếu trường / sai kiểu", () => {
   assert.deepEqual(validateEngine(engineRaw()).problems, []);
@@ -27,7 +27,7 @@ test("validateEngine / validateTheme: hợp lệ và các lỗi thiếu trườn
     { defaultVoices: { vi: "x" } }, { voices: { "vi-VN": [{ id: "a" }] } }, { requires: { env: "X" } }, { order: 1.5 },
   ];
   for (const over of badEngines) assert.equal(validateEngine(engineRaw(over)).engine, null, JSON.stringify(over));
-  const badThemes = [{ scripts: [] }, { scripts: ["latn"] }, { name: "" }, { enabled: 1 }, { default: "yes" }];
+  const badThemes = [{ scripts: [] }, { scripts: ["latn"] }, { languages: [] }, { languages: ["Vietnamese"] }, { name: "" }, { enabled: 1 }, { default: "yes" }];
   for (const over of badThemes) assert.equal(validateTheme(themeRaw(over)).theme, null, JSON.stringify(over));
   assert.equal(validateEngine(null).engine, null);
   assert.equal(validateTheme([]).theme, null);
@@ -63,42 +63,51 @@ test("config thật: mọi engine/theme bật đều hợp lệ; engine khai bá
       if (e.voices?.[loc]) assert.ok(e.voices[loc].some((v) => v.id === voice), `${e.id}: giọng mặc định ${voice} không có trong voices.${loc}`);
     }
   }
-  for (const t of listThemes()) assert.ok(t.scripts.length > 0, t.id);
+  for (const t of listThemes()) assert.ok(t.scripts.length > 0 && t.languages.length > 0, t.id);
   assert.ok(getDefaultTheme());
 });
 
-test("renderable = có engine hỗ trợ ngôn ngữ VÀ theme hỗ trợ script (quy tắc, tính từ khai báo)", () => {
+test("renderable = engine hỗ trợ ngôn ngữ VÀ theme hỗ trợ script VÀ theme hỗ trợ language (quy tắc, tính từ khai báo)", () => {
   const loc = { code: "xx-XX", language: "xx", script: "Zzzz", displayName: "XX" };
   const engines = [engineRaw({ id: "a", languages: ["xx"] }), engineRaw({ id: "b", languages: ["yy"] })];
-  const themes = [themeRaw({ id: "t", scripts: ["Zzzz"] }), themeRaw({ id: "u", scripts: ["Latn"] })];
+  const themes = [
+    themeRaw({ id: "t", scripts: ["Zzzz"], languages: ["xx"] }),
+    themeRaw({ id: "u", scripts: ["Latn"], languages: ["xx"] }), // thiếu font
+    themeRaw({ id: "w", scripts: ["Zzzz"], languages: ["yy"] }), // pipeline chưa kiểm chứng ngôn ngữ
+  ];
 
   let r = checkRenderability(loc, { engines, themes, themeId: "t" });
   assert.equal(r.renderable, true);
   assert.deepEqual(r.engines, ["a"]);
   assert.deepEqual(r.blockers, []);
 
-  r = checkRenderability(loc, { engines, themes, themeId: "u" }); // theme không có script -> khoá, lý do về giao diện
+  r = checkRenderability(loc, { engines, themes, themeId: "u" });
   assert.equal(r.renderable, false);
   assert.deepEqual(r.blockers.map((b) => b.kind), ["theme"]);
   assert.match(r.blockers[0].message, /Zzzz/);
 
-  r = checkRenderability(loc, { engines: [engines[1]], themes, themeId: "t" }); // không engine -> khoá, lý do về giọng đọc
+  r = checkRenderability(loc, { engines, themes, themeId: "w" });
+  assert.equal(r.renderable, false);
+  assert.deepEqual(r.blockers.map((b) => b.kind), ["pipeline"]);
+  assert.equal(r.blockers[0].message, "Pipeline dựng video chưa hỗ trợ XX.");
+
+  r = checkRenderability(loc, { engines: [engines[1]], themes, themeId: "t" });
   assert.deepEqual(r.blockers.map((b) => b.kind), ["tts"]);
 
-  r = checkRenderability(loc, { engines: [], themes: [themeRaw({ scripts: ["Latn"] })] }); // thiếu cả hai -> 2 lý do
-  assert.deepEqual(r.blockers.map((b) => b.kind).sort(), ["theme", "tts"]);
+  r = checkRenderability(loc, { engines: [], themes: [themeRaw({ scripts: ["Latn"], languages: ["yy"] })] }); // thiếu cả ba
+  assert.deepEqual(r.blockers.map((b) => b.kind).sort(), ["pipeline", "theme", "tts"]);
   assert.equal(r.renderable, false);
 
-  assert.equal(checkRenderability(loc, { engines, themes: [] }).renderable, false); // không có theme nào
-  // theme không tồn tại -> rơi về theme mặc định, không throw
+  assert.equal(checkRenderability(loc, { engines, themes: [] }).renderable, false);
   assert.doesNotThrow(() => checkRenderability(loc, { engines, themes, themeId: "khong-co" }));
 });
 
 test("renderable không phụ thuộc cờ cứng: đổi khai báo engine/theme thì kết quả đổi theo", () => {
   const loc = { language: "xx", script: "Zzzz", displayName: "XX" };
-  const themes = [themeRaw({ scripts: ["Latn"] })];
-  assert.equal(checkRenderability(loc, { engines: [engineRaw({ languages: ["xx"] })], themes }).renderable, false);
-  assert.equal(checkRenderability(loc, { engines: [engineRaw({ languages: ["xx"] })], themes: [themeRaw({ scripts: ["Latn", "Zzzz"] })] }).renderable, true);
+  const eng = [engineRaw({ languages: ["xx"] })];
+  assert.equal(checkRenderability(loc, { engines: eng, themes: [themeRaw({ scripts: ["Latn"], languages: ["xx"] })] }).renderable, false);
+  assert.equal(checkRenderability(loc, { engines: eng, themes: [themeRaw({ scripts: ["Latn", "Zzzz"], languages: ["xx"] })] }).renderable, true);
+  assert.equal(checkRenderability(loc, { engines: eng, themes: [themeRaw({ scripts: ["Latn", "Zzzz"], languages: ["yy"] })] }).renderable, false);
   assert.deepEqual(enginesForLanguage("xx", [engineRaw({ languages: ["xx", "yy"] })]).map((e) => e.id), ["e1"]);
   assert.equal(themeSupportsScript(themeRaw({ scripts: ["Latn"] }), "Jpan"), false);
 });
@@ -109,7 +118,9 @@ test("locale thật: kết quả renderable của mọi locale khớp quy tắc 
     const expectTts = enginesForLanguage(l.language).length > 0;
     const theme = getDefaultTheme();
     const expectTheme = !!theme && themeSupportsScript(theme, l.script);
-    assert.equal(r.renderable, expectTts && expectTheme, l.code);
+    const expectPipeline = !!theme && themeSupportsLanguage(theme, l.language);
+    assert.equal(r.renderable, expectTts && expectTheme && expectPipeline, l.code);
+    assert.equal(r.blockers.some((b) => b.kind === "pipeline"), !expectPipeline, l.code);
     assert.equal(r.blockers.some((b) => b.kind === "tts"), !expectTts, l.code);
     assert.equal(r.blockers.some((b) => b.kind === "theme"), !expectTheme, l.code);
   }

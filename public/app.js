@@ -182,15 +182,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // -------------------------------------------------------------
-  // Target market (locale), TTS engines and video themes — everything below is built from the
-  // server registries (GET /api/locales, /api/tts-engines, /api/themes), nothing is hard-coded here.
+  // Target market (locale) and TTS engines — everything below is built from the server registries
+  // (GET /api/locales, /api/tts-engines), nothing is hard-coded here.
   // -------------------------------------------------------------
   const LOCALE_STORAGE_KEY = "acv.locale";
   const localeButtons = document.getElementById("locale-buttons");
   const localeStyleLine = document.getElementById("locale-style-line");
   const localeRenderNote = document.getElementById("locale-render-note");
   const ttsNotice = document.getElementById("tts-notice");
-  const videoThemeSelect = document.getElementById("video-theme");
   const voiceSelectLabel = document.getElementById("voice-select-label");
   let localesData = []; // [{code, displayName, flag, styleSummary, renderable, blockers, ...}]
   let currentLocale = null; // selected locale code
@@ -269,8 +268,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   async function loadLocales() {
-    const theme = videoThemeSelect && videoThemeSelect.value ? `?theme=${encodeURIComponent(videoThemeSelect.value)}` : "";
-    const res = await fetch(`/api/locales${theme}`);
+    const res = await fetch("/api/locales");
     const data = await res.json();
     if (!res.ok) throw new Error(data.error || "Không tải được danh sách thị trường.");
     return data;
@@ -307,45 +305,11 @@ document.addEventListener("DOMContentLoaded", () => {
     await refreshMarketDependents();
   }
 
-  // Themes and voice engines depend on the market: re-filter both, then refresh renderability for the chosen theme.
+  // Voice engines depend on the market. (Video theme is not selectable: the pipeline has a single theme, and
+  // renderability from /api/locales is computed against it.)
   async function refreshMarketDependents() {
     const requestId = ++marketRequestId;
-    await Promise.all([loadThemes(requestId), loadEngines(requestId)]);
-  }
-
-  async function loadThemes(requestId) {
-    if (!videoThemeSelect || !currentLocale) return;
-    try {
-      const res = await fetch(`/api/themes?locale=${encodeURIComponent(currentLocale)}`);
-      const data = await res.json();
-      if (requestId !== marketRequestId) return;
-      if (!res.ok) throw new Error(data.error || "Không tải được giao diện.");
-      const previous = videoThemeSelect.value;
-      videoThemeSelect.innerHTML = "";
-      (data.themes || []).forEach((t) => {
-        const opt = document.createElement("option");
-        opt.value = t.id;
-        opt.disabled = !t.supported;
-        opt.textContent = t.supported ? t.label : `${t.label} — ${t.reason}`;
-        videoThemeSelect.appendChild(opt);
-      });
-      const usable = (data.themes || []).filter((t) => t.supported);
-      const pick = [previous, data.defaultTheme].find((id) => usable.some((t) => t.id === id)) || (usable[0] && usable[0].id);
-      if (pick) videoThemeSelect.value = pick;
-      else videoThemeSelect.selectedIndex = 0; // mọi theme đều bị khoá: vẫn hiện nhãn + lý do thay vì ô trống
-      const themeNotice = document.getElementById("theme-notice");
-      if (themeNotice) {
-        themeNotice.textContent = usable.length ? "" : "Chưa có giao diện video nào hỗ trợ chữ của thị trường này (thiếu font) — chưa dựng được video.";
-        themeNotice.classList.toggle("hidden", usable.length > 0);
-      }
-      // Renderability is relative to the selected theme (a market is unrenderable if NO usable theme exists).
-      const fresh = await loadLocales();
-      if (requestId !== marketRequestId) return;
-      localesData = fresh.locales || localesData;
-      renderLocaleButtons();
-    } catch (err) {
-      console.error("Failed to load themes:", err);
-    }
+    await loadEngines(requestId);
   }
 
   async function loadEngines(requestId) {
@@ -454,19 +418,6 @@ document.addEventListener("DOMContentLoaded", () => {
   // Handle TTS Provider Change
   if (ttsProviderSelect) {
     ttsProviderSelect.addEventListener("change", applyTtsSelection);
-  }
-
-  // Theme change -> renderability of every market is relative to the selected theme
-  if (videoThemeSelect) {
-    videoThemeSelect.addEventListener("change", async () => {
-      try {
-        const fresh = await loadLocales();
-        localesData = fresh.locales || localesData;
-        renderLocaleButtons();
-      } catch (err) {
-        console.error("Failed to refresh markets:", err);
-      }
-    });
   }
 
   // Handle Voice Cloning Audio Upload
@@ -906,7 +857,6 @@ document.addEventListener("DOMContentLoaded", () => {
           slug: scriptSlug.value.trim(),
           pendingSlug: pendingContentSlug,
           topicHint: topicHintInput.value.trim(),
-          theme: document.getElementById("video-theme") ? document.getElementById("video-theme").value : "paper",
           ttsProvider,
           ttsVoice,
           vieneuVoice,
