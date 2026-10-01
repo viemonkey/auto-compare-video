@@ -1,4 +1,7 @@
 // Auto Compare Video Web UI Application Logic
+// (ES module: dùng chung hàm đọc field song ngữ với server — public/shared/bilingual.mjs)
+import { flattenContent } from "/shared/bilingual.mjs";
+
 document.addEventListener("DOMContentLoaded", () => {
   // State
   let uploadedLeftPath = null;
@@ -7,6 +10,8 @@ document.addEventListener("DOMContentLoaded", () => {
   let actionCatalog = [];
   let currentEditingPointIndex = null;
   let pointsData = [];
+  let generatedContent = null; // nội dung Gemini nguyên bản (field song ngữ { text, vi } với thị trường ngoài tiếng Việt)
+  let generatedWarnings = []; // cảnh báo theo field: [{ path, code, message }]
 
   // DOM Elements - Stepper & Sections
   const stepNav1 = document.getElementById("step-nav-1");
@@ -229,6 +234,8 @@ document.addEventListener("DOMContentLoaded", () => {
     scriptSlug.value = "";
     hashtagPlan = [];
     geminiHashtagMeta = { materials: [], topicTags: [], suggestedTags: [] };
+    generatedContent = null;
+    generatedWarnings = [];
     renderPointsList();
     renderHashtagChips();
   }
@@ -576,8 +583,12 @@ document.addEventListener("DOMContentLoaded", () => {
 
       pendingContentSlug = genData.pendingSlug || null;
 
-      // Populate Step 2 Studio with Gemini output
-      const content = genData.content;
+      // Populate Step 2 Studio with Gemini output.
+      // Thị trường khác tiếng Việt trả field song ngữ { text, vi }: bản gốc giữ ở generatedContent (+ cảnh báo theo field)
+      // cho trình soạn song ngữ ở bước sau; ô nhập hiện tại chỉ hiện chữ ngôn ngữ đích.
+      generatedContent = genData.content;
+      generatedWarnings = genData.warnings || [];
+      const content = flattenContent(genData.content);
       scriptTitle.value = content.title || "";
       scriptLabelLeft.value = content.label_left || "";
       scriptLabelRight.value = content.label_right || "";
@@ -617,11 +628,13 @@ document.addEventListener("DOMContentLoaded", () => {
       const chip = document.createElement("span");
       const over = idx >= hashtagMax;
       chip.className = `hashtag-chip ${h.tier === "topic" ? "topic" : ""} ${over ? "over-limit" : ""}`;
-      chip.title = over
-        ? `Vượt giới hạn ${hashtagMax} hashtag — sẽ không được đăng`
-        : h.tier === "topic" && !h.manual
-          ? "Tag chủ đề — mỗi lần đăng có thể đổi sang tag khác cùng nhóm"
-          : "Tag cố định";
+      chip.title =
+        (h.vi ? `${h.vi} — ` : "") +
+        (over
+          ? `Vượt giới hạn ${hashtagMax} hashtag — sẽ không được đăng`
+          : h.tier === "topic" && !h.manual
+            ? "Tag chủ đề — mỗi lần đăng có thể đổi sang tag khác cùng nhóm"
+            : "Tag cố định");
       chip.innerHTML = `<span>${escapeAttr(h.tag)}</span><button type="button" aria-label="Xoá ${escapeAttr(h.tag)}">✕</button>`;
       chip.querySelector("button").addEventListener("click", () => {
         hashtagPlan.splice(idx, 1);
@@ -641,14 +654,14 @@ document.addEventListener("DOMContentLoaded", () => {
       const res = await fetch("/api/normalize-hashtag", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ tag: raw }),
+        body: JSON.stringify({ tag: raw, locale: currentLocale }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Hashtag không hợp lệ.");
       if (hashtagPlan.some((h) => h.tag === data.tag)) {
         hashtagNote.textContent = `${data.tag} đã có rồi.`;
       } else {
-        hashtagPlan.push({ tag: data.tag, tier: data.tier, manual: true });
+        hashtagPlan.push({ tag: data.tag, tier: data.tier, manual: true, ...(data.vi ? { vi: data.vi } : {}) });
         // giữ thứ tự cụ thể → chủ đề (sort ổn định)
         hashtagPlan = [...hashtagPlan.filter((h) => h.tier !== "topic"), ...hashtagPlan.filter((h) => h.tier === "topic")];
         hashtagAddInput.value = "";
@@ -668,6 +681,7 @@ document.addEventListener("DOMContentLoaded", () => {
           label_left: scriptLabelLeft.value.trim(),
           label_right: scriptLabelRight.value.trim(),
           topicTags: geminiHashtagMeta.topicTags,
+          locale: currentLocale,
         }),
       });
       const data = await res.json();

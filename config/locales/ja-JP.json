@@ -57,8 +57,9 @@
   },
   "forbiddenPhrases": ["絶対", "必ず儲かる", "世界一", "100％本物", "最安値", "奇跡の"],
   "hashtags": "config/hashtags/ja-JP.json",
+  "hashtagStyle": "native",
   "mixedGroup": "豆知識",
-  "jewelryKeywords": [],
+  "jewelryKeywords": ["宝石", "ジュエリー", "アクセサリー", "指輪", "リング", "ネックレス", "ダイヤモンド", "ダイヤ", "貴金属", "プラチナ", "ゴールド", "シルバー", "真珠", "パール", "ルビー", "サファイア", "エメラルド", "アメジスト", "トパーズ", "水晶", "金", "銀"],
   "prompt": {
     "language": "tiếng Nhật",
     "languageDetailed": "tiếng Nhật (kanji/hiragana/katakana chuẩn, thể です/ます)",

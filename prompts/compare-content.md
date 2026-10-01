@@ -9,7 +9,7 @@ Cú pháp:
   Nếu thẻ mở/đóng nằm riêng 1 dòng thì cả dòng thẻ bị bỏ (không để dòng trống thừa).
 - `@@@ <tên>` mở 1 phần (system, user, hoặc fragment.<tên> = mảnh chữ nhỏ do code ghép).
 
-Biến dùng chung: language, languageDetailed, titleLength, pointLength, tagLength, subLength, example.{text,tag,sub},
+Biến dùng chung: bilingual (không rỗng khi thị trường cần dòng nghĩa tiếng Việt), language, languageDetailed, titleLength, pointLength, tagLength, subLength, example.{text,tag,sub},
 materialExamples, topicGroupsHint, suggestedTagStyle, limits.*, styleGuide, glossary, forbidden,
 topicTags, actionLines, maxContextImages. Hướng dẫn viết (meta) luôn bằng tiếng Việt; NGÔN NGỮ KẾT QUẢ
 do locale quyết định ({{language}}).
@@ -71,6 +71,13 @@ JSON trả về LUÔN LUÔN có đủ 8 field sau — không được bỏ bớt
 {{#forbidden}}
 - CỤM TỪ CẤM — tuyệt đối không dùng: {{forbidden}}
 {{/forbidden}}
+{{#bilingual}}
+- SONG NGỮ — MỌI field hiển thị ("title", "label_left", "label_right" và "text"/"tag"/"sub" của từng point) KHÔNG phải chuỗi
+  mà là object {"text": "<chữ bằng {{language}}, đúng như mô tả field ở trên>", "vi": "<nghĩa tiếng Việt>"}. "vi" là bản dịch SÁT NGHĨA
+  của đúng câu "text" đó bằng tiếng Việt tự nhiên, để người vận hành kiểm soát: KHÔNG làm cho hay hơn, KHÔNG thêm ý, KHÔNG bớt ý,
+  KHÔNG diễn giải lại. "sub" để trống thì {"text": "", "vi": ""}. Các field còn lại ("error", "materials", "topicTags",
+  "suggestedTags", "side", "suggested_action", "needs_context_image", "image_concept") giữ nguyên kiểu như mô tả ở trên.
+{{/bilingual}}
 - "text" là LỜI THOẠI (đọc lên, câu đầy đủ). "tag"/"sub" là CHỮ HIỆN TRÊN MÀN HÌNH — phải
   RẤT NGẮN, viết như tiêu đề kiểu TikTok, KHÔNG lặp lại nguyên câu "text", không có dấu chấm
   cuối. Ví dụ: text = "{{example.text}}"

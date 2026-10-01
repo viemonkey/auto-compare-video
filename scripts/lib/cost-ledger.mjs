@@ -16,7 +16,8 @@ import { fileURLToPath } from "node:url";
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const OUTPUT_DIR = path.join(REPO_ROOT, "output");
-export const COST_LEDGER_PATH = path.join(OUTPUT_DIR, "cost-ledger.jsonl");
+// COST_LEDGER_PATH (env) chỉ để test không ghi vào sổ thật.
+export const COST_LEDGER_PATH = process.env.COST_LEDGER_PATH || path.join(OUTPUT_DIR, "cost-ledger.jsonl");
 
 /**
  * @param {object} entry
@@ -32,11 +33,13 @@ export const COST_LEDGER_PATH = path.join(OUTPUT_DIR, "cost-ledger.jsonl");
  * @param {number} [entry.httpStatus]
  * @param {string} [entry.errorMessage] - chỉ khi status="error"
  * @param {number} [entry.attempt] - lần thử thứ mấy (retry)
+ * @param {string} [entry.locale] - mã thị trường (vd "ja-JP") của lần sinh nội dung; dòng cũ không có -> null
  */
 export function appendCostEntry(entry) {
   const row = {
     timestamp: new Date().toISOString(),
     slug: entry.slug || null,
+    locale: entry.locale || null,
     task: entry.task,
     model: entry.model,
     input_tokens: typeof entry.inputTokens === "number" ? entry.inputTokens : null,

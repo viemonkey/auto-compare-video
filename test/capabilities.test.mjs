@@ -224,7 +224,9 @@ test("prompt theo locale: có styleGuide/glossary/forbidden đúng locale (khi c
     assert.ok(systemPrompt.includes(`tối đa ${l.limits.tag} ${unit}`), `${l.code}: độ dài tag theo ${l.limits.unit}`);
     assert.ok(systemPrompt.includes(`tối đa ${l.limits.sub} ${unit}`), `${l.code}: độ dài sub`);
     assert.ok(userPrompt.includes("gợi ý") && userPrompt.includes("góc độ"));
-    assert.equal(responseSchema.properties.points.items.properties.tag.maxLength, schemaMaxLength(l.limits, "tag"));
+    // field hiển thị là chuỗi (thị trường tiếng Việt) hoặc { text, vi } (thị trường khác): maxLength của chữ đích theo limits
+    const tagField = responseSchema.properties.points.items.properties.tag;
+    assert.equal((tagField.properties ? tagField.properties.text : tagField).maxLength, schemaMaxLength(l.limits, "tag"));
   }
 });
 
@@ -234,7 +236,8 @@ test("schema: unit 'word' đổi sang ký tự bằng charsPerWord; unit 'graphe
   assert.equal(schemaMaxLength(word, "topicTag"), 24);
   assert.equal(schemaMaxLength({ ...word, unit: "grapheme" }, "title"), 14);
   const schema = buildResponseSchema(["a"], { topic: [] }, { limits: word });
-  assert.equal(schema.properties.title.maxLength, 126);
+  assert.equal((schema.properties.title.properties?.text ?? schema.properties.title).maxLength, 126);
   assert.equal(schema.properties.topicTags.items.maxLength, 24);
   assert.equal(schema.properties.materials.items.maxLength, 36);
+  assert.equal(schema.properties.topicTags.items.maxLength, 24);
 });

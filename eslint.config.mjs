@@ -12,7 +12,7 @@ export default [
   },
   {
     files: ["public/**/*.js"],
-    languageOptions: { ecmaVersion: "latest", sourceType: "script", globals: { ...globals.browser } },
+    languageOptions: { ecmaVersion: "latest", sourceType: "module", globals: { ...globals.browser } },
     rules: baseRules,
   },
 ];

@@ -9,6 +9,8 @@ import fs from "node:fs";
 import path from "node:path";
 import { makeLogger } from "./fb-config.mjs";
 import { getDefaultLocale, REPO_ROOT } from "./locales.mjs";
+import { truncateGraphemes } from "../../public/shared/text-length.mjs";
+import { textOf } from "../../public/shared/bilingual.mjs";
 
 const log = makeLogger("hashtags");
 
@@ -37,26 +39,45 @@ export function foldVietnamese(str) {
     .toLowerCase();
 }
 
+// Mọi chuẩn hoá bắt đầu bằng NFKC: đưa chữ full-width ("Ｄiamond" -> "Diamond"), katakana nửa độ rộng ("ﾀﾞｲﾔ" -> "ダイヤ")
+// và các dạng tương thích về dạng chuẩn trước khi lọc ký tự.
+// Ngoại lệ: NFKC tách SARA AM tiếng Thái (U+0E33 "ำ") thành NIKHAHIT + SARA AA (U+0E4D U+0E32) — nhìn giống hệt nhưng là chuỗi
+// khác, làm hashtag/khoá tra bảng lệch với chữ người dùng gõ. Ghép lại (tương tự tiếng Lào U+0EB3).
+const nfkc = (s) => String(s ?? "").normalize("NFKC").replace(/\u0E4D\u0E32/g, "\u0E33").replace(/\u0ECD\u0EB2/g, "\u0EB3");
+
 /**
- * Chuẩn hoá 1 tag: thường, bỏ dấu, chỉ giữ a-z0-9, tối đa limits.hashtagTotal ký tự (gồm '#'), thêm '#'.
+ * Thân tag (chưa có '#') theo locale.hashtagStyle:
+ *   "ascii"  — bỏ dấu (đ->d), thường, chỉ a-z0-9 (vi, en);
+ *   "native" — GIỮ chữ bản địa (không bỏ dấu, không ép ASCII): NFC, thường, chỉ giữ chữ/dấu kết hợp/số
+ *              (\p{L}\p{M}\p{N}) — bỏ khoảng trắng và ký tự đặc biệt (ja, th).
+ */
+function tagBody(raw, locale) {
+  const s = nfkc(raw);
+  if (locale.hashtagStyle === "native") return s.normalize("NFC").toLowerCase().replace(/[^\p{L}\p{M}\p{N}]/gu, "");
+  return foldVietnamese(s).replace(/[^a-z0-9]/g, "");
+}
+
+/**
+ * Chuẩn hoá 1 tag theo luật của locale, tối đa limits.hashtagTotal ký tự (gồm '#') ĐẾM THEO GRAPHEME, thêm '#'.
  * Trả null nếu rỗng hoặc chỉ toàn số (Facebook không nhận hashtag thuần số).
  * `locale` mặc định = thị trường mặc định.
  */
 export function normalizeTag(raw, locale = getDefaultLocale()) {
-  const body = foldVietnamese(raw).replace(/[^a-z0-9]/g, "").slice(0, locale.limits.hashtagTotal - 1);
-  if (!body || /^\d+$/.test(body)) return null;
+  const body = truncateGraphemes(tagBody(raw, locale), locale.limits.hashtagTotal - 1);
+  if (!body || /^\p{N}+$/u.test(body)) return null;
   return `#${body}`;
 }
 
-/** Khoá tra bảng materials: bỏ dấu, thường, gộp khoảng trắng. */
-function materialKey(name) {
-  return foldVietnamese(name).replace(/[^a-z0-9]+/g, " ").trim();
+/** Khoá tra bảng materials theo luật locale: ascii = bỏ dấu + thường + gộp khoảng trắng; native = chỉ giữ chữ/số, liền nhau. */
+function materialKey(name, locale) {
+  if (locale.hashtagStyle === "native") return nfkc(name).normalize("NFC").toLowerCase().replace(/[^\p{L}\p{M}\p{N}]+/gu, "");
+  return foldVietnamese(nfkc(name)).replace(/[^a-z0-9]+/g, " ").trim();
 }
 
 /**
  * Dựng config nội bộ từ JSON thô (thuần, dễ test): chuẩn hoá mọi tag, loại tag blocked/trùng.
  * materials: mỗi mục là `{tags:[...], group}` (group tuỳ chọn) hoặc mảng tag thuần (không có group).
- * @returns {{locale: object, mixedGroup: string, topic: Array<{tag:string,group:string}>, materials: Map<string,string[]>, materialGroups: Map<string,string>, blocked: Set<string>, groupOf: Map<string,string>}}
+ * @returns {{locale: object, mixedGroup: string, meanings: Map<string,string>, topic: Array<{tag:string,group:string}>, materials: Map<string,string[]>, materialGroups: Map<string,string>, blocked: Set<string>, groupOf: Map<string,string>}}
  */
 export function buildConfig(raw, locale = getDefaultLocale()) {
   const blocked = new Set();
@@ -67,12 +88,17 @@ export function buildConfig(raw, locale = getDefaultLocale()) {
 
   const topic = [];
   const groupOf = new Map();
+  const meanings = new Map(); // tag -> nghĩa tiếng Việt (chỉ thị trường ngoài tiếng Việt có trường `vi`), hiện ở tooltip
+  const putMeaning = (tag, vi) => {
+    if (typeof vi === "string" && vi.trim() && !meanings.has(tag)) meanings.set(tag, vi.trim());
+  };
   for (const entry of Array.isArray(raw?.topic) ? raw.topic : []) {
     const tag = normalizeTag(entry?.tag, locale);
     const group = String(entry?.group ?? "").trim();
     if (!tag || !group || blocked.has(tag) || groupOf.has(tag)) continue;
     topic.push({ tag, group });
     groupOf.set(tag, group);
+    putMeaning(tag, entry.vi);
   }
 
   const materials = new Map();
@@ -80,7 +106,7 @@ export function buildConfig(raw, locale = getDefaultLocale()) {
   const src = raw?.materials && typeof raw.materials === "object" ? raw.materials : {};
   for (const [name, tags] of Object.entries(src)) {
     if (name.startsWith("_")) continue;
-    const key = materialKey(name);
+    const key = materialKey(name, locale);
     if (!key) continue;
     const list = [];
     const rawTags = Array.isArray(tags) ? tags : tags?.tags;
@@ -90,11 +116,25 @@ export function buildConfig(raw, locale = getDefaultLocale()) {
     }
     if (!list.length) continue;
     materials.set(key, list);
+    if (!Array.isArray(tags)) for (const t of list) putMeaning(t, tags?.vi);
     const group = Array.isArray(tags) ? "" : String(tags?.group ?? "").trim();
     if (group) materialGroups.set(key, group);
   }
 
-  return { locale, mixedGroup: locale.mixedGroup, topic, materials, materialGroups, blocked, groupOf };
+  return { locale, mixedGroup: locale.mixedGroup, topic, materials, materialGroups, blocked, groupOf, meanings };
+}
+
+/** Nghĩa tiếng Việt của 1 tag (đã chuẩn hoá) theo bộ từ vựng của locale; không có -> "". */
+export function hashtagMeaning(tag, cfg) {
+  return cfg.meanings.get(tag) || "";
+}
+
+/** Gắn `vi` (nghĩa) vào từng mục của plan hashtag để UI hiện tooltip. Không đổi plan gốc. */
+export function withMeanings(plan, cfg) {
+  return (plan || []).map((e) => {
+    const vi = hashtagMeaning(e.tag, cfg);
+    return vi ? { ...e, vi } : { ...e };
+  });
 }
 
 /** File bộ từ vựng của 1 locale: HASHTAGS_CONFIG_PATH (chỉ locale mặc định) > file của locale > config/hashtags.json cũ. */
@@ -142,12 +182,12 @@ export function cleanTag(raw, cfg) {
 
 /** Tra tag của 1 vật liệu theo tên (Gemini "tên chuẩn" hoặc label). Trả [] nếu chưa có trong bảng. */
 export function lookupMaterial(name, cfg) {
-  return cfg.materials.get(materialKey(name)) || [];
+  return cfg.materials.get(materialKey(name, cfg.locale)) || [];
 }
 
 /** Nhóm (đá quý / kim loại / trang sức) của 1 vật liệu theo tên; undefined nếu không rõ. */
 export function lookupMaterialGroup(name, cfg) {
-  return cfg.materialGroups.get(materialKey(name));
+  return cfg.materialGroups.get(materialKey(name, cfg.locale));
 }
 
 /**
@@ -156,7 +196,7 @@ export function lookupMaterialGroup(name, cfg) {
  */
 export function resolveMaterialGroups({ materials, label_left, label_right } = {}, cfg) {
   const mats = Array.isArray(materials) ? materials : [];
-  const labels = [label_left, label_right];
+  const labels = [textOf(label_left), textOf(label_right)];
   const groups = [];
   for (let side = 0; side < 2; side++) {
     for (const name of [mats[side], labels[side]]) {
@@ -202,7 +242,7 @@ export function alignTopicTags(topicTags, groups, cfg, rand = Math.random) {
  */
 export function resolveSpecificTags({ materials, label_left, label_right } = {}, cfg) {
   const mats = Array.isArray(materials) ? materials : [];
-  const labels = [label_left, label_right];
+  const labels = [textOf(label_left), textOf(label_right)];
   const primary = [];
   const aliases = [];
   const unmapped = [];

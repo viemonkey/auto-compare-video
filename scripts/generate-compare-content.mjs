@@ -32,8 +32,9 @@ import { calcContentCost } from "../config/pricing.mjs";
 import { appendCostEntry } from "./lib/cost-ledger.mjs";
 import { loadHashtagConfig } from "./lib/hashtags.mjs";
 import { buildComparePrompt } from "./lib/compare-prompt.mjs";
-import { parseAndValidate, enforceJewelryGating, enforceContextImageLimits } from "./lib/compare-content.mjs";
+import { parseAndValidate, enforceJewelryGating, enforceContextImageLimits, collectContentWarnings } from "./lib/compare-content.mjs";
 import { resolveLocale } from "./lib/locales.mjs";
+import { textOf } from "../public/shared/bilingual.mjs";
 import {
   RetryableError,
   NonRetryableError,
@@ -71,12 +72,14 @@ function loadEnv() {
 }
 
 const ENV = loadEnv();
-const GEMINI_API_KEY = ENV.GEMINI_API_KEY;
+// Đọc lười (mỗi lần dùng): import module này (vd trong test, hoặc từ scaffold) không bị process.exit khi thiếu key.
+const apiKey = () => process.env.GEMINI_API_KEY || ENV.GEMINI_API_KEY;
 const GEMINI_MODEL = ENV.GEMINI_MODEL || "gemini-3.5-flash";
 // Model dự phòng khi model chính HẾT QUOTA THEO NGÀY (429 PerDay). Trống = không chuyển, báo lỗi ngay.
 const GEMINI_FALLBACK_MODEL = (ENV.GEMINI_FALLBACK_MODEL || process.env.GEMINI_FALLBACK_MODEL || "").trim();
 
-if (!GEMINI_API_KEY) {
+function requireApiKey() {
+  if (apiKey()) return;
   console.error(
     "Thiếu GEMINI_API_KEY trong .env (repo root).\n" +
       "Lấy API key tại https://aistudio.google.com/apikey rồi điền vào .env trước khi chạy script này.",
@@ -218,7 +221,7 @@ function loadActionCatalog() {
 
 async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalog, locale, slug, attempt, model = GEMINI_MODEL }) {
   const hashtagCfg = loadHashtagConfig(locale);
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey()}`;
   const { systemPrompt, userPrompt, responseSchema } = buildComparePrompt({ catalog, hashtagCfg, topicHint, angleInstruction, locale });
   const body = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
@@ -257,11 +260,11 @@ async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalo
     const isTimeout = err.name === "AbortError";
     const reason = redactKey(
       isTimeout ? `Gemini request timeout sau ${REQUEST_TIMEOUT_MS / 1000}s` : `Gemini request thất bại (network): ${err.message}`,
-      GEMINI_API_KEY,
+      apiKey(),
     );
     // Request chưa từng chạm tới server Gemini (timeout/network) — Google không tính phí, vẫn
     // ghi lại để biết tần suất lỗi mạng/timeout.
-    appendCostEntry({ slug, task: "content-generation", model, status: "error", errorMessage: reason, attempt });
+    appendCostEntry({ slug, locale: locale?.code, task: "content-generation", model, status: "error", errorMessage: reason, attempt });
     console.warn(`[gemini-error] model=${model} ${reason}`);
     throw new RetryableError(reason, {
       userMessage: isTimeout
@@ -278,17 +281,17 @@ async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalo
     // sổ để theo dõi tần suất lỗi/retry, cost_usd luôn 0 (ép trong appendCostEntry).
     appendCostEntry({
       slug,
-      task: "content-generation",
+      locale: locale?.code, task: "content-generation",
       model,
       status: "error",
       httpStatus: res.status,
-      errorMessage: redactKey(errText, GEMINI_API_KEY).slice(0, 500),
+      errorMessage: redactKey(errText, apiKey()).slice(0, 500),
       attempt,
     });
     // Phân loại (429 theo phút/theo ngày, 503, 401/403, 400, 5xx) + thông báo tiếng Việt cho người
     // dùng — JSON gốc CHỈ ghi vào log server (dòng [gemini-error]), không nằm trong err.userMessage.
     const classified = classifyGeminiHttpError({ httpStatus: res.status, bodyText: errText, model });
-    console.warn(`[gemini-error] ${describeGeminiErrorForLog(classified, { bodyText: errText, apiKey: GEMINI_API_KEY })}`);
+    console.warn(`[gemini-error] ${describeGeminiErrorForLog(classified, { bodyText: errText, apiKey: apiKey() })}`);
     throw classified;
   }
 
@@ -311,7 +314,7 @@ async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalo
   const outputTokens = usage.candidatesTokenCount || 0;
   appendCostEntry({
     slug,
-    task: "content-generation",
+    locale: locale?.code, task: "content-generation",
     model,
     status: "success",
     httpStatus: res.status,
@@ -345,14 +348,14 @@ async function generateWithRetry(args) {
     run: async (model) => ({
       model,
       content: await withRetry(
-        async (attempt) => parseAndValidate(await callGeminiOnce({ ...args, attempt, model }), args.catalog, { hashtagCfg: loadHashtagConfig(args.locale) }),
+        async (attempt) => parseAndValidate(await callGeminiOnce({ ...args, attempt, model }), args.catalog, { locale: args.locale, hashtagCfg: loadHashtagConfig(args.locale) }),
         {
           maxAttempts: MAX_ATTEMPTS,
           baseDelayMs: RETRY_BASE_DELAY_MS,
           label: "Gemini call",
           onRetryableError: (err, attempt, waitMs) =>
             console.warn(
-              `[attempt ${attempt}/${MAX_ATTEMPTS}] ${redactKey(err.message, GEMINI_API_KEY)}` +
+              `[attempt ${attempt}/${MAX_ATTEMPTS}] ${redactKey(err.message, apiKey())}` +
                 (attempt < MAX_ATTEMPTS ? ` — thử lại sau ${(waitMs / 1000).toFixed(1)}s` : ""),
             ),
         },
@@ -369,6 +372,7 @@ async function generateWithRetry(args) {
 // around this same function — no behavior duplication between the two entry points.
 // ============================================================
 async function runCompareContent({ left, right, topicHint, contentAngleId, customAngleText, slug = null, locale: localeCode } = {}) {
+  requireApiKey();
   const locale = resolveLocale(localeCode); // rỗng/thiếu -> thị trường mặc định (DEFAULT_LOCALE)
   const catalog = loadActionCatalog();
   const leftImg = loadImage(left, "trái");
@@ -390,11 +394,11 @@ async function runCompareContent({ left, right, topicHint, contentAngleId, custo
     console.log("  (không có point nào — Gemini cho rằng chủ đề này không cần ảnh minh hoạ ngữ cảnh riêng)");
   } else {
     for (const p of rawFlagged) {
-      console.log(`  - [${p.side}] "${p.text}" -> image_concept: "${p.image_concept}"`);
+      console.log(`  - [${p.side}] "${textOf(p.text)}" -> image_concept: "${p.image_concept}"`);
     }
   }
 
-  const { corrections } = enforceJewelryGating(content, catalog, topicHint, locale);
+  const { corrections } = enforceJewelryGating(content, catalog, topicHint, locale, { hashtagCfg: loadHashtagConfig(locale) });
   const { corrections: contextImageCorrections } = enforceContextImageLimits(content);
 
   const keptFlagged = content.points.filter((p) => p.needs_context_image);
@@ -403,10 +407,19 @@ async function runCompareContent({ left, right, topicHint, contentAngleId, custo
       (contextImageCorrections.length ? ` (đã cắt ${contextImageCorrections.length} — xem lý do ở log corrections trên).` : "."),
   );
 
+  // Cảnh báo theo từng field (độ dài theo limits, cụm cấm, thiếu nghĩa tiếng Việt, lệch glossary) — KHÔNG chặn.
+  const warnings = collectContentWarnings(content, locale);
+  if (warnings.length) {
+    console.warn(`[generate-compare-content] ${warnings.length} cảnh báo nội dung (${locale.code}):`);
+    for (const w of warnings) console.warn(`  - ${w.path}: ${w.message}`);
+  }
+  content.locale = locale.code; // thị trường của nội dung này (lưu cùng content JSON)
+
   return {
     content,
     corrections,
     contextImageCorrections,
+    warnings,
     model: usedModel,
     source_images: {
       left: left.startsWith("data:") ? "<inline base64>" : path.resolve(left),
@@ -425,7 +438,8 @@ async function main() {
   console.log(`Left image:  ${opts.left}`);
   console.log(`Right image: ${opts.right}`);
 
-  const { content, corrections, contextImageCorrections, model, source_images } = await runCompareContent({
+  requireApiKey();
+  const { content, corrections, contextImageCorrections, warnings, model, source_images } = await runCompareContent({
     left: opts.left,
     right: opts.right,
     topicHint: opts.topicHint,
@@ -456,6 +470,7 @@ async function main() {
       source_images,
       corrections,
       contextImageCorrections,
+      warnings,
       content_angle_id: opts.contentAngleId || "auto",
       custom_angle_text: opts.contentAngleId === "custom" ? opts.customAngleText || "" : "",
     },
@@ -464,8 +479,8 @@ async function main() {
   fs.mkdirSync(path.dirname(opts.out), { recursive: true });
   fs.writeFileSync(opts.out, JSON.stringify(output, null, 2));
   console.log(`\nOK — đã ghi nội dung ra ${opts.out}`);
-  console.log(`  title: ${output.title}`);
-  console.log(`  label_left: ${output.label_left} | label_right: ${output.label_right}`);
+  console.log(`  title: ${textOf(output.title)}`);
+  console.log(`  label_left: ${textOf(output.label_left)} | label_right: ${textOf(output.label_right)}`);
   console.log(`  points: ${output.points.length}`);
 }
 
@@ -481,8 +496,8 @@ if (isMainModule) {
     // Không bao giờ ghi file output khi lỗi — composition không được đọc data rỗng/undefined.
     // userMessage (tiếng Việt, không có JSON gốc) nếu là lỗi Gemini; chi tiết kỹ thuật nằm ở các dòng
     // [gemini-error] phía trên trong log. Server chỉ trích dòng "THẤT BẠI:" này ra UI.
-    if (err.userMessage && err.userMessage !== err.message) console.error(`[gemini-error] ${redactKey(err.message, GEMINI_API_KEY)}`);
-    console.error(`\nTHẤT BẠI: ${redactKey(err.userMessage || err.message, GEMINI_API_KEY)}`);
+    if (err.userMessage && err.userMessage !== err.message) console.error(`[gemini-error] ${redactKey(err.message, apiKey())}`);
+    console.error(`\nTHẤT BẠI: ${redactKey(err.userMessage || err.message, apiKey())}`);
     // process.exitCode (không phải process.exit()) — thoát êm, tránh crash libuv trên Windows
     // khi vừa có AbortController timeout/abort đang dọn dẹp dở (đã gặp thực tế khi test).
     process.exitCode = 1;

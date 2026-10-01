@@ -5,7 +5,7 @@
 // giới hạn độ dài, ví dụ) nằm trong config/locales/<code>.json. File này chỉ nạp template và điền giá trị.
 import path from "node:path";
 import { loadTemplateFile, renderTemplate } from "./template.mjs";
-import { getDefaultLocale, REPO_ROOT } from "./locales.mjs";
+import { getDefaultLocale, glossLocale, needsGloss, REPO_ROOT } from "./locales.mjs";
 import { MAX_CONTEXT_IMAGES } from "./compare-content.mjs";
 
 export const PROMPT_TEMPLATE_PATH = process.env.PROMPT_TEMPLATE_PATH || path.join(REPO_ROOT, "prompts", "compare-content.md");
@@ -51,6 +51,7 @@ export function buildSystemPrompt(catalog, hashtagCfg, locale = getDefaultLocale
     topicTags: topicLines,
     actionLines,
     maxContextImages: MAX_CONTEXT_IMAGES,
+    bilingual: needsGloss(locale) ? "1" : "",
   });
 }
 
@@ -72,6 +73,20 @@ export function schemaMaxLength(limits, key) {
 
 export function buildResponseSchema(allIds, hashtagCfg, locale = getDefaultLocale()) {
   const limits = Object.fromEntries(Object.keys(locale.limits).map((k) => [k, schemaMaxLength(locale.limits, k)]));
+  // Thị trường cần nghĩa tiếng Việt: field hiển thị là { text, vi }. `vi` dài tối đa bằng giới hạn của locale tiếng Việt
+  // (hoặc bằng `text` nếu lớn hơn, vì dịch sang tiếng Việt thường dài hơn chữ Nhật/Thái) — chỉ để chặn model lặp vô hạn.
+  const gloss = needsGloss(locale);
+  const viLimits = glossLocale()?.limits;
+  const display = (key, extra = {}) => {
+    const max = limits[key];
+    if (!gloss) return { type: "string", maxLength: max, ...extra };
+    const viMax = Math.max(max, viLimits ? schemaMaxLength(viLimits, key) : max * 2);
+    return {
+      type: "object",
+      required: ["text", "vi"],
+      properties: { text: { type: "string", maxLength: max }, vi: { type: "string", maxLength: viMax } },
+    };
+  };
   // Lowercase JSON Schema type strings — the REST generateContent body wants "object"/"string"/
   // "array", NOT the SDK's Type.OBJECT/Type.STRING enum constants (which serialize uppercase).
   // Sending uppercase here is accepted without an HTTP error but silently fails to constrain the
@@ -96,9 +111,9 @@ export function buildResponseSchema(allIds, hashtagCfg, locale = getDefaultLocal
     required: ["error", "title", "label_left", "label_right", "materials", "topicTags", "suggestedTags", "points"],
     properties: {
       error: { type: "string", maxLength: 200 },
-      title: { type: "string", maxLength: limits.title },
-      label_left: { type: "string", maxLength: limits.label },
-      label_right: { type: "string", maxLength: limits.label },
+      title: display("title"),
+      label_left: display("label"),
+      label_right: display("label"),
       materials: { type: "array", maxItems: 2, items: { type: "string", maxLength: limits.material } },
       // enum = whitelist config/hashtags/<locale>.json: Gemini không thể trả tag ngoài danh sách. Không có
       // minItems -> mảng rỗng hợp lệ (nội dung ngoài ngành trang sức: caption chỉ có tag cụ thể).
@@ -113,12 +128,12 @@ export function buildResponseSchema(allIds, hashtagCfg, locale = getDefaultLocal
           // without `required` the model returns partial objects and stops.
           required: ["text", "side", "tag", "sub", "suggested_action", "needs_context_image", "image_concept"],
           properties: {
-            text: { type: "string", maxLength: limits.point },
+            text: display("point"),
             side: { type: "string", enum: ["left", "right", "both"] },
             // maxLength is what keeps the on-screen tag from turning back into
             // a sentence — the label zone fits ~18 / ~26 characters per line.
-            tag: { type: "string", maxLength: limits.tag },
-            sub: { type: "string", maxLength: limits.sub },
+            tag: display("tag"),
+            sub: display("sub"),
             suggested_action: { type: "string", enum: allIds },
             // Giai đoạn 1 — ảnh minh hoạ ngữ cảnh (xem enforceContextImageLimits): model tự đề
             // xuất, code hậu kiểm/cắt bớt sau, không tin tưởng tuyệt đối vào việc model tự giác

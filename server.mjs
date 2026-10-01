@@ -65,7 +65,9 @@ import {
   cleanTag,
   maxHashtags,
   recordHashtagSuggestions,
+  withMeanings,
 } from "./scripts/lib/hashtags.mjs";
+import { textOf } from "./public/shared/bilingual.mjs";
 import { checkFfmpeg, extractPoseTimeline, setReelThumbnail } from "./scripts/lib/reel-thumbnail.mjs";
 import { getLocale, listLocales, localeErrors, getDefaultLocale } from "./scripts/lib/locales.mjs";
 import {
@@ -352,6 +354,12 @@ function assertInsideUploads(p, label) {
   return abs;
 }
 
+// Thị trường từ mã client gửi: rỗng -> mặc định; mã không tồn tại/bị tắt -> null (gọi hàm tự trả 400).
+function localeFromCode(code) {
+  const c = String(code || "").trim();
+  return c ? getLocale(c) : getDefaultLocale();
+}
+
 app.post("/api/generate-content", async (req, res) => {
   let leftPath, rightPath;
   try {
@@ -414,9 +422,19 @@ app.post("/api/generate-content", async (req, res) => {
     // client giữ nội dung trong state và POST lại ở /api/create-video, nên
     // file tạm này không cần sống tiếp
     fs.rmSync(outPath, { force: true });
-    // Hashtag dự kiến cho Studio Bước 2 (chip có thể xoá/thêm) — cùng logic với lúc đăng.
-    const { plan } = planHashtags(content, loadHashtagConfig());
-    res.json({ content, pendingSlug, hashtags: plan, hashtagMax: maxHashtags() });
+    // Hashtag dự kiến cho Studio Bước 2 (chip có thể xoá/thêm) — cùng logic với lúc đăng, theo bộ từ vựng của thị trường
+    // (kèm nghĩa tiếng Việt cho tooltip). `warnings` = cảnh báo theo từng field (không chặn).
+    const locale = localeFromCode(content.locale) || getDefaultLocale();
+    const cfg = loadHashtagConfig(locale);
+    const { plan } = planHashtags(content, cfg);
+    res.json({
+      content,
+      pendingSlug,
+      locale: locale.code,
+      hashtags: withMeanings(plan, cfg),
+      hashtagMax: maxHashtags(),
+      warnings: content._meta?.warnings || [],
+    });
   } catch (e) {
     res.status(500).json({ error: `Không đọc được kết quả Gemini: ${e.message}` });
   }
@@ -425,12 +443,15 @@ app.post("/api/generate-content", async (req, res) => {
 // Chuẩn hoá 1 hashtag người dùng gõ tay ở Studio (bỏ dấu, thường, <=25 ký tự, lọc blocked) — để UI
 // dùng ĐÚNG luật của server thay vì tự cài lại. tier="topic" nếu tag nằm trong whitelist chủ đề.
 app.post("/api/normalize-hashtag", (req, res) => {
-  const cfg = loadHashtagConfig();
+  const locale = localeFromCode(req.body?.locale);
+  if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
+  const cfg = loadHashtagConfig(locale);
   const tag = cleanTag(req.body?.tag, cfg);
   if (!tag) {
     return res.status(422).json({ error: "Hashtag không hợp lệ hoặc nằm trong danh sách cấm." });
   }
-  res.json({ tag, tier: cfg.groupOf.has(tag) ? "topic" : "specific" });
+  const [withVi] = withMeanings([{ tag }], cfg);
+  res.json({ tag, tier: cfg.groupOf.has(tag) ? "topic" : "specific", vi: withVi.vi || "" });
 });
 
 // Tính lại plan hashtag theo label HIỆN TẠI (sau khi người dùng sửa label ở Bước 2). Bỏ `materials`
@@ -439,11 +460,13 @@ app.post("/api/normalize-hashtag", (req, res) => {
 // để client dùng cho lần tính lại sau.
 app.post("/api/plan-hashtags", (req, res) => {
   const b = req.body || {};
-  const cfg = loadHashtagConfig();
+  const locale = localeFromCode(b.locale);
+  if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
+  const cfg = loadHashtagConfig(locale);
   const labels = { label_left: b.label_left, label_right: b.label_right };
   const topicTags = alignTopicTags(b.topicTags, resolveMaterialGroups(labels, cfg), cfg);
   const { plan } = planHashtags({ ...labels, topicTags }, cfg);
-  res.json({ hashtags: plan, topicTags });
+  res.json({ hashtags: withMeanings(plan, cfg), topicTags });
 });
 
 // ------------------------------------------------------------------
@@ -516,9 +539,22 @@ app.post("/api/create-video", async (req, res) => {
       return fail("Thiếu nội dung kịch bản (content.points rỗng).");
     }
 
+    // Thị trường của nội dung: content.locale (do bước sinh nội dung ghi) hoặc locale client gửi; không có -> mặc định.
+    // Thị trường chưa đủ điều kiện dựng (thiếu giọng đọc / giao diện chưa hỗ trợ chữ / pipeline chưa hỗ trợ ngôn ngữ) bị chặn
+    // Ở ĐÂY (server) dù UI đã khoá nút — không tin client.
+    const locale = localeFromCode(content.locale || req.body?.locale);
+    if (!locale) return fail("Thị trường của nội dung không tồn tại hoặc đang bị tắt.");
+    if (content.locale && req.body?.locale && content.locale !== req.body.locale) {
+      return fail(`Nội dung thuộc thị trường "${content.locale}" nhưng yêu cầu dựng cho "${req.body.locale}".`);
+    }
+    const renderability = checkRenderability(locale);
+    if (!renderability.renderable) {
+      return fail(`Thị trường ${locale.displayName} chưa dựng được video: ${renderability.blockers.map((b) => b.message).join(" ")}`);
+    }
+
     // Hashtag: plan Studio gửi lên (đã cho người dùng sửa) — luôn làm sạch lại phía server. Không có
     // (client cũ/API gọi trực tiếp) thì tự dựng từ content, video thiếu dữ liệu mới rơi về label.
-    const hashtagCfg = loadHashtagConfig();
+    const hashtagCfg = loadHashtagConfig(locale);
     const planned = planHashtags(content, hashtagCfg);
     const hashtagPlan = sanitizePlan(req.body?.hashtags, hashtagCfg) ?? planned.plan;
     // Gợi ý (vật liệu chưa có trong bảng + suggestedTags) chỉ ghi ra file cho người duyệt, KHÔNG đăng.
@@ -652,7 +688,7 @@ app.post("/api/create-video", async (req, res) => {
         if (!fs.existsSync(absoluteVideoPath)) {
           say(`⚠ Không thêm vào hàng đợi đăng Facebook: file không tồn tại: ${absoluteVideoPath}`);
         } else {
-          const { title: caption, hashtags } = resolveSocialPost(slug, videoDisplayName, hashtagPlan);
+          const { title: caption, hashtags } = resolveSocialPost(slug, videoDisplayName, hashtagPlan, locale.code);
           const item = enqueueVideo({ slug, videoPath: absoluteVideoPath, caption, hashtags });
           if (item) {
             say("ℹ Đã thêm vào hàng đợi đăng Facebook (đăng luân phiên các page, cách nhau 30-60 phút).");
@@ -765,15 +801,18 @@ function latestRender(slug) {
 // output/content/<slug>.compare-content.json — xem CONTENT_ARCHIVE_DIR ở đầu file. `livePlan` là plan
 // vừa chốt ở /api/create-video (ưu tiên hơn bản lưu). Video cũ dựng trước khi tính năng này tồn tại
 // (không có file content / không có materials, topicTags) rơi về tên hiển thị/slug + hashtag theo label.
-function resolveSocialPost(slug, fallbackName, livePlan = null) {
-  const cfg = loadHashtagConfig();
+function resolveSocialPost(slug, fallbackName, livePlan = null, localeCode = null) {
+  let cfg = loadHashtagConfig(localeFromCode(localeCode) || getDefaultLocale());
   let title = "";
   let plan = livePlan;
   try {
     const p = path.join(CONTENT_ARCHIVE_DIR, `${slug}.compare-content.json`);
     if (fs.existsSync(p)) {
       const content = JSON.parse(fs.readFileSync(p, "utf8"));
-      if (content.title && String(content.title).trim()) title = String(content.title).trim();
+      // bản lưu ghi rõ thị trường -> dùng bộ từ vựng của thị trường đó (dữ liệu cũ không có locale = mặc định)
+      cfg = loadHashtagConfig(localeFromCode(content.locale) || getDefaultLocale());
+      const t = textOf(content.title).trim(); // title chuỗi phẳng (cũ/tiếng Việt) hoặc { text, vi }
+      if (t) title = t;
       if (!plan) plan = sanitizePlan(content.hashtagPlan, cfg) ?? planHashtags(content, cfg).plan;
     }
   } catch {

@@ -57,8 +57,9 @@
   },
   "forbiddenPhrases": ["ที่สุดในโลก", "รับประกัน 100%", "ของแท้แน่นอน", "รวยแน่นอน", "เสริมดวง"],
   "hashtags": "config/hashtags/th-TH.json",
+  "hashtagStyle": "native",
   "mixedGroup": "ความรู้",
-  "jewelryKeywords": [],
+  "jewelryKeywords": ["อัญมณี", "พลอย", "เครื่องประดับ", "จิวเวลรี่", "แหวน", "สร้อย", "กำไล", "ต่างหู", "เพชร", "ทองคำ", "ทอง", "เงิน", "แพลทินัม", "ไข่มุก", "ทับทิม", "แซฟไฟร์", "มรกต", "อเมทิสต์", "โทแพซ", "ควอตซ์"],
   "prompt": {
     "language": "tiếng Thái",
     "languageDetailed": "tiếng Thái tự nhiên (ภาษาพูดสุภาพ)",

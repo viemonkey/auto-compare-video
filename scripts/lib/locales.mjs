@@ -18,6 +18,13 @@ export const LOCALES_DIR = process.env.LOCALES_DIR || path.join(REPO_ROOT, "conf
 export const FALLBACK_LOCALE = "vi-VN";
 
 export const LIMIT_UNITS = ["grapheme", "word"];
+// Cách chuẩn hoá hashtag: "ascii" (bỏ dấu, thường, chỉ a-z0-9 — vi, en) | "native" (giữ chữ bản địa: NFKC+NFC, bỏ khoảng
+// trắng/ký tự đặc biệt — ja, th). Xem scripts/lib/hashtags.mjs normalizeTag.
+export const HASHTAG_STYLES = ["ascii", "native"];
+
+// Ngôn ngữ của người vận hành tool (UI + dòng "nghĩa" để kiểm soát nội dung). Thị trường có language khác ngôn ngữ này
+// thì Gemini viết thêm `vi` (nghĩa tiếng Việt sát nghĩa) cho mọi field hiển thị.
+export const GLOSS_LANGUAGE = "vi";
 // Các giới hạn độ dài bắt buộc (số nguyên dương) + readingRate (số dương, đơn vị/giây).
 // `unit` áp dụng cho title/label/point/tag/sub/material; topicTag/suggestedTag/hashtagTotal (hashtag) LUÔN đếm theo grapheme.
 // unit "word" cần thêm `charsPerWord` để đổi sang maxLength (ký tự) trong response schema của Gemini.
@@ -69,6 +76,7 @@ export function validateLocale(raw, { repoRoot = REPO_ROOT } = {}) {
   }
 
   need(Array.isArray(raw.forbiddenPhrases) && raw.forbiddenPhrases.every(isNonEmptyStr), '"forbiddenPhrases" phải là mảng chuỗi không rỗng');
+  need(HASHTAG_STYLES.includes(raw.hashtagStyle), `"hashtagStyle" phải là ${HASHTAG_STYLES.map((s) => `"${s}"`).join(" | ")}`);
   need(isNonEmptyStr(raw.mixedGroup), '"mixedGroup" phải là chuỗi không rỗng (tên nhóm hashtag "kiến thức chung")');
   need(Array.isArray(raw.jewelryKeywords) && raw.jewelryKeywords.every(isNonEmptyStr), '"jewelryKeywords" phải là mảng chuỗi');
 
@@ -214,6 +222,12 @@ export function defaultLocaleCode(env = process.env, { envFile = path.join(REPO_
   return FALLBACK_LOCALE;
 }
 const warnedBadDefault = new Set();
+
+/** Thị trường này có cần dòng nghĩa tiếng Việt (`vi`) bên cạnh chữ ngôn ngữ đích không. */
+export const needsGloss = (locale) => locale.language !== GLOSS_LANGUAGE;
+
+/** Locale dùng làm nguồn "nghĩa" (từ khoá kim hoàn, giới hạn độ dài của dòng vi): locale đầu tiên có language = GLOSS_LANGUAGE. */
+export const glossLocale = () => listLocales().find((l) => l.language === GLOSS_LANGUAGE);
 
 /** Locale mặc định. Thiếu cả locale dự phòng -> throw (không có thị trường nào chạy được). */
 export function getDefaultLocale(env = process.env, opts) {

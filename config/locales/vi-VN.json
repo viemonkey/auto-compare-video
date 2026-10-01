@@ -25,6 +25,7 @@
   },
   "forbiddenPhrases": [],
   "hashtags": "config/hashtags/vi-VN.json",
+  "hashtagStyle": "ascii",
   "mixedGroup": "kiến thức",
   "jewelryKeywords": [
     "kim cuong", "kim hoan", "trang suc", "da quy", "ngoc", "nhan", "vang", "bac",

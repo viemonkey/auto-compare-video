@@ -32,6 +32,8 @@ import { generateContextImage } from "./generate-context-image.mjs";
 import { renameCostLedgerSlug } from "./lib/cost-ledger.mjs";
 import { npmCommand } from "./lib/npm-cmd.mjs";
 import { stripDiacritics, slugify } from "./lib/slug.mjs";
+import { resolveLocale } from "./lib/locales.mjs";
+import { checkRenderability } from "./lib/capabilities.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -761,6 +763,13 @@ async function main() {
     corrections = result.corrections;
     contextImageCorrections = result.contextImageCorrections;
     sourceImages = result.source_images;
+  }
+
+  // Thị trường của nội dung (thiếu = mặc định). Chưa đủ điều kiện dựng (giọng đọc / chữ / pipeline) -> dừng, không dựng hỏng.
+  const contentLocale = resolveLocale(content.locale);
+  const renderability = checkRenderability(contentLocale);
+  if (!renderability.renderable) {
+    fail(`Thị trường ${contentLocale.displayName} chưa dựng được video: ${renderability.blockers.map((b) => b.message).join(" ")}`);
   }
 
   const catalog = loadActionCatalog();
