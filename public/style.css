@@ -1272,3 +1272,44 @@ body {
   border-radius: var(--radius-sm); border: 1px solid var(--accent-yellow); color: var(--accent-yellow);
 }
 .locale-flag { width: 24px; height: 16px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18); flex: none; }
+
+/* Step 2 bilingual editor ------------------------------------------------- */
+.point-item { display: flex; flex-direction: column; gap: 6px; }
+.point-extra { padding: 0 14px 4px 56px; display: flex; flex-direction: column; gap: 8px; }
+.point-subfield { display: flex; flex-direction: column; gap: 4px; }
+.point-subfield > label { font-size: 11px; color: var(--fg-dim); font-weight: 700; }
+
+.bi-view-mode { display: flex; flex-wrap: wrap; gap: 8px; }
+.bi-view-btn { font-size: 12px; padding: 6px 12px; }
+
+.bi-field { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
+.bi-vi-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: var(--fg-dim); }
+.bi-vi-tag {
+  font-size: 10px; font-weight: 800; letter-spacing: 0.5px; padding: 1px 6px; border-radius: var(--radius-sm);
+  background: var(--panel-edge); color: var(--fg-dim);
+}
+.bi-vi-text { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
+.bi-vi-text.is-stale { opacity: 0.55; text-decoration: line-through; text-decoration-color: rgba(255, 209, 102, 0.5); }
+.bi-stale { color: var(--accent-yellow); font-weight: 700; font-size: 11.5px; }
+.bi-btn {
+  border: 1px solid var(--panel-edge); background: var(--panel); color: var(--fg); border-radius: var(--radius-sm);
+  min-width: 28px; height: 26px; cursor: pointer; font: inherit; line-height: 1;
+}
+.bi-btn:hover:not(:disabled) { background: var(--panel-hover); border-color: var(--accent-cyan); }
+.bi-btn:disabled, .bi-field.is-busy .bi-edit button:disabled { opacity: 0.5; cursor: progress; }
+.bi-edit { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
+.bi-edit-text { flex: 1 1 260px; min-height: 52px; resize: vertical; font-size: 13px; }
+.bi-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; }
+.bi-reading { color: var(--fg-dim); }
+.bi-warnings { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 0; margin: 0; }
+.bi-warn-warn, .bi-warn-info { color: var(--accent-yellow); }
+.bi-warn-danger { color: var(--danger); font-weight: 700; }
+.bi-error { color: var(--danger); font-weight: 700; flex-basis: 100%; }
+
+/* view modes: both | target (hide the Vietnamese line) | vi (hide the target-language inputs) */
+.bi-view-target .bi-vi-line, .bi-view-target .bi-edit { display: none !important; }
+.bi-view-vi .bi-main {
+  height: 0; min-height: 0; padding: 0; border-width: 0; margin: 0; overflow: hidden; opacity: 0; pointer-events: none;
+}
+.bi-view-vi .bi-vi-text { color: var(--fg); font-size: 14px; }
+.bi-view-vi .point-subfield > label { display: none; }

@@ -1,6 +1,7 @@
 // Auto Compare Video Web UI Application Logic
 // (ES module: dùng chung hàm đọc field song ngữ với server — public/shared/bilingual.mjs)
-import { flattenContent } from "/shared/bilingual.mjs";
+import { flattenContent, textOf, viOf } from "/shared/bilingual.mjs";
+import { createFieldEditor } from "/field-editor.js";
 
 document.addEventListener("DOMContentLoaded", () => {
   // State
@@ -12,6 +13,10 @@ document.addEventListener("DOMContentLoaded", () => {
   let pointsData = [];
   let generatedContent = null; // nội dung Gemini nguyên bản (field song ngữ { text, vi } với thị trường ngoài tiếng Việt)
   let generatedWarnings = []; // cảnh báo theo field: [{ path, code, message }]
+  // Trình soạn song ngữ: nghĩa tiếng Việt của từng dòng { vi, baseText } (stale = chữ đích hiện tại khác baseText)
+  const emptyPair = () => ({ vi: "", baseText: "" });
+  const emptyPointBi = () => ({ text: emptyPair(), tag: emptyPair(), sub: emptyPair() });
+  let biState = { title: emptyPair(), label_left: emptyPair(), label_right: emptyPair() };
 
   // DOM Elements - Stepper & Sections
   const stepNav1 = document.getElementById("step-nav-1");
@@ -236,7 +241,8 @@ document.addEventListener("DOMContentLoaded", () => {
     geminiHashtagMeta = { materials: [], topicTags: [], suggestedTags: [] };
     generatedContent = null;
     generatedWarnings = [];
-    renderPointsList();
+    biState = { title: emptyPair(), label_left: emptyPair(), label_right: emptyPair() };
+    refreshBiEditors();
     renderHashtagChips();
   }
 
@@ -291,6 +297,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } else {
       localeRenderNote.classList.add("hidden");
     }
+    updateApproveState();
   }
 
   async function loadLocales() {
@@ -331,11 +338,11 @@ document.addEventListener("DOMContentLoaded", () => {
     await refreshMarketDependents();
   }
 
-  // Voice engines depend on the market. (Video theme is not selectable: the pipeline has a single theme, and
+  // Voice engines and the editor rules depend on the market. (Video theme is not selectable: the pipeline has a single theme, and
   // renderability from /api/locales is computed against it.)
   async function refreshMarketDependents() {
     const requestId = ++marketRequestId;
-    await loadEngines(requestId);
+    await Promise.all([loadEngines(requestId), loadLocaleRules(requestId)]);
   }
 
   async function loadEngines(requestId) {
@@ -400,6 +407,183 @@ document.addEventListener("DOMContentLoaded", () => {
       vieneuPresetSelect.appendChild(opt);
     });
     if (voiceSelectLabel) voiceSelectLabel.textContent = engine ? `🗣️ Chọn giọng ${engine.label}:` : "🗣️ Chọn giọng:";
+  }
+
+  // -------------------------------------------------------------
+  // Step 2: bilingual editor — rules per market, view modes, render lock, busy state.
+  // Per-line widgets live in /field-editor.js; warnings use the same module as the server (/shared/field-warnings.mjs).
+  // -------------------------------------------------------------
+  const VIEW_MODE_KEY = "acv.biViewMode";
+  const VIEW_MODES = [
+    { id: "both", label: "Song ngữ" },
+    { id: "target", label: "Chỉ ngôn ngữ đích" },
+    { id: "vi", label: "Chỉ tiếng Việt" },
+  ];
+  const biViewModeBox = document.getElementById("bi-view-mode");
+  const renderLockNote = document.getElementById("render-lock-note");
+  let localeRules = null; // GET /api/locale-rules cho thị trường đang chọn
+  let biViewMode = "both";
+  try {
+    const stored = localStorage.getItem(VIEW_MODE_KEY);
+    if (VIEW_MODES.some((m) => m.id === stored)) biViewMode = stored;
+  } catch {
+    // storage bị chặn — chế độ xem chỉ không được nhớ
+  }
+  let staticEditors = []; // [{ editor, host }] cho title + 2 label
+  let pointEditors = []; // widget của từng dòng point (dựng lại mỗi lần renderPointsList)
+  let busyCount = 0; // số dòng đang chờ AI
+
+  const isGloss = () => !!(localeRules && localeRules.needsGloss);
+
+  function setBusy(delta) {
+    busyCount = Math.max(0, busyCount + delta);
+    updateApproveState();
+  }
+
+  // Nút dựng khoá khi: thị trường chưa render được (kèm lý do cụ thể) hoặc đang chờ AI sửa dòng nào đó.
+  function updateApproveState() {
+    if (!btnApproveBuild) return;
+    const info = currentLocaleInfo();
+    const locked = !!info && !info.renderable;
+    const busyNow = busyCount > 0;
+    btnApproveBuild.disabled = locked || busyNow;
+    btnApproveBuild.title = locked ? "Thị trường này chưa dựng được video" : busyNow ? "Đang chờ AI sửa dòng…" : "";
+    if (locked) {
+      renderLockNote.textContent = `🔒 Chưa dựng được video cho ${info.displayName}: ${info.blockers.map((b) => b.message).join(" ")} Bạn vẫn xem và sửa kịch bản bình thường.`;
+    } else if (busyNow) {
+      renderLockNote.textContent = "⏳ Đang chờ AI sửa dòng — nút dựng video tạm khoá để không gửi nội dung chưa xong.";
+    }
+    renderLockNote.classList.toggle("hidden", !(locked || busyNow));
+  }
+
+  function biContext(point) {
+    const pair = (input, st) => ({ text: input.value, vi: st.vi });
+    return {
+      title: pair(scriptTitle, biState.title),
+      label_left: pair(scriptLabelLeft, biState.label_left),
+      label_right: pair(scriptLabelRight, biState.label_right),
+      pointText: point ? { text: point.text, vi: point._bi ? point._bi.text.vi : "" } : undefined,
+      pointTag: point ? { text: point.tag || "", vi: point._bi ? point._bi.tag.vi : "" } : undefined,
+    };
+  }
+
+  function mountEditor(kind, inputEl, host, state, point) {
+    inputEl.classList.add("bi-main");
+    return createFieldEditor({
+      kind,
+      inputEl,
+      host,
+      state,
+      getRules: () => localeRules,
+      getLocaleCode: () => currentLocale,
+      getContext: () => biContext(point),
+      getPendingSlug: () => pendingContentSlug,
+      onBusy: setBusy,
+    });
+  }
+
+  function mountStaticEditors() {
+    staticEditors.forEach(({ editor, host }) => {
+      editor.destroy();
+      host.remove();
+    });
+    staticEditors = [];
+    [
+      ["title", scriptTitle],
+      ["label_left", scriptLabelLeft],
+      ["label_right", scriptLabelRight],
+    ].forEach(([kind, input]) => {
+      const host = document.createElement("div");
+      input.insertAdjacentElement("afterend", host);
+      staticEditors.push({ editor: mountEditor(kind, input, host, biState[kind], null), host });
+    });
+  }
+
+  function renderViewModeBar() {
+    biViewModeBox.innerHTML = "";
+    biViewModeBox.classList.toggle("hidden", !isGloss());
+    VIEW_MODES.forEach((m) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "locale-btn bi-view-btn";
+      btn.setAttribute("role", "radio");
+      btn.setAttribute("aria-checked", String(m.id === biViewMode));
+      btn.textContent = m.label;
+      btn.addEventListener("click", () => {
+        biViewMode = m.id;
+        try {
+          localStorage.setItem(VIEW_MODE_KEY, m.id);
+        } catch {
+          // không nhớ được chế độ xem — không sao
+        }
+        renderViewModeBar();
+        applyViewMode();
+      });
+      biViewModeBox.appendChild(btn);
+    });
+  }
+
+  function applyViewMode() {
+    const mode = isGloss() ? biViewMode : "both";
+    step2.classList.remove("bi-view-both", "bi-view-target", "bi-view-vi");
+    step2.classList.add(`bi-view-${mode}`);
+  }
+
+  // (Re)build every editor widget: called when the market's rules arrive, after content is generated, and on reset.
+  function refreshBiEditors() {
+    mountStaticEditors();
+    renderPointsList();
+    renderViewModeBar();
+    applyViewMode();
+    updateApproveState();
+  }
+
+  async function loadLocaleRules(requestId) {
+    if (!currentLocale) return;
+    try {
+      const res = await fetch(`/api/locale-rules?locale=${encodeURIComponent(currentLocale)}`);
+      const data = await res.json();
+      if (requestId !== marketRequestId) return;
+      if (!res.ok) throw new Error(data.error || "Không tải được luật của thị trường.");
+      localeRules = data;
+      refreshBiEditors();
+    } catch (err) {
+      console.error("Failed to load locale rules:", err);
+    }
+  }
+
+  // Content from Gemini -> editor state. Markets with a gloss line keep { vi, baseText } per line; flat markets are unchanged.
+  function initBilingualState(content) {
+    const pairOf = (f) => ({ vi: viOf(f), baseText: textOf(f) });
+    biState = { title: pairOf(content.title), label_left: pairOf(content.label_left), label_right: pairOf(content.label_right) };
+    pointsData = (content.points || []).map((p) => {
+      const q = { ...p, text: textOf(p.text), tag: textOf(p.tag), sub: textOf(p.sub) };
+      if (isGloss()) q._bi = { text: pairOf(p.text), tag: pairOf(p.tag), sub: pairOf(p.sub) };
+      return q;
+    });
+  }
+
+  // Content for /api/create-video (and, later, drafts): bilingual markets send { text, vi } per line, flat markets unchanged.
+  function buildContentPayload() {
+    const hashtagMeta = { materials: geminiHashtagMeta.materials, topicTags: geminiHashtagMeta.topicTags, suggestedTags: geminiHashtagMeta.suggestedTags };
+    if (!isGloss()) {
+      return {
+        title: scriptTitle.value.trim(),
+        label_left: scriptLabelLeft.value.trim(),
+        label_right: scriptLabelRight.value.trim(),
+        ...hashtagMeta,
+        points: pointsData,
+      };
+    }
+    const field = (text, st) => ({ text: String(text ?? "").trim(), vi: st.vi || "" });
+    return {
+      locale: currentLocale,
+      title: field(scriptTitle.value, biState.title),
+      label_left: field(scriptLabelLeft.value, biState.label_left),
+      label_right: field(scriptLabelRight.value, biState.label_right),
+      ...hashtagMeta,
+      points: pointsData.map(({ _bi, ...p }) => ({ ...p, text: field(p.text, _bi.text), tag: field(p.tag, _bi.tag), sub: field(p.sub, _bi.sub) })),
+    };
   }
 
   async function fetchContentAngles() {
@@ -596,8 +780,8 @@ document.addEventListener("DOMContentLoaded", () => {
       // Auto-generate suggested slug — hậu tố theo góc độ nội dung đã chọn ở Bước 1
       scriptSlug.value = buildSlugWithAngle(content.label_left, content.label_right);
 
-      pointsData = content.points || [];
-      renderPointsList();
+      initBilingualState(generatedContent);
+      refreshBiEditors();
 
       geminiHashtagMeta = {
         materials: content.materials || [],
@@ -709,9 +893,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // Step 2: Points List & Action Selector Studio
   // -------------------------------------------------------------
   function renderPointsList() {
+    pointEditors.forEach((e) => e.destroy()); // huỷ yêu cầu đang chờ của các dòng sắp bị dựng lại
+    pointEditors = [];
     pointsContainer.innerHTML = "";
 
     pointsData.forEach((p, idx) => {
+      const item = document.createElement("div");
+      item.className = "point-item";
       const row = document.createElement("div");
       row.className = "point-row";
 
@@ -752,20 +940,59 @@ document.addEventListener("DOMContentLoaded", () => {
         renderPointsList();
       });
 
-      pointsContainer.appendChild(row);
+      item.appendChild(row);
+
+      // Dưới mỗi dòng: nghĩa tiếng Việt + cảnh báo của lời thoại; thị trường có dòng nghĩa còn sửa được nhãn (tag) và dòng phụ (sub).
+      const extra = document.createElement("div");
+      extra.className = "point-extra";
+      const textHost = document.createElement("div");
+      extra.appendChild(textHost);
+      pointEditors.push(mountEditor("text", input, textHost, p._bi ? p._bi.text : emptyPair(), p));
+      if (isGloss() && p._bi) {
+        [
+          ["tag", "Nhãn trên màn hình (tag)"],
+          ["sub", "Dòng phụ (sub)"],
+        ].forEach(([kind, label]) => {
+          const group = document.createElement("div");
+          group.className = "point-subfield";
+          const lab = document.createElement("label");
+          lab.textContent = label;
+          const field = document.createElement("input");
+          field.type = "text";
+          field.className = "input-text";
+          field.value = p[kind] || "";
+          field.addEventListener("input", (e) => {
+            pointsData[idx][kind] = e.target.value;
+          });
+          const host = document.createElement("div");
+          group.append(lab, field, host);
+          extra.appendChild(group);
+          pointEditors.push(mountEditor(kind, field, host, p._bi[kind], p));
+        });
+      }
+      item.appendChild(extra);
+
+      pointsContainer.appendChild(item);
     });
   }
 
   btnAddPoint.addEventListener("click", () => {
     // side/tag/sub are required by the scaffold — a point added here without
     // them aborts the build at points[i].side = undefined.
-    pointsData.push({
+    const fresh = {
       text: "Điểm so sánh mới...",
       side: pointsData.length % 2 === 0 ? "left" : "right",
       tag: "Nhãn ngắn",
       sub: "",
       suggested_action: DEFAULT_POSE,
-    });
+    };
+    // thị trường có dòng nghĩa: điểm mới do người dùng tự gõ, chưa có nghĩa tiếng Việt (hiện "chưa cập nhật nghĩa" + ↻)
+    if (isGloss()) {
+      fresh.text = "";
+      fresh.tag = "";
+      fresh._bi = emptyPointBi();
+    }
+    pointsData.push(fresh);
     renderPointsList();
   });
 
@@ -842,15 +1069,7 @@ document.addEventListener("DOMContentLoaded", () => {
       scriptSlug.value = suggested;
     }
 
-    const payloadContent = {
-      title: scriptTitle.value.trim(),
-      label_left: scriptLabelLeft.value.trim(),
-      label_right: scriptLabelRight.value.trim(),
-      materials: geminiHashtagMeta.materials,
-      topicTags: geminiHashtagMeta.topicTags,
-      suggestedTags: geminiHashtagMeta.suggestedTags,
-      points: pointsData,
-    };
+    const payloadContent = buildContentPayload();
 
     gotoStep(3);
     terminalLogs.textContent = "▶ Đang kết nối tới server để dựng video...\n";

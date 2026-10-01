@@ -68,6 +68,9 @@ import {
   withMeanings,
 } from "./scripts/lib/hashtags.mjs";
 import { textOf } from "./public/shared/bilingual.mjs";
+import { rulesOf } from "./scripts/lib/compare-content.mjs";
+import { rewriteField, translateField, FieldEditError } from "./scripts/lib/field-edit.mjs";
+import { AbortedError } from "./scripts/lib/gemini-client.mjs";
 import { checkFfmpeg, extractPoseTimeline, setReelThumbnail } from "./scripts/lib/reel-thumbnail.mjs";
 import { getLocale, listLocales, localeErrors, getDefaultLocale } from "./scripts/lib/locales.mjs";
 import {
@@ -268,6 +271,48 @@ app.get("/api/locales", (req, res) => {
       .map((l) => describeLocale(l, themeId)),
   });
 });
+
+// Luật kiểm tra từng dòng của 1 thị trường (giới hạn, cụm cấm, glossary, tốc độ đọc) — trình duyệt dùng CÙNG module cảnh báo
+// (public/shared/field-warnings.mjs) với server nên chỉ cần dữ liệu luật, không cài lại logic.
+app.get("/api/locale-rules", (req, res) => {
+  const locale = localeFromCode(req.query.locale);
+  if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
+  res.json({ code: locale.code, displayName: locale.displayName, languageName: locale.prompt.language, ...rulesOf(locale) });
+});
+
+// Sửa 1 dòng bằng Gemini — chỉ gọi cho ĐÚNG trường đó (Bước 2). Huỷ khi client đóng kết nối / gửi yêu cầu mới (AbortController
+// phía trình duyệt -> kết nối đóng -> huỷ request Gemini đang chờ).
+function fieldEditHandler(run) {
+  return async (req, res) => {
+    const locale = localeFromCode(req.body?.locale);
+    if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
+    const controller = new AbortController();
+    res.on("close", () => {
+      if (!res.writableEnded) controller.abort();
+    });
+    try {
+      const slug = typeof req.body?.pendingSlug === "string" && req.body.pendingSlug.startsWith("_pending-") ? req.body.pendingSlug : null;
+      const out = await run({ locale, body: req.body || {}, slug, signal: controller.signal });
+      res.json({ ...out, requestId: req.body?.requestId ?? null });
+    } catch (e) {
+      if (e instanceof AbortedError || controller.signal.aborted) return; // client đã bỏ
+      if (e instanceof FieldEditError) return res.status(400).json({ error: e.message });
+      console.warn(`[field-edit] ${redactSecrets(e.message)}`);
+      res.status(500).json({ error: e.userMessage || "Gemini xử lý thất bại, vui lòng thử lại." });
+    }
+  };
+}
+
+app.post(
+  "/api/rewrite-field",
+  fieldEditHandler(({ locale, body, slug, signal }) =>
+    rewriteField({ locale, kind: body.kind, idea: body.idea, current: body.current, context: body.context, slug, signal }),
+  ),
+);
+app.post(
+  "/api/translate-field",
+  fieldEditHandler(({ locale, body, slug, signal }) => translateField({ locale, kind: body.kind, text: body.text, slug, signal })),
+);
 
 // Engine TTS cho 1 thị trường: supported = engine khai báo ngôn ngữ của locale; ready = đủ cấu hình để chạy.
 app.get("/api/tts-engines", (req, res) => {

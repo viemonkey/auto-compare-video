@@ -18,6 +18,8 @@ const REPO_ROOT = path.resolve(__dirname, "..", "..");
 const OUTPUT_DIR = path.join(REPO_ROOT, "output");
 // COST_LEDGER_PATH (env) chỉ để test không ghi vào sổ thật.
 export const COST_LEDGER_PATH = process.env.COST_LEDGER_PATH || path.join(OUTPUT_DIR, "cost-ledger.jsonl");
+// Đọc env cả lúc GHI (không chỉ lúc import) — test đặt COST_LEDGER_PATH sau khi module đã được import vẫn không ghi nhầm vào sổ thật.
+const ledgerPath = () => process.env.COST_LEDGER_PATH || COST_LEDGER_PATH;
 
 /**
  * @param {object} entry
@@ -33,6 +35,7 @@ export const COST_LEDGER_PATH = process.env.COST_LEDGER_PATH || path.join(OUTPUT
  * @param {number} [entry.httpStatus]
  * @param {string} [entry.errorMessage] - chỉ khi status="error"
  * @param {number} [entry.attempt] - lần thử thứ mấy (retry)
+ * @param {string} [entry.subtask] - tác vụ con (vd "field-rewrite" / "field-translate" ở Bước 2); task vẫn là content-generation để cột chi phí không đổi
  * @param {string} [entry.locale] - mã thị trường (vd "ja-JP") của lần sinh nội dung; dòng cũ không có -> null
  */
 export function appendCostEntry(entry) {
@@ -40,6 +43,7 @@ export function appendCostEntry(entry) {
     timestamp: new Date().toISOString(),
     slug: entry.slug || null,
     locale: entry.locale || null,
+    subtask: entry.subtask || null,
     task: entry.task,
     model: entry.model,
     input_tokens: typeof entry.inputTokens === "number" ? entry.inputTokens : null,
@@ -53,10 +57,11 @@ export function appendCostEntry(entry) {
   };
 
   try {
-    fs.mkdirSync(OUTPUT_DIR, { recursive: true });
-    fs.appendFileSync(COST_LEDGER_PATH, JSON.stringify(row) + "\n");
+    const file = ledgerPath();
+    fs.mkdirSync(path.dirname(file), { recursive: true });
+    fs.appendFileSync(file, JSON.stringify(row) + "\n");
   } catch (e) {
-    console.error(`⚠ [cost-ledger] Không ghi được ${COST_LEDGER_PATH}: ${e.message}`);
+    console.error(`⚠ [cost-ledger] Không ghi được ${ledgerPath()}: ${e.message}`);
   }
 }
 
@@ -79,8 +84,8 @@ export function appendCostEntry(entry) {
 export function renameCostLedgerSlug(oldSlug, newSlug) {
   if (!oldSlug || !newSlug || oldSlug === newSlug) return 0;
   try {
-    if (!fs.existsSync(COST_LEDGER_PATH)) return 0;
-    const raw = fs.readFileSync(COST_LEDGER_PATH, "utf8");
+    if (!fs.existsSync(ledgerPath())) return 0;
+    const raw = fs.readFileSync(ledgerPath(), "utf8");
     let changed = 0;
     const nextLines = raw.split("\n").map((line) => {
       const trimmed = line.trim();
@@ -97,7 +102,7 @@ export function renameCostLedgerSlug(oldSlug, newSlug) {
       return JSON.stringify(row);
     });
     if (changed > 0) {
-      fs.writeFileSync(COST_LEDGER_PATH, nextLines.join("\n"));
+      fs.writeFileSync(ledgerPath(), nextLines.join("\n"));
     }
     return changed;
   } catch (e) {

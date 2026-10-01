@@ -8,7 +8,8 @@ import { resolveTopicTags, cleanTag, loadHashtagConfig, resolveMaterialGroups } 
 import { stripDiacritics } from "./slug.mjs";
 import { getDefaultLocale, glossLocale, glossaryEntries, needsGloss } from "./locales.mjs";
 import { CONTENT_FIELDS, POINT_FIELDS, isBilingualField, textOf, viOf, coerceField } from "../../public/shared/bilingual.mjs";
-import { measure } from "../../public/shared/text-length.mjs";
+import { warningsForField as fieldWarnings } from "../../public/shared/field-warnings.mjs";
+import { nfkcLower } from "../../public/shared/text-fold.mjs";
 
 // Giai đoạn 1 — giới hạn cứng bằng CODE, không tin vào việc model tự giác tuân theo hướng dẫn
 // prompt (giống enforceJewelryGating): tối đa MAX_CONTEXT_IMAGES point/video được sinh
@@ -20,8 +21,6 @@ import { measure } from "../../public/shared/text-length.mjs";
 // scaffold-compare-video.mjs § buildTimelineBeatsJs).
 export const MAX_CONTEXT_IMAGES = 5;
 
-// Cùng ngoại lệ SARA AM tiếng Thái như hashtags.mjs (NFKC tách "ำ" thành 2 code point).
-const nfkcLower = (s) => String(s ?? "").normalize("NFKC").replace(/\u0E4D\u0E32/g, "\u0E33").replace(/\u0ECD\u0EB2/g, "\u0EB3").toLowerCase();
 
 /**
  * Chủ đề có phải trang sức/đá quý/kim loại quý không — hậu kiểm bằng code, KHÔNG dựa vào việc Gemini "tự giác".
@@ -113,62 +112,16 @@ export function parseAndValidate(rawText, catalog, { locale = getDefaultLocale()
 }
 
 // ---------------------------------------------------------------------------------------------
-// Cảnh báo theo từng field (KHÔNG chặn, KHÔNG retry): độ dài theo limits, cụm cấm, thiếu nghĩa tiếng Việt, thuật ngữ
-// lệch glossary. Dùng lúc Gemini trả về (M2) và để kiểm tra lại từng dòng khi người dùng sửa (M3).
+// Cảnh báo theo từng field (KHÔNG chặn, KHÔNG retry) — luật nằm ở public/shared/field-warnings.mjs (dùng chung với trình duyệt).
 // ---------------------------------------------------------------------------------------------
-const LIMIT_KEY = { title: "title", label_left: "label", label_right: "label", text: "point", tag: "tag", sub: "sub" };
-const UNIT_NAME = { grapheme: "ký tự", word: "từ" };
-
-// Nhắc tới khái niệm glossary trong dòng nghĩa tiếng Việt nhưng chữ đích không dùng thuật ngữ chuẩn. Khớp khái niệm DÀI
-// trước và gạch khỏi chuỗi (vd "thạch anh tím" trước "thạch anh") để không báo nhầm khái niệm con.
-// Khái niệm mơ hồ (glossary `ambiguous`) không bao giờ bị cảnh báo; khái niệm có `contexts` chỉ bị kiểm khi nghĩa chứa 1 cụm ngữ cảnh.
-function glossaryWarnings(text, vi, entries) {
-  const out = [];
-  const viFolded = ` ${stripDiacritics(vi)} `;
-  let rest = viFolded;
-  const normText = nfkcLower(text);
-  for (const { concept, term, ambiguous, contexts } of [...entries].sort((a, b) => b.concept.length - a.concept.length)) {
-    const key = stripDiacritics(concept);
-    if (!key || !rest.includes(key)) continue;
-    rest = rest.split(key).join(" "); // luôn gạch khỏi chuỗi để khái niệm con ngắn hơn không bị khớp lại
-    if (ambiguous) continue;
-    if (contexts && !contexts.some((c) => viFolded.includes(stripDiacritics(c)))) continue;
-    // thuật ngữ có thể ghi kèm chú thích: "金（ゴールド）" -> chấp nhận cả "金" lẫn "ゴールド"
-    const variants = [term, ...term.split(/[()（）]/).map((s) => s.trim()).filter(Boolean)].map(nfkcLower);
-    if (!variants.some((v) => normText.includes(v))) {
-      out.push({ code: "glossary-term", concept, term });
-    }
-  }
-  return out;
+/** Luật kiểm tra của 1 locale, dạng dữ liệu thuần (cũng là nội dung GET /api/locale-rules cho trình duyệt). */
+export function rulesOf(locale) {
+  return { limits: locale.limits, forbiddenPhrases: locale.forbiddenPhrases, glossary: glossaryEntries(locale), needsGloss: needsGloss(locale) };
 }
 
 /** Cảnh báo cho 1 field hiển thị. `kind` ∈ title|label_left|label_right|text|tag|sub. */
 export function warningsForField(kind, field, locale) {
-  const text = textOf(field);
-  const warnings = [];
-  const add = (code, message, extra = {}) => warnings.push({ code, message, ...extra });
-  if (!text.trim()) return warnings; // field rỗng hợp lệ (vd sub) — không có gì để kiểm
-
-  const limit = locale.limits[LIMIT_KEY[kind]];
-  const used = measure(text, locale.limits.unit);
-  if (used > limit) add("too-long", `Vượt giới hạn ${limit} ${UNIT_NAME[locale.limits.unit]} (đang ${used}).`, { limit, used });
-
-  const normText = nfkcLower(text);
-  for (const phrase of locale.forbiddenPhrases) {
-    if (normText.includes(nfkcLower(phrase))) add("forbidden-phrase", `Chứa cụm bị cấm của thị trường: "${phrase}".`, { phrase });
-  }
-
-  if (needsGloss(locale)) {
-    const vi = viOf(field).trim();
-    if (!vi) {
-      add("missing-vi", "Thiếu dòng nghĩa tiếng Việt.");
-    } else {
-      for (const g of glossaryWarnings(text, vi, glossaryEntries(locale))) {
-        add("glossary-term", `Nghĩa nhắc "${g.concept}" nhưng chữ không dùng thuật ngữ chuẩn "${g.term}".`, g);
-      }
-    }
-  }
-  return warnings;
+  return fieldWarnings(kind, field, rulesOf(locale));
 }
 
 /**
