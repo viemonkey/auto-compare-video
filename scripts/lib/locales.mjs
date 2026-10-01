@@ -47,7 +47,9 @@ export function validateLocale(raw, { repoRoot = REPO_ROOT } = {}) {
   );
   need(isStr(raw.script) && /^[A-Z][a-z]{3}$/.test(raw.script), '"script" phải là mã ISO 15924 4 chữ (vd "Latn", "Jpan", "Thai")');
   need(isNonEmptyStr(raw.displayName), '"displayName" phải là chuỗi không rỗng');
-  need(isNonEmptyStr(raw.flag), '"flag" phải là chuỗi không rỗng');
+  need(isNonEmptyStr(raw.flag), '"flag" phải là chuỗi không rỗng (emoji, chỉ làm dự phòng khi không có flagIcon)');
+  need(raw.flagIcon === undefined || (isNonEmptyStr(raw.flagIcon) && raw.flagIcon.startsWith("/") && raw.flagIcon.toLowerCase().endsWith(".svg")),
+    '"flagIcon" phải là đường dẫn file .svg bắt đầu bằng "/" (vd "/flags/ja-JP.svg", file nằm trong public/)');
   need(typeof raw.enabled === "boolean", '"enabled" phải là boolean');
   need(isStr(raw.slugSuffix) && /^[a-z0-9]+(-[a-z0-9]+)*$|^$/.test(raw.slugSuffix), '"slugSuffix" phải là chuỗi a-z0-9 (có thể rỗng)');
   need(isNonEmptyStr(raw.styleSummary), '"styleSummary" phải là chuỗi không rỗng (mô tả văn phong 1 dòng hiện ở UI)');
@@ -88,7 +90,13 @@ export function validateLocale(raw, { repoRoot = REPO_ROOT } = {}) {
   if (problems.length) return { locale: null, problems };
 
   const hashtagsPath = path.isAbsolute(raw.hashtags) ? raw.hashtags : path.join(repoRoot, raw.hashtags);
-  return { locale: Object.freeze({ ...raw, hashtagsPath }), problems };
+  // Thiếu file cờ KHÔNG tắt locale: bỏ flagIcon, UI rơi về emoji `flag`.
+  let flagIcon = raw.flagIcon ?? null;
+  if (flagIcon && !fs.existsSync(path.join(repoRoot, "public", flagIcon))) {
+    log.warn(`Locale "${raw.code}": không thấy file cờ public${flagIcon} — dùng emoji.`);
+    flagIcon = null;
+  }
+  return { locale: Object.freeze({ ...raw, flagIcon, hashtagsPath }), problems };
 }
 
 /**

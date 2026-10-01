@@ -3,6 +3,7 @@
   "language": "ja",
   "script": "Jpan",
   "displayName": "日本語",
+  "flagIcon": "/flags/ja-JP.svg",
   "flag": "🇯🇵",
   "enabled": true,
   "slugSuffix": "ja",

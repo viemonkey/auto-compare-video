@@ -243,8 +243,27 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.setAttribute("aria-checked", String(l.code === currentLocale));
       btn.dataset.code = l.code;
       btn.title = l.renderable ? l.styleSummary : l.blockers.map((b) => b.message).join(" ");
+      // Flag: bundled SVG (public/flags, declared as flagIcon in the locale file); emoji only as fallback.
+      if (l.flagIcon) {
+        const img = document.createElement("img");
+        img.className = "locale-flag";
+        img.src = l.flagIcon;
+        img.alt = "";
+        img.width = 24;
+        img.height = 16;
+        img.addEventListener("error", () => {
+          const emoji = document.createElement("span");
+          emoji.textContent = l.flag;
+          img.replaceWith(emoji);
+        });
+        btn.appendChild(img);
+      } else {
+        const emoji = document.createElement("span");
+        emoji.textContent = l.flag;
+        btn.appendChild(emoji);
+      }
       const label = document.createElement("span");
-      label.textContent = `${l.flag} ${l.displayName}`;
+      label.textContent = l.displayName;
       btn.appendChild(label);
       if (!l.renderable) {
         const lock = document.createElement("span");

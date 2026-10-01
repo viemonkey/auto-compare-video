@@ -72,6 +72,7 @@ test("validateLocale: thiếu trường / sai kiểu -> báo từng lỗi", () =
     prompt: (r) => { delete r.prompt; },
     "prompt.example": (r) => { delete r.prompt.example.tag; },
     hashtags: (r) => { r.hashtags = "config/hashtags/khong-ton-tai.json"; },
+    flagIcon: (r) => { r.flagIcon = "flags/khong-co-slash.svg"; },
     ...Object.fromEntries(LIMIT_KEYS.map((k) => [`limits.${k}`, (r) => { r.limits[k] = -1; }])),
   };
   for (const [field, mutate] of Object.entries(cases)) {
@@ -83,6 +84,17 @@ test("validateLocale: thiếu trường / sai kiểu -> báo từng lỗi", () =
   }
   assert.equal(validateLocale(null).locale, null);
   assert.equal(validateLocale([]).locale, null);
+});
+
+test("flagIcon: locale thật có file cờ trong public/; thiếu file chỉ bỏ flagIcon (dùng emoji), không tắt locale", () => {
+  const raw = defaultRaw();
+  const real = validateLocale(raw);
+  assert.ok(real.locale.flagIcon, "locale mặc định khai báo flagIcon");
+  assert.ok(fs.existsSync(path.join(ROOT, "public", real.locale.flagIcon)));
+  assert.ok(raw.flag, "emoji dự phòng vẫn còn");
+  const missing = validateLocale({ ...raw, flagIcon: "/flags/khong-ton-tai.svg" });
+  assert.deepEqual(missing.problems, []);
+  assert.equal(missing.locale.flagIcon, null);
 });
 
 test("loadLocales: locale lỗi bị tắt + báo lỗi, locale tốt vẫn nạp, KHÔNG throw", () => {

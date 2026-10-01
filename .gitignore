@@ -44,6 +44,9 @@ assets/temp/
 !assets/actions/**
 !assets/backgrounds/**
 
+# Market (locale) flag icons shown in the Step 1 picker — hand-written SVGs, referenced by `flagIcon` in config/locales/*.json
+!public/flags/*.svg
+
 # Per-video sources ARE committed as of 2026-08-30.
 #
 # The previous rule here was `videos/*` plus an allowlist of two directories,

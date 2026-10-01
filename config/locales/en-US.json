@@ -3,6 +3,7 @@
   "language": "en",
   "script": "Latn",
   "displayName": "English (US)",
+  "flagIcon": "/flags/en-US.svg",
   "flag": "🇺🇸",
   "enabled": true,
   "slugSuffix": "en",

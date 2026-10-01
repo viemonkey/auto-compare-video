@@ -3,6 +3,7 @@
   "language": "vi",
   "script": "Latn",
   "displayName": "Tiếng Việt",
+  "flagIcon": "/flags/vi-VN.svg",
   "flag": "🇻🇳",
   "enabled": true,
   "slugSuffix": "",

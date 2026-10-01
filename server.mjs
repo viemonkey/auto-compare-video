@@ -246,6 +246,7 @@ function describeLocale(l, themeId) {
     script: l.script,
     displayName: l.displayName,
     flag: l.flag,
+    flagIcon: l.flagIcon,
     slugSuffix: l.slugSuffix,
     styleSummary: l.styleSummary,
     renderable: r.renderable,

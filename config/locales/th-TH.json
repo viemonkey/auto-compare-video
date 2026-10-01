@@ -3,6 +3,7 @@
   "language": "th",
   "script": "Thai",
   "displayName": "ภาษาไทย",
+  "flagIcon": "/flags/th-TH.svg",
   "flag": "🇹🇭",
   "enabled": true,
   "slugSuffix": "th",
