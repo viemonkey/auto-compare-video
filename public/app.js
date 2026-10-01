@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", () => {
   // State
   let uploadedLeftPath = null;
   let uploadedRightPath = null;
+  let pendingContentSlug = null; // slug tạm gắn ở Bước 1 (/api/generate-content), đổi thành slug thật ở /api/create-video
   let actionCatalog = [];
   let currentEditingPointIndex = null;
   let pointsData = [];
@@ -42,6 +43,13 @@ document.addEventListener("DOMContentLoaded", () => {
   const scriptLabelRight = document.getElementById("script-label-right");
   const scriptTitle = document.getElementById("script-title");
   const scriptSlug = document.getElementById("script-slug");
+  const hashtagChips = document.getElementById("hashtag-chips");
+  const hashtagAddInput = document.getElementById("hashtag-add-input");
+  const btnAddHashtag = document.getElementById("btn-add-hashtag");
+  const hashtagNote = document.getElementById("hashtag-note");
+  let hashtagPlan = []; // [{tag, tier:"specific"|"topic", manual?}] — server làm sạch lại khi dựng
+  let hashtagMax = 4;
+  let geminiHashtagMeta = { materials: [], topicTags: [], suggestedTags: [] };
   const pointsContainer = document.getElementById("points-container");
   const btnAddPoint = document.getElementById("btn-add-point");
   const btnBackStep1 = document.getElementById("btn-back-step1");
@@ -120,6 +128,40 @@ document.addEventListener("DOMContentLoaded", () => {
   const btnExistingVideos = document.getElementById("btn-existing-videos");
   const btnCloseVideosModal = document.getElementById("btn-close-videos-modal");
   const videosListGrid = document.getElementById("videos-list-grid");
+
+  const costStatsModal = document.getElementById("cost-stats-modal");
+  const btnCostStats = document.getElementById("btn-cost-stats");
+  const btnCloseCostModal = document.getElementById("btn-close-cost-modal");
+  const costTotalToday = document.getElementById("cost-total-today");
+  const costTotal7d = document.getElementById("cost-total-7d");
+  const costTotalAll = document.getElementById("cost-total-all");
+  const costTotalTodayVnd = document.getElementById("cost-total-today-vnd");
+  const costTotal7dVnd = document.getElementById("cost-total-7d-vnd");
+  const costTotalAllVnd = document.getElementById("cost-total-all-vnd");
+  const costStateLoading = document.getElementById("cost-state-loading");
+  const costStateError = document.getElementById("cost-state-error");
+  const costStateEmpty = document.getElementById("cost-state-empty");
+  const costContent = document.getElementById("cost-content");
+  const costChartWrap = document.getElementById("cost-chart-wrap");
+  const costVideosTbody = document.getElementById("cost-videos-tbody");
+  const costRangeSelect = document.getElementById("cost-range-select");
+  const costCustomRange = document.getElementById("cost-custom-range");
+  const costDateFrom = document.getElementById("cost-date-from");
+  const costDateTo = document.getElementById("cost-date-to");
+  const btnApplyCustomRange = document.getElementById("btn-apply-custom-range");
+  const btnExportCsv = document.getElementById("btn-export-csv");
+  const costFootContent = document.getElementById("cost-foot-content");
+  const costFootImage = document.getElementById("cost-foot-image");
+  const costFootImagesCount = document.getElementById("cost-foot-images-count");
+  const costFootTotal = document.getElementById("cost-foot-total");
+  const costPagePrev = document.getElementById("cost-page-prev");
+  const costPageNext = document.getElementById("cost-page-next");
+  const costPageLabel = document.getElementById("cost-page-label");
+  const costTableHeaders = document.querySelectorAll("#cost-content th[data-sort]");
+
+  // Tỷ giá ƯỚC TÍNH cố định — không phải tỷ giá thời gian thực, chỉ để hình dung nhanh.
+  const USD_TO_VND_RATE = 26000;
+  const COST_PAGE_SIZE = 20;
 
   // -------------------------------------------------------------
   // Initial Setup: Fetch Action Catalog & VieNeu Preset Voices
@@ -347,6 +389,8 @@ document.addEventListener("DOMContentLoaded", () => {
       const genData = await genRes.json();
       if (!genRes.ok) throw new Error(genData.error || "Gemini sinh nội dung thất bại.");
 
+      pendingContentSlug = genData.pendingSlug || null;
+
       // Populate Step 2 Studio with Gemini output
       const content = genData.content;
       scriptTitle.value = content.title || "";
@@ -359,6 +403,15 @@ document.addEventListener("DOMContentLoaded", () => {
       pointsData = content.points || [];
       renderPointsList();
 
+      geminiHashtagMeta = {
+        materials: content.materials || [],
+        topicTags: content.topicTags || [],
+        suggestedTags: content.suggestedTags || [],
+      };
+      hashtagPlan = genData.hashtags || [];
+      hashtagMax = genData.hashtagMax || 4;
+      renderHashtagChips();
+
       gotoStep(2);
     } catch (err) {
       alert(`Lỗi: ${err.message}`);
@@ -366,6 +419,90 @@ document.addEventListener("DOMContentLoaded", () => {
       btnGenerateContent.disabled = false;
       spinGen.classList.add("hidden");
       btnGenerateContent.querySelector(".btn-text").textContent = "✨ TẠO NỘI DUNG VỚI GEMINI AI";
+    }
+  });
+
+  // -------------------------------------------------------------
+  // Step 2: Hashtag chips — xoá/thêm; tag thêm tay đi qua /api/normalize-hashtag (cùng luật chuẩn
+  // hoá + danh sách cấm của server). Chip vượt giới hạn FB_MAX_HASHTAGS bị mờ = sẽ không được đăng.
+  // -------------------------------------------------------------
+  function renderHashtagChips() {
+    hashtagChips.innerHTML = "";
+    hashtagPlan.forEach((h, idx) => {
+      const chip = document.createElement("span");
+      const over = idx >= hashtagMax;
+      chip.className = `hashtag-chip ${h.tier === "topic" ? "topic" : ""} ${over ? "over-limit" : ""}`;
+      chip.title = over
+        ? `Vượt giới hạn ${hashtagMax} hashtag — sẽ không được đăng`
+        : h.tier === "topic" && !h.manual
+          ? "Tag chủ đề — mỗi lần đăng có thể đổi sang tag khác cùng nhóm"
+          : "Tag cố định";
+      chip.innerHTML = `<span>${escapeAttr(h.tag)}</span><button type="button" aria-label="Xoá ${escapeAttr(h.tag)}">✕</button>`;
+      chip.querySelector("button").addEventListener("click", () => {
+        hashtagPlan.splice(idx, 1);
+        renderHashtagChips();
+      });
+      hashtagChips.appendChild(chip);
+    });
+    hashtagNote.textContent = hashtagPlan.length
+      ? `Caption: câu hỏi mở đầu + tối đa ${hashtagMax} hashtag (thứ tự cụ thể → chủ đề). Viền nét đứt = tag chủ đề, tự đổi ngẫu nhiên cùng nhóm mỗi lần đăng.`
+      : "Chưa có hashtag — caption sẽ chỉ có câu hỏi mở đầu.";
+  }
+
+  async function addManualHashtag() {
+    const raw = hashtagAddInput.value.trim();
+    if (!raw) return;
+    try {
+      const res = await fetch("/api/normalize-hashtag", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tag: raw }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Hashtag không hợp lệ.");
+      if (hashtagPlan.some((h) => h.tag === data.tag)) {
+        hashtagNote.textContent = `${data.tag} đã có rồi.`;
+      } else {
+        hashtagPlan.push({ tag: data.tag, tier: data.tier, manual: true });
+        // giữ thứ tự cụ thể → chủ đề (sort ổn định)
+        hashtagPlan = [...hashtagPlan.filter((h) => h.tier !== "topic"), ...hashtagPlan.filter((h) => h.tier === "topic")];
+        hashtagAddInput.value = "";
+        renderHashtagChips();
+      }
+    } catch (err) {
+      hashtagNote.textContent = err.message;
+    }
+  }
+  // Tính lại chip tự động theo label hiện tại; tag thêm tay được giữ nguyên.
+  async function refreshHashtags() {
+    try {
+      const res = await fetch("/api/plan-hashtags", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          label_left: scriptLabelLeft.value.trim(),
+          label_right: scriptLabelRight.value.trim(),
+          topicTags: geminiHashtagMeta.topicTags,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Không tính lại được hashtag.");
+      geminiHashtagMeta.topicTags = data.topicTags || geminiHashtagMeta.topicTags;
+      const manual = hashtagPlan.filter((h) => h.manual);
+      const auto = (data.hashtags || []).filter((h) => !manual.some((m) => m.tag === h.tag));
+      const merged = [...manual, ...auto];
+      hashtagPlan = [...merged.filter((h) => h.tier !== "topic"), ...merged.filter((h) => h.tier === "topic")];
+      renderHashtagChips();
+    } catch (err) {
+      hashtagNote.textContent = err.message;
+    }
+  }
+  document.getElementById("btn-refresh-hashtags").addEventListener("click", refreshHashtags);
+  btnAddHashtag.addEventListener("click", addManualHashtag);
+  hashtagAddInput.addEventListener("keydown", (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      addManualHashtag();
     }
   });
 
@@ -510,6 +647,9 @@ document.addEventListener("DOMContentLoaded", () => {
       title: scriptTitle.value.trim(),
       label_left: scriptLabelLeft.value.trim(),
       label_right: scriptLabelRight.value.trim(),
+      materials: geminiHashtagMeta.materials,
+      topicTags: geminiHashtagMeta.topicTags,
+      suggestedTags: geminiHashtagMeta.suggestedTags,
       points: pointsData,
     };
 
@@ -542,7 +682,9 @@ document.addEventListener("DOMContentLoaded", () => {
           leftPath: uploadedLeftPath,
           rightPath: uploadedRightPath,
           content: payloadContent,
+          hashtags: hashtagPlan,
           slug: scriptSlug.value.trim(),
+          pendingSlug: pendingContentSlug,
           topicHint: topicHintInput.value.trim(),
           theme: document.getElementById("video-theme") ? document.getElementById("video-theme").value : "paper",
           ttsProvider,
@@ -596,6 +738,7 @@ document.addEventListener("DOMContentLoaded", () => {
   btnExistingVideos.addEventListener("click", async () => {
     videosModal.classList.remove("hidden");
     videosListGrid.innerHTML = `<p style="color: var(--fg-dim);">Đang tải danh sách...</p>`;
+    loadSocialAlerts();
 
     try {
       const res = await fetch("/api/videos");
@@ -614,6 +757,7 @@ document.addEventListener("DOMContentLoaded", () => {
           <div>
             <h4>${escapeHtml(v.name)}</h4>
             <span style="font-size: 11px; color: var(--accent-cyan); font-family: monospace;">${escapeHtml(v.location || `videos/${v.slug}/`)}</span>
+            ${socialStatusHtml(v.social)}
           </div>
           <div class="video-card-actions">
             <a href="${v.previewUrl}" target="_blank" class="btn btn-small btn-primary">${v.hasIndex ? "🎬 Xem Trước" : "▶ Xem MP4"}</a>
@@ -627,9 +771,497 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   });
 
+  // Cảnh báo đăng Facebook: page bị tắt vì lỗi token, cấu hình dở dang, ffmpeg hỏng.
+  async function loadSocialAlerts() {
+    const box = document.getElementById("social-alerts");
+    if (!box) return;
+    box.innerHTML = "";
+    try {
+      const st = await (await fetch("/api/social-status")).json();
+      const items = [];
+      for (const d of st.disabledPages || []) {
+        items.push(`<b>Page "${escapeHtml(d.pageName)}" đang bị TẮT</b> vì lỗi token: ${escapeHtml(d.reason || "không rõ")}<br><span style="opacity:.8">${escapeHtml(d.howToEnable)}</span>`);
+      }
+      for (const p of st.configProblems || []) items.push(escapeHtml(p));
+      if (st.autoPost && !(st.configuredPages || []).length) items.push("Đăng tự động đang bật nhưng chưa có page hợp lệ nào trong .env.");
+      if (st.autoPost && st.ffmpeg && st.ffmpeg.ok === false) items.push(`ffmpeg lỗi (${escapeHtml(st.ffmpeg.detail)}) — không đặt được ảnh bìa Reel.`);
+      box.innerHTML = items
+        .map((t) => `<div style="font-size: 12px; color: var(--danger); border: 1px solid var(--danger); border-radius: 6px; padding: 8px 10px; margin-bottom: 8px;">⚠ ${t}</div>`)
+        .join("");
+    } catch {
+      // không lấy được trạng thái -> bỏ qua, danh sách video vẫn hiện bình thường
+    }
+  }
+
   btnCloseVideosModal.addEventListener("click", () => videosModal.classList.add("hidden"));
   videosModal.addEventListener("click", (e) => {
     if (e.target === videosModal) videosModal.classList.add("hidden");
+  });
+
+  // -------------------------------------------------------------
+  // Cost Stats Modal — GET /api/cost-stats (xem output/cost-ledger.jsonl)
+  //
+  // Kiến trúc: fetch 1 lần khi mở modal (costRawData giữ nguyên response), mọi tương tác sau đó
+  // (đổi khoảng ngày, sort cột, đổi trang, xuất CSV) chỉ tính toán lại trên dữ liệu đã có trong
+  // trình duyệt — không gọi lại API — vì toàn bộ ledger là 1 file JSONL nhỏ đọc 1 lần là đủ.
+  //
+  // 3 thẻ tổng hợp (hôm nay/7 ngày/toàn thời gian) CỐ ĐỊNH, không đổi theo bộ lọc khoảng ngày —
+  // đó là mốc KPI tham chiếu luôn hiện diện. Bộ lọc khoảng ngày chỉ tác động biểu đồ + bảng chi
+  // tiết bên dưới (đúng mẫu "filters scope the content below them", không phải toàn trang).
+  // -------------------------------------------------------------
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const USD_TO_VND_TOOLTIP = "Tỷ giá ước tính cố định, không phải tỷ giá thời gian thực.";
+
+  let costRawData = null; // response gốc từ /api/cost-stats
+  let costFilteredSorted = []; // video list sau filter+sort hiện tại (dùng cho footer + export CSV)
+  let costSortKey = "createdAt";
+  let costSortDir = "desc";
+  let costPage = 1;
+
+  function formatUsd(n) {
+    const v = typeof n === "number" ? n : 0;
+    // Chi phí mỗi lần gọi rất nhỏ (vài phần nghìn USD) — 2 số thập phân sẽ hiện toàn $0.00,
+    // nên hiện 4 số thập phân để còn thấy chênh lệch giữa các video.
+    return `$${v.toFixed(4)}`;
+  }
+
+  function formatVnd(usdAmount) {
+    const vnd = Math.round((usdAmount || 0) * USD_TO_VND_RATE);
+    return `≈ ${vnd.toLocaleString("vi-VN")}₫`;
+  }
+
+  function formatDateShort(dateStr) {
+    const parts = String(dateStr).split("-");
+    return parts.length === 3 ? `${parts[2]}/${parts[1]}` : dateStr;
+  }
+
+  btnCostStats.addEventListener("click", () => {
+    costStatsModal.classList.remove("hidden");
+    openCostStats();
+  });
+
+  async function openCostStats() {
+    costStateLoading.classList.remove("hidden");
+    costStateError.classList.add("hidden");
+    costStateEmpty.classList.add("hidden");
+    costContent.classList.add("hidden");
+    btnExportCsv.disabled = true;
+
+    try {
+      const res = await fetch("/api/cost-stats");
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Không tải được thống kê chi phí.");
+
+      costRawData = data;
+      costPage = 1;
+      costStateLoading.classList.add("hidden");
+
+      // Ledger rỗng hoàn toàn (chưa từng có lần gọi Gemini nào) — khác với "có dữ liệu nhưng
+      // khoảng ngày đang lọc không khớp video nào", cái đó xử lý trong renderCostStats().
+      if (!data.byDay || !data.byDay.length) {
+        costStateEmpty.classList.remove("hidden");
+        return;
+      }
+
+      renderCostStats();
+    } catch (err) {
+      costStateLoading.classList.add("hidden");
+      costStateError.textContent = `⚠ Lỗi tải thống kê chi phí: ${err.message}`;
+      costStateError.classList.remove("hidden");
+    }
+  }
+
+  // ---- Khoảng ngày hiển thị trên biểu đồ (zero-fill ngày không có chi phí để trục thời gian
+  // đúng thực tế — nếu không zero-fill, 2 ngày cách xa nhau sẽ trông như liền kề, đọc sai xu
+  // hướng). "Tất cả" bị chặn tối đa 60 cột để biểu đồ còn đọc được (personal tool, không kỳ
+  // vọng lịch sử hàng trăm ngày) — bảng chi tiết bên dưới KHÔNG bị chặn theo giới hạn này.
+  function getChartDates(rangeValue, byDayMap) {
+    const todayUtc = new Date();
+    todayUtc.setUTCHours(0, 0, 0, 0);
+
+    if (rangeValue === "custom") {
+      const fromStr = costDateFrom.value;
+      const toStr = costDateTo.value || todayUtc.toISOString().slice(0, 10);
+      if (!fromStr) return [todayUtc.toISOString().slice(0, 10)];
+      const fromUtc = new Date(`${fromStr}T00:00:00Z`);
+      const toUtc = new Date(`${toStr}T00:00:00Z`);
+      if (toUtc < fromUtc) return [fromStr];
+      // Chặn khoảng quá dài để biểu đồ không bị nén thành các cột chỉ vài px.
+      const days = Math.min(Math.round((toUtc.getTime() - fromUtc.getTime()) / DAY_MS) + 1, 90);
+      const dates = [];
+      for (let i = 0; i < days; i++) {
+        dates.push(new Date(fromUtc.getTime() + i * DAY_MS).toISOString().slice(0, 10));
+      }
+      return dates;
+    }
+
+    let days;
+    if (rangeValue === "all") {
+      const allDates = Object.keys(byDayMap).sort();
+      if (!allDates.length) {
+        days = 1;
+      } else {
+        const earliest = new Date(`${allDates[0]}T00:00:00Z`);
+        days = Math.round((todayUtc.getTime() - earliest.getTime()) / DAY_MS) + 1;
+      }
+      days = Math.min(Math.max(days, 1), 60);
+    } else {
+      days = parseInt(rangeValue, 10) || 7;
+    }
+    const dates = [];
+    for (let i = days - 1; i >= 0; i--) {
+      dates.push(new Date(todayUtc.getTime() - i * DAY_MS).toISOString().slice(0, 10));
+    }
+    return dates;
+  }
+
+  function renderCostChart(dates, byDayMap) {
+    costChartWrap.innerHTML = "";
+
+    const values = dates.map((d) => byDayMap[d] || 0);
+    const maxVal = Math.max(...values, 0.0001);
+
+    const width = 880;
+    const height = 160;
+    const paddingBottom = 6;
+    const paddingTop = 8;
+    const plotHeight = height - paddingBottom - paddingTop;
+    const slotWidth = width / dates.length;
+    const barWidth = Math.max(2, Math.min(22, slotWidth - 3));
+
+    const svgNS = "http://www.w3.org/2000/svg";
+    const svg = document.createElementNS(svgNS, "svg");
+    svg.setAttribute("viewBox", `0 0 ${width} ${height}`);
+    svg.setAttribute("width", "100%");
+    svg.setAttribute("height", String(height));
+    svg.setAttribute("preserveAspectRatio", "none");
+    svg.classList.add("cost-chart-svg");
+
+    const baseline = document.createElementNS(svgNS, "line");
+    baseline.setAttribute("x1", "0");
+    baseline.setAttribute("x2", String(width));
+    baseline.setAttribute("y1", String(height - paddingBottom));
+    baseline.setAttribute("y2", String(height - paddingBottom));
+    baseline.setAttribute("class", "cost-chart-baseline");
+    svg.appendChild(baseline);
+
+    const tooltip = document.createElement("div");
+    tooltip.className = "cost-chart-tooltip hidden";
+    costChartWrap.appendChild(tooltip);
+
+    dates.forEach((date, i) => {
+      const val = values[i];
+      const barHeight = maxVal > 0 ? (val / maxVal) * plotHeight : 0;
+      const slotX = i * slotWidth;
+      const barX = slotX + (slotWidth - barWidth) / 2;
+      const barY = height - paddingBottom - barHeight;
+
+      const bar = document.createElementNS(svgNS, "rect");
+      bar.setAttribute("x", String(barX));
+      bar.setAttribute("y", String(barY));
+      bar.setAttribute("width", String(barWidth));
+      bar.setAttribute("height", String(val > 0 ? Math.max(barHeight, 2) : 0));
+      bar.setAttribute("rx", "3");
+      bar.setAttribute("ry", "3");
+      bar.classList.add("cost-chart-bar");
+
+      // Hit area rộng hơn thanh thật (toàn bộ slot) — theo nguyên tắc "hit target lớn hơn mark"
+      // vì thanh chi phí thấp/mảnh rất khó trỏ trúng chính xác bằng chuột.
+      const hit = document.createElementNS(svgNS, "rect");
+      hit.setAttribute("x", String(slotX));
+      hit.setAttribute("y", String(paddingTop));
+      hit.setAttribute("width", String(slotWidth));
+      hit.setAttribute("height", String(height - paddingBottom - paddingTop));
+      hit.setAttribute("fill", "transparent");
+      hit.setAttribute("tabindex", "0");
+      hit.classList.add("cost-chart-hit");
+
+      const showTooltip = () => {
+        tooltip.innerHTML = "";
+        const strong = document.createElement("strong");
+        strong.textContent = formatUsd(val);
+        const small = document.createElement("span");
+        small.textContent = ` — ${formatDateShort(date)}`;
+        tooltip.appendChild(strong);
+        tooltip.appendChild(small);
+        tooltip.classList.remove("hidden");
+        tooltip.style.left = `${((slotX + slotWidth / 2) / width) * 100}%`;
+        tooltip.style.top = `${(barY / height) * 100}%`;
+        bar.classList.add("cost-chart-bar-hover");
+      };
+      const hideTooltip = () => {
+        tooltip.classList.add("hidden");
+        bar.classList.remove("cost-chart-bar-hover");
+      };
+
+      hit.addEventListener("pointerenter", showTooltip);
+      hit.addEventListener("pointermove", showTooltip);
+      hit.addEventListener("pointerleave", hideTooltip);
+      hit.addEventListener("focus", showTooltip);
+      hit.addEventListener("blur", hideTooltip);
+
+      svg.appendChild(bar);
+      svg.appendChild(hit);
+    });
+
+    costChartWrap.appendChild(svg);
+
+    // Nhãn chọn lọc — chỉ ngày đầu/cuối, không nhồi nhãn lên từng cột (marks-and-anatomy: label
+    // selectively, never a number on every point).
+    const labelRow = document.createElement("div");
+    labelRow.className = "cost-chart-labels";
+    const firstLabel = document.createElement("span");
+    firstLabel.textContent = formatDateShort(dates[0]);
+    const lastLabel = document.createElement("span");
+    lastLabel.textContent = formatDateShort(dates[dates.length - 1]);
+    labelRow.appendChild(firstLabel);
+    labelRow.appendChild(lastLabel);
+    costChartWrap.appendChild(labelRow);
+  }
+
+  function sortVideos(list, key, dir) {
+    return [...list].sort((a, b) => {
+      let av = a[key];
+      let bv = b[key];
+      if (typeof av === "string" || typeof bv === "string") {
+        av = String(av || "").toLowerCase();
+        bv = String(bv || "").toLowerCase();
+      } else {
+        av = av || 0;
+        bv = bv || 0;
+      }
+      if (av < bv) return dir === "asc" ? -1 : 1;
+      if (av > bv) return dir === "asc" ? 1 : -1;
+      return 0;
+    });
+  }
+
+  function paginateVideos(list) {
+    const totalPages = Math.max(1, Math.ceil(list.length / COST_PAGE_SIZE));
+    if (costPage > totalPages) costPage = totalPages;
+    const start = (costPage - 1) * COST_PAGE_SIZE;
+    return { pageItems: list.slice(start, start + COST_PAGE_SIZE), totalPages };
+  }
+
+  function renderCostTableRows(pageItems) {
+    costVideosTbody.innerHTML = "";
+    if (!pageItems.length) {
+      const tr = document.createElement("tr");
+      const td = document.createElement("td");
+      td.colSpan = 6;
+      td.className = "cost-table-empty-row";
+      td.textContent = "Không có video nào trong khoảng thời gian đang lọc.";
+      tr.appendChild(td);
+      costVideosTbody.appendChild(tr);
+      return;
+    }
+    pageItems.forEach((v) => {
+      const tr = document.createElement("tr");
+      const createdAt = v.createdAt ? new Date(v.createdAt).toLocaleString("vi-VN") : "—";
+      tr.innerHTML = `
+        <td class="cost-td-slug">${escapeHtml(v.slug)}</td>
+        <td>${escapeHtml(createdAt)}</td>
+        <td class="cost-td-content">${formatUsd(v.contentCost)}</td>
+        <td class="cost-td-image">${formatUsd(v.imageCost)}</td>
+        <td>${v.imagesGenerated || 0}</td>
+        <td class="cost-td-total">
+          ${formatUsd(v.totalCost)}
+          <span class="cost-td-total-vnd" title="${USD_TO_VND_TOOLTIP}">${formatVnd(v.totalCost)}</span>
+        </td>
+      `;
+      costVideosTbody.appendChild(tr);
+    });
+  }
+
+  function renderCostFooterTotals(list) {
+    const totals = list.reduce(
+      (acc, v) => {
+        acc.content += v.contentCost || 0;
+        acc.image += v.imageCost || 0;
+        acc.images += v.imagesGenerated || 0;
+        acc.total += v.totalCost || 0;
+        return acc;
+      },
+      { content: 0, image: 0, images: 0, total: 0 },
+    );
+    costFootContent.textContent = formatUsd(totals.content);
+    costFootImage.textContent = formatUsd(totals.image);
+    costFootImagesCount.textContent = String(totals.images);
+    costFootTotal.textContent = formatUsd(totals.total);
+  }
+
+  function updateSortArrows() {
+    costTableHeaders.forEach((th) => {
+      const arrow = th.querySelector(".sort-arrow");
+      if (!arrow) return;
+      arrow.textContent = th.dataset.sort === costSortKey ? (costSortDir === "asc" ? " ▲" : " ▼") : "";
+    });
+  }
+
+  function renderCostStats() {
+    if (!costRawData) return;
+
+    // openCostStats() ẩn #cost-content trước khi fetch (để không loé nội dung cũ trong lúc chờ
+    // API) — nhánh "có dữ liệu" phải tự hiện lại nó ở đây. Thiếu dòng này là lý do biểu đồ + bảng
+    // được TÍNH TOÁN và ĐIỀN DỮ LIỆU đầy đủ (không lỗi JS, không throw) nhưng người dùng không
+    // bao giờ thấy gì cả — div cha vẫn mang class "hidden" (display:none) nên không chiếm chỗ,
+    // khiến modal trông như bị cắt cụt sau 3 thẻ tổng và không có gì để cuộn thêm.
+    costContent.classList.remove("hidden");
+
+    const rangeValue = costRangeSelect.value;
+
+    // KPI cố định — không đổi theo bộ lọc (xem ghi chú kiến trúc ở đầu section).
+    costTotalToday.textContent = formatUsd(costRawData.totalToday);
+    costTotalTodayVnd.textContent = formatVnd(costRawData.totalToday);
+    costTotal7d.textContent = formatUsd(costRawData.totalLast7Days);
+    costTotal7dVnd.textContent = formatVnd(costRawData.totalLast7Days);
+    costTotalAll.textContent = formatUsd(costRawData.totalAllTime);
+    costTotalAllVnd.textContent = formatVnd(costRawData.totalAllTime);
+
+    const byDayMap = {};
+    (costRawData.byDay || []).forEach((d) => {
+      byDayMap[d.date] = d.cost;
+    });
+
+    const chartDates = getChartDates(rangeValue, byDayMap);
+    renderCostChart(chartDates, byDayMap);
+
+    // Bảng chi tiết: lọc theo cùng khoảng ngày với biểu đồ (trừ "Tất cả" — không giới hạn 60
+    // ngày như biểu đồ, video cũ hơn 60 ngày vẫn phải hiện đủ trong bảng). "Tùy chọn ngày" cần
+    // cả 2 đầu mốc vì "đến ngày" không nhất thiết là hôm nay như 2 preset kia.
+    let videos = costRawData.videos || [];
+    if (rangeValue !== "all") {
+      const cutoffFrom = chartDates[0];
+      const cutoffTo = chartDates[chartDates.length - 1];
+      videos = videos.filter((v) => {
+        if (!v.createdAt) return false;
+        const d = v.createdAt.slice(0, 10);
+        return d >= cutoffFrom && d <= cutoffTo;
+      });
+    }
+
+    const enriched = videos.map((v) => ({
+      ...v,
+      contentCost: (v.byTask && v.byTask["content-generation"]) || 0,
+      imageCost: (v.byTask && v.byTask["context-image"]) || 0,
+    }));
+
+    costFilteredSorted = sortVideos(enriched, costSortKey, costSortDir);
+    btnExportCsv.disabled = costFilteredSorted.length === 0;
+
+    const { pageItems, totalPages } = paginateVideos(costFilteredSorted);
+    renderCostTableRows(pageItems);
+    renderCostFooterTotals(costFilteredSorted);
+    costPageLabel.textContent = `Trang ${costPage}/${totalPages}`;
+    costPagePrev.disabled = costPage <= 1;
+    costPageNext.disabled = costPage >= totalPages;
+    updateSortArrows();
+  }
+
+  costRangeSelect.addEventListener("change", () => {
+    const isCustom = costRangeSelect.value === "custom";
+    costCustomRange.classList.toggle("hidden", !isCustom);
+    if (isCustom) {
+      // Mở lần đầu chưa chọn ngày nào: mặc định 7 ngày gần nhất cho có dữ liệu ngay,
+      // người dùng chỉnh lại theo ý muốn rồi bấm Áp dụng.
+      if (!costDateTo.value) {
+        const todayUtc = new Date();
+        todayUtc.setUTCHours(0, 0, 0, 0);
+        costDateTo.value = todayUtc.toISOString().slice(0, 10);
+      }
+      if (!costDateFrom.value) {
+        const todayUtc = new Date();
+        todayUtc.setUTCHours(0, 0, 0, 0);
+        costDateFrom.value = new Date(todayUtc.getTime() - 6 * DAY_MS).toISOString().slice(0, 10);
+      }
+      return; // chờ bấm "Áp dụng" thay vì render ngay với ngày mặc định vừa điền
+    }
+    costPage = 1;
+    renderCostStats();
+  });
+
+  btnApplyCustomRange.addEventListener("click", () => {
+    if (!costDateFrom.value || !costDateTo.value) return;
+    if (costDateFrom.value > costDateTo.value) {
+      alert("\"Từ ngày\" phải trước hoặc bằng \"Đến ngày\".");
+      return;
+    }
+    costPage = 1;
+    renderCostStats();
+  });
+
+  costTableHeaders.forEach((th) => {
+    th.addEventListener("click", () => {
+      const key = th.dataset.sort;
+      if (costSortKey === key) {
+        costSortDir = costSortDir === "asc" ? "desc" : "asc";
+      } else {
+        costSortKey = key;
+        costSortDir = key === "slug" ? "asc" : "desc";
+      }
+      costPage = 1;
+      renderCostStats();
+    });
+  });
+
+  costPagePrev.addEventListener("click", () => {
+    if (costPage > 1) {
+      costPage--;
+      renderCostStats();
+    }
+  });
+  costPageNext.addEventListener("click", () => {
+    costPage++;
+    renderCostStats();
+  });
+
+  function csvEscape(value) {
+    const str = String(value ?? "");
+    return /[",\n]/.test(str) ? `"${str.replace(/"/g, '""')}"` : str;
+  }
+
+  function exportCostCsv() {
+    if (!costFilteredSorted.length) return;
+    const header = ["slug", "created_at", "content_cost_usd", "image_cost_usd", "images_generated", "total_cost_usd"];
+    const lines = [header.join(",")];
+    const totals = { content: 0, image: 0, images: 0, total: 0 };
+
+    costFilteredSorted.forEach((v) => {
+      totals.content += v.contentCost || 0;
+      totals.image += v.imageCost || 0;
+      totals.images += v.imagesGenerated || 0;
+      totals.total += v.totalCost || 0;
+      lines.push(
+        [
+          csvEscape(v.slug),
+          csvEscape(v.createdAt || ""),
+          (v.contentCost || 0).toFixed(6),
+          (v.imageCost || 0).toFixed(6),
+          v.imagesGenerated || 0,
+          (v.totalCost || 0).toFixed(6),
+        ].join(","),
+      );
+    });
+    lines.push(
+      ["TONG", "", totals.content.toFixed(6), totals.image.toFixed(6), totals.images, totals.total.toFixed(6)].join(","),
+    );
+
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `cost-stats-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  btnExportCsv.addEventListener("click", exportCostCsv);
+
+  btnCloseCostModal.addEventListener("click", () => costStatsModal.classList.add("hidden"));
+  costStatsModal.addEventListener("click", (e) => {
+    if (e.target === costStatsModal) costStatsModal.classList.add("hidden");
   });
 
   // Helper
@@ -638,5 +1270,25 @@ document.addEventListener("DOMContentLoaded", () => {
   }
   function escapeAttr(str) {
     return String(str || "").replace(/"/g, "&quot;");
+  }
+  // Dòng trạng thái đăng Facebook trong video-card (v.social đến từ GET /api/videos,
+  // gắn ở server.mjs từ data/social-queue.json — xem socialStatusBySlug()).
+  function socialStatusHtml(social) {
+    if (!social) return "";
+    if (social.status === "posted") {
+      const when = new Date(social.postedAt).toLocaleString("vi-VN", { hour: "2-digit", minute: "2-digit", day: "2-digit", month: "2-digit" });
+      const typeLabel = social.postType === "reel" ? "Reel" : "video thường";
+      const fallbackNote = social.fallbackReason
+        ? ` <span title="${escapeAttr(social.fallbackReason)}" style="color: var(--fg-dim);">(fallback từ Reel — hover xem lý do)</span>`
+        : "";
+      return `<div style="font-size: 11px; color: var(--accent-cyan); margin-top: 4px;">✔ Đã đăng ${typeLabel} lên ${escapeHtml(social.pageName)} lúc ${when}${fallbackNote}</div>`;
+    }
+    if (social.status === "verifying") {
+      return `<div style="font-size: 11px; color: var(--fg-dim); margin-top: 4px;">⏳ Reel đã tạo trên ${escapeHtml(social.pageName || "")}, Facebook đang xử lý...</div>`;
+    }
+    if (social.status === "failed") {
+      return `<div style="font-size: 11px; color: var(--danger); margin-top: 4px;" title="${escapeAttr(social.lastError || "")}">✖ Đăng Facebook thất bại</div>`;
+    }
+    return `<div style="font-size: 11px; color: var(--fg-dim); margin-top: 4px;">⏳ Đang chờ đăng Facebook</div>`;
   }
 });

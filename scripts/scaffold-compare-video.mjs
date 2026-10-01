@@ -24,10 +24,13 @@
 //     --content /tmp/compare-test-jewelry.json
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { runCompareContent, loadActionCatalog, enforceContextImageLimits } from "./generate-compare-content.mjs";
 import { generateContextImage } from "./generate-context-image.mjs";
+import { renameCostLedgerSlug } from "./lib/cost-ledger.mjs";
+import { npmCommand } from "./lib/npm-cmd.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -153,9 +156,11 @@ function escapeHtml(str) {
     .replace(/'/g, "&#39;");
 }
 
-function run(cmd, cwd, label) {
-  console.log(`\n[${label}] ${cmd}  (cwd: ${cwd})`);
-  const res = spawnSync(cmd, { cwd, stdio: "inherit", shell: true });
+// command + args là mảng (không shell, không nối chuỗi) — npm/npx xem lib/npm-cmd.mjs.
+function run(command, args, cwd, label) {
+  console.log(`\n[${label}] ${command} ${args.join(" ")}  (cwd: ${cwd})`);
+  const res = spawnSync(command, args, { cwd, stdio: "inherit" });
+  if (res.error) fail(`${label} không chạy được: ${res.error.message}`);
   if (res.status !== 0) {
     fail(`${label} thất bại (exit ${res.status}).`);
   }
@@ -435,7 +440,7 @@ function computeTiming(lines, durations) {
 // đã tự trả null + tự log cảnh báo; ở đây chỉ cần giữ contextImageFile=null để
 // buildTimelineBeatsJs biết mà bỏ qua setCardImage, giữ nguyên ảnh sản phẩm gốc cho point đó.
 // ============================================================
-async function generateContextImages(target, lines) {
+async function generateContextImages(target, lines, slug) {
   const candidates = lines.filter((l) => l.needsContextImage);
   // Log LUÔN chạy, kể cả 0 candidate — để phân biệt "hàm này không được gọi" (bug) với
   // "hàm được gọi nhưng không có point nào cần ảnh" (đúng thiết kế, do content.points không
@@ -451,7 +456,7 @@ async function generateContextImages(target, lines) {
   for (const line of candidates) {
     const outBase = path.join(imgDir, `context-${line.n}`);
     console.log(`  → gọi generateContextImage cho point ${line.n} [${line.side}], concept: "${line.imageConcept}"`);
-    const result = await generateContextImage({ concept: line.imageConcept, outBase });
+    const result = await generateContextImage({ concept: line.imageConcept, outBase, slug });
     console.log(`  ← point ${line.n} trả về: ${result ? result : "null"}`);
     if (result) {
       line.contextImageFile = path.basename(result);
@@ -619,7 +624,7 @@ function runScaffoldMjs(slug) {
   if (!fs.existsSync(scaffoldScript)) {
     fail(`Không tìm thấy ${scaffoldScript} — cần script scaffold.mjs của skill create-video.`);
   }
-  run(`node "${scaffoldScript}" ${slug}`, REPO_ROOT, "scaffold.mjs (create-video skill)");
+  run(process.execPath, [scaffoldScript, slug], REPO_ROOT, "scaffold.mjs (create-video skill)");
 }
 
 // hyperframes check's default --timeout is 3000ms ("scripts and media settle"). Auto-compare
@@ -747,6 +752,12 @@ async function main() {
   const opts = parseArgs(process.argv.slice(2));
 
   let content, corrections, contextImageCorrections, sourceImages;
+  // slug thật (khi không truyền --slug) chỉ tính được SAU khi có label_left/label_right từ
+  // Gemini (xem genUniqueSlug() bên dưới) — nhưng dòng cost-ledger.jsonl cho lần gọi Gemini
+  // phải ghi NGAY lúc gọi, trước khi biết slug đó. Dùng slug TẠM (placeholder) cho lần ghi
+  // đầu tiên, rồi renameCostLedgerSlug() đổi lại thành slug thật ngay sau khi chốt xong, để
+  // không còn dòng "slug": null mồ côi trong ledger (xem cost-ledger.mjs).
+  let pendingContentSlug = null;
   if (opts.contentPath) {
     console.log(`Dùng compare-content có sẵn: ${opts.contentPath} (bỏ qua gọi Gemini).`);
     const raw = JSON.parse(fs.readFileSync(opts.contentPath, "utf8"));
@@ -756,7 +767,8 @@ async function main() {
     sourceImages = raw._meta?.source_images || {};
   } else {
     console.log("Gọi Gemini (generate-compare-content.mjs) để sinh nội dung từ 2 ảnh...");
-    const result = await runCompareContent({ left: opts.left, right: opts.right, topicHint: opts.topicHint });
+    pendingContentSlug = opts.slug || `_pending-${crypto.randomUUID()}`;
+    const result = await runCompareContent({ left: opts.left, right: opts.right, topicHint: opts.topicHint, slug: pendingContentSlug });
     content = result.content;
     corrections = result.corrections;
     contextImageCorrections = result.contextImageCorrections;
@@ -771,6 +783,12 @@ async function main() {
   const slug = opts.slug ? ensureUniqueSlugDir(requestedSlug) : requestedSlug;
   if (slug !== requestedSlug) {
     console.log(`ℹ videos/${requestedSlug}/ đã tồn tại — dùng "${slug}" thay thế.`);
+  }
+  if (pendingContentSlug && pendingContentSlug !== slug) {
+    const renamed = renameCostLedgerSlug(pendingContentSlug, slug);
+    if (renamed > 0) {
+      console.log(`ℹ Đã đổi ${renamed} dòng cost-ledger từ slug tạm "${pendingContentSlug}" sang "${slug}".`);
+    }
   }
   const target = path.join(REPO_ROOT, "videos", slug);
 
@@ -797,7 +815,7 @@ async function main() {
   // video, đã ép ở enforceContextImageLimits). Lỗi ở đây KHÔNG chặn build — line.contextImageFile
   // ở lại null.
   console.log("\n▶ Bước 3b: generateContextImages() ...");
-  await generateContextImages(target, lines);
+  await generateContextImages(target, lines, slug);
 
   // 4. copy action SVG thực sự dùng tới + actions.json tham chiếu
   const usedActions = copyUsedActions(target, lines);
@@ -821,8 +839,9 @@ async function main() {
   // hyperframes init's blank example at this point (ours isn't written until step 8, after
   // real VO timing exists), so sync-channel.mjs's "#eyebrow not found" check throws. None of
   // dev/check/render/publish are being invoked here, so skipping hooks is safe and correct.
-  run("npm install --ignore-scripts", target, "npm install");
-  run("node scripts/generate-vo.mjs", target, "generate-vo.mjs");
+  const npmInstall = npmCommand("npm", ["install", "--ignore-scripts"]);
+  run(npmInstall.command, npmInstall.args, target, "npm install");
+  run(process.execPath, ["scripts/generate-vo.mjs"], target, "generate-vo.mjs");
 
   // 7. đọc durations thật, tính timing
   const durationsPath = path.join(target, "assets", "vo", "durations.json");
@@ -839,7 +858,8 @@ async function main() {
 
   // 10. check
   if (!opts.skipCheck) {
-    run("npm run check", target, "npm run check");
+    const npmCheck = npmCommand("npm", ["run", "check"]);
+    run(npmCheck.command, npmCheck.args, target, "npm run check");
   } else {
     console.log("\n(--skip-check) Bỏ qua npm run check — chạy tay: cd " + `videos/${slug} && npm run check`);
   }

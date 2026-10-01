@@ -15,6 +15,9 @@
 // Options:
 //   --out <path>          Đường dẫn file JSON output (mặc định ./compare-content.json)
 //   --topic-hint <text>   Gợi ý ngữ cảnh thêm cho Gemini (tuỳ chọn, vd "đồ trang sức")
+//   --slug <slug>         Gắn slug (thật hoặc TẠM/placeholder) vào dòng cost-ledger.jsonl ghi
+//                         cho lần gọi Gemini này — xem scripts/lib/cost-ledger.mjs
+//                         renameCostLedgerSlug() nếu cần đổi lại slug tạm thành slug thật sau đó.
 //
 // Ví dụ:
 //   node scripts/generate-compare-content.mjs assets/left.jpg assets/right.jpg \
@@ -24,6 +27,19 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 import { CONTENT_ANGLES } from "../config/content-angles.mjs";
+import { calcContentCost } from "../config/pricing.mjs";
+import { appendCostEntry } from "./lib/cost-ledger.mjs";
+import { loadHashtagConfig, resolveTopicTags, cleanTag } from "./lib/hashtags.mjs";
+import { buildComparePrompt } from "./lib/compare-prompt.mjs";
+import {
+  RetryableError,
+  NonRetryableError,
+  classifyGeminiHttpError,
+  describeGeminiErrorForLog,
+  redactKey,
+  runWithModelFallback,
+  withRetry,
+} from "./lib/gemini-retry.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -54,6 +70,8 @@ function loadEnv() {
 const ENV = loadEnv();
 const GEMINI_API_KEY = ENV.GEMINI_API_KEY;
 const GEMINI_MODEL = ENV.GEMINI_MODEL || "gemini-3.5-flash";
+// Model dự phòng khi model chính HẾT QUOTA THEO NGÀY (429 PerDay). Trống = không chuyển, báo lỗi ngay.
+const GEMINI_FALLBACK_MODEL = (ENV.GEMINI_FALLBACK_MODEL || process.env.GEMINI_FALLBACK_MODEL || "").trim();
 
 if (!GEMINI_API_KEY) {
   console.error(
@@ -68,13 +86,15 @@ if (!GEMINI_API_KEY) {
 // ============================================================
 function parseArgs(argv) {
   const positional = [];
-  const opts = { out: null, topicHint: null, contentAngleId: null, customAngleText: null };
+  const opts = { out: null, topicHint: null, contentAngleId: null, customAngleText: null, slug: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--out") {
       opts.out = argv[++i];
     } else if (a === "--topic-hint") {
       opts.topicHint = argv[++i];
+    } else if (a === "--slug") {
+      opts.slug = argv[++i];
     } else if (a === "--content-angle-id") {
       opts.contentAngleId = argv[++i];
     } else if (a === "--custom-angle-text") {
@@ -89,7 +109,7 @@ function parseArgs(argv) {
   if (positional.length !== 2) {
     console.error(
       "Usage: node scripts/generate-compare-content.mjs <left-image> <right-image> [--out <path>] " +
-        "[--topic-hint <text>] [--content-angle-id <id>] [--custom-angle-text <text>]",
+        "[--topic-hint <text>] [--content-angle-id <id>] [--custom-angle-text <text>] [--slug <slug>]",
     );
     process.exit(1);
   }
@@ -214,162 +234,17 @@ function isJewelryTopic({ title, label_left, label_right }, topicHint) {
   return JEWELRY_KEYWORDS.some((kw) => haystack.includes(kw));
 }
 
-// ============================================================
-// Prompt construction — inject danh sách action id + use_case động từ actions.json,
-// không hardcode, để tự đồng bộ khi actions.json đổi.
-// ============================================================
-function buildSystemPrompt(catalog) {
-  const actionLines = catalog.actions
-    .map((a) => {
-      const propTag = a.prop === "jewelry" ? " [CHỈ DÙNG CHO CHỦ ĐỀ TRANG SỨC/ĐÁ QUÝ/KIM CƯƠNG]" : "";
-      return `- "${a.id}"${propTag}: ${a.use_case}`;
-    })
-    .join("\n");
-
-  return `Bạn là trợ lý sinh nội dung kịch bản cho một series video TikTok/Reels tiếng Việt
-dạng "so sánh kiến thức" (2 khái niệm/vật thể hay bị nhầm lẫn, host chỉ tay giải thích).
-
-NHIỆM VỤ: nhận 2 ảnh (trái, phải) người dùng cung cấp để so sánh, trả lời DUY NHẤT một
-đối tượng JSON — không kèm lời dẫn, không giải thích, không bọc trong \`\`\`json hay bất kỳ
-markdown/code fence nào. Chỉ JSON thuần.
-
-JSON trả về LUÔN LUÔN có đủ 5 field sau — không được bỏ bớt field nào, kể cả khi rỗng:
-{
-  "error": "",
-  "title": "1 câu hỏi mở đầu ngắn (tối đa ~15 từ), giọng tò mò/viral, tiếng Việt có dấu",
-  "label_left": "tên gọi ngắn gọn (1-4 từ) của vật thể/khái niệm trong ảnh TRÁI",
-  "label_right": "tên gọi ngắn gọn (1-4 từ) của vật thể/khái niệm trong ảnh PHẢI",
-  "points": [
-    {
-      "text": "1 câu so sánh ngắn (tối đa ~20 từ), tiếng Việt có dấu — đây là LỜI THOẠI đọc lên",
-      "side": "left | right | both",
-      "tag": "nhãn NGẮN hiện trên màn hình, 1-3 từ, tối đa 18 ký tự",
-      "sub": "dòng phụ dưới nhãn, tối đa 26 ký tự, để chuỗi rỗng \"\" nếu không cần",
-      "suggested_action": "<id>",
-      "needs_context_image": false,
-      "image_concept": ""
-    }
-  ]
-}
-
-- NẾU so sánh được: "error" PHẢI là chuỗi rỗng "" — điền đầy đủ 4 field còn lại.
-- NẾU 2 ảnh KHÔNG so sánh được một cách hợp lý (ví dụ: cùng một vật thể chụp 2 lần, ảnh mờ/
-  không nhận diện được chủ thể, hoặc 2 chủ thể không có điểm chung nào để so sánh kiến thức):
-  "error" là lý do ngắn gọn bằng tiếng Việt (không rỗng); "title"/"label_left"/"label_right"
-  điền chuỗi rỗng "", "points" điền mảng rỗng [] — 4 field này bị bỏ qua khi "error" không rỗng,
-  chỉ cần đúng KIỂU dữ liệu, không cần nội dung thật.
-- KHÔNG BAO GIỜ để "title" (hay bất kỳ field text nào) chứa nhiều câu hỏi/khẩu hiệu lặp lại
-  nối tiếp nhau — mỗi field chỉ 1 câu duy nhất, đúng độ dài tối đa đã nêu.
-
-- Sinh 4 đến 8 phần tử "points" — mỗi câu là một luận điểm so sánh riêng biệt (định nghĩa,
-  đặc điểm nổi bật, ví dụ thực tế, điểm khác biệt cốt lõi...), giọng nhanh/giáo dục nhẹ,
-  không nghiêm túc quá, phù hợp video 30-40 giây.
-- "text" là LỜI THOẠI (đọc lên, câu đầy đủ). "tag"/"sub" là CHỮ HIỆN TRÊN MÀN HÌNH — phải
-  RẤT NGẮN, viết như tiêu đề kiểu TikTok, KHÔNG lặp lại nguyên câu "text", không có dấu chấm
-  cuối. Ví dụ: text = "Kim cương cứng nhất hành tinh, đạt 10/10 trên thang Mohs."
-  -> tag = "Rất cứng", sub = "10/10 thang Mohs".
-- "side" cho biết luận điểm nói về ảnh nào: "left" (ảnh trái), "right" (ảnh phải), hoặc "both"
-  (so sánh cả hai / kết luận chung). BỐ TRÍ TỐT NHẤT: xen kẽ left rồi right thành từng cặp
-  liền nhau (left, right, left, right...) để 2 nhãn hiện đối xứng 2 bên như video mẫu.
-  Chỉ dùng "both" cho luận điểm tổng kết, tối đa 2 lần.
-- "suggested_action" của MỖI point BẮT BUỘC là một trong các id sau đây — TUYỆT ĐỐI không
-  tự bịa id khác, không thêm hậu tố, không đổi chính tả:
-${actionLines}
-- Các action có đánh dấu "[CHỈ DÙNG CHO CHỦ ĐỀ TRANG SỨC/ĐÁ QUÝ/KIM CƯƠNG]" ở trên CHỈ được
-  gợi ý khi chủ đề thật sự là trang sức/đá quý/kim cương/kim hoàn. Nếu chủ đề không liên
-  quan, TUYỆT ĐỐI không dùng các id đó — chọn action trung tính khác phù hợp ngữ cảnh.
-
-- "needs_context_image": ĐÁNH DẤU MẠNH DẠN — true cho BẤT KỲ point nào nhắc tới một yếu tố có
-  thể minh hoạ trực quan bằng 1 ảnh RIÊNG (khác ảnh sản phẩm trái/phải đang so sánh), gồm cả:
-  tính chất vật lý (độ cứng, độ bền, phản ứng hoá học, cấu trúc tinh thể...), nguồn gốc/xuất xứ,
-  quy trình hình thành/chế tác/khai thác, hiện tượng đi kèm, hoặc 1 phép so sánh hình ảnh cụ thể
-  (vd "cứng gấp 3 lần" minh hoạ được bằng cảnh so sánh trực quan độ cứng). Ví dụ: point nói "kim
-  cương hình thành từ áp suất cực lớn trong lòng đất" -> true, minh hoạ cảnh địa chất/khai thác.
-  Chỉ để false cho point THỰC SỰ trừu tượng/không có gì để vẽ riêng — kết luận chung chung, lời
-  khuyên chọn mua, hoặc point chỉ lặp lại đặc điểm bề ngoài của chính vật thể trái/phải (ảnh sản
-  phẩm đã đủ minh hoạ, vẽ thêm cũng chỉ là ảnh sản phẩm khác góc). MỤC TIÊU: đa số video nên có
-  khoảng 3-5 point (trong tổng 4-8 point) được đánh true — coi false là NGOẠI LỆ cho point không
-  có gì đáng vẽ, không phải mặc định. Đừng tự giới hạn số lượng vì sợ vượt cap — hệ thống tự cắt
-  bớt nếu bạn đánh dấu quá nhiều (hiện cho phép tối đa 5/video), và tự bỏ point có "side":"both".
-- "image_concept": khi needs_context_image=true, mô tả NGẮN bằng tiếng Anh (tối đa ~20 từ) cảnh
-  cần vẽ, càng cụ thể/trực quan càng tốt (vd "diamond crystal forming under extreme pressure
-  deep underground, geological cross-section"). Khi needs_context_image=false, để chuỗi rỗng "".
-- Không thêm field nào ngoài schema trên. Không thêm text trước/sau JSON.`;
-}
-
-function buildUserPrompt(topicHint, angleInstruction) {
-  const hint = topicHint ? `\n\nGợi ý ngữ cảnh thêm từ người dùng: ${topicHint}` : "";
-  const angle = angleInstruction ? `\n\nGóc độ nội dung yêu cầu cho video này: ${angleInstruction}` : "";
-  return `Ảnh 1 (bên trái) và ảnh 2 (bên phải) đính kèm là 2 chủ thể cần so sánh cho video.${hint}${angle}`;
-}
-
-// ============================================================
-// Gemini call
-// ============================================================
-function buildResponseSchema(allIds) {
-  // Lowercase JSON Schema type strings — the REST generateContent body wants "object"/"string"/
-  // "array", NOT the SDK's Type.OBJECT/Type.STRING enum constants (which serialize uppercase).
-  // Sending uppercase here is accepted without an HTTP error but silently fails to constrain the
-  // model — confirmed by testing: the model rambled instead of returning schema-shaped JSON.
-  // maxLength/maxItems bound every open-ended field — without them the model (observed 3/3
-  // times on gemini-3.6-flash, both thinkingLevel "low" and default) degenerates into a
-  // repeating-phrase loop while generating "title" and never reaches the rest of the schema.
-  //
-  // ALL 5 top-level fields are `required`. Gemini's responseSchema subset has no oneOf/anyOf,
-  // so a schema that makes title/label_left/label_right/points optional (to allow an
-  // error-only response) was silently exploited by the model: without `required`, it returned
-  // valid-but-incomplete JSON containing only "title" and stopped (finishReason STOP) — this
-  // was the actual root cause of every earlier failed test, confirmed via DEBUG_GEMINI logging.
-  // Fix: every field is required; "error" is "" (empty string) in the success case, and when
-  // non-empty the other 4 fields are meaningless placeholders (empty string / empty array) —
-  // see parseAndValidate, which branches on `error` first and ignores the placeholders.
-  return {
-    type: "object",
-    required: ["error", "title", "label_left", "label_right", "points"],
-    properties: {
-      error: { type: "string", maxLength: 200 },
-      title: { type: "string", maxLength: 120 },
-      label_left: { type: "string", maxLength: 40 },
-      label_right: { type: "string", maxLength: 40 },
-      points: {
-        type: "array",
-        maxItems: 8,
-        items: {
-          type: "object",
-          // Every field required, for the same reason the top-level ones are:
-          // without `required` the model returns partial objects and stops.
-          required: ["text", "side", "tag", "sub", "suggested_action", "needs_context_image", "image_concept"],
-          properties: {
-            text: { type: "string", maxLength: 160 },
-            side: { type: "string", enum: ["left", "right", "both"] },
-            // maxLength is what keeps the on-screen tag from turning back into
-            // a sentence — the label zone fits ~18 / ~26 characters per line.
-            tag: { type: "string", maxLength: 18 },
-            sub: { type: "string", maxLength: 26 },
-            suggested_action: { type: "string", enum: allIds },
-            // Giai đoạn 1 — ảnh minh hoạ ngữ cảnh (xem enforceContextImageLimits): model tự đề
-            // xuất, code hậu kiểm/cắt bớt sau, không tin tưởng tuyệt đối vào việc model tự giác
-            // giới hạn số lượng — cùng triết lý với enforceJewelryGating ở trên.
-            needs_context_image: { type: "boolean" },
-            image_concept: { type: "string", maxLength: 200 },
-          },
-        },
-      },
-    },
-  };
-}
-
-class NonRetryableError extends Error {}
-
-async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalog }) {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalog, slug, attempt, model = GEMINI_MODEL }) {
+  const hashtagCfg = loadHashtagConfig();
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`;
+  const { systemPrompt, userPrompt, responseSchema } = buildComparePrompt({ catalog, hashtagCfg, topicHint, angleInstruction });
   const body = {
-    systemInstruction: { parts: [{ text: buildSystemPrompt(catalog) }] },
+    systemInstruction: { parts: [{ text: systemPrompt }] },
     contents: [
       {
         role: "user",
         parts: [
-          { text: buildUserPrompt(topicHint, angleInstruction) },
+          { text: userPrompt },
           { inlineData: { mimeType: left.mimeType, data: left.data } },
           { inlineData: { mimeType: right.mimeType, data: right.data } },
         ],
@@ -378,7 +253,7 @@ async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalo
     generationConfig: {
       temperature: 0.4,
       responseMimeType: "application/json",
-      responseSchema: buildResponseSchema(catalog.allIds),
+      responseSchema,
       // thinkingLevel intentionally left at the model default ("medium") — tried "low" to cut
       // latency, but it made the model degenerate into a repeating-token loop on the first
       // string field instead of finishing the schema (reproduced 3/3 times). Trade the extra
@@ -397,44 +272,80 @@ async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalo
       signal: controller.signal,
     });
   } catch (err) {
-    if (err.name === "AbortError") {
-      throw new Error(`Gemini request timeout sau ${REQUEST_TIMEOUT_MS / 1000}s`);
-    }
-    throw new Error(`Gemini request thất bại (network): ${err.message}`);
+    const isTimeout = err.name === "AbortError";
+    const reason = redactKey(
+      isTimeout ? `Gemini request timeout sau ${REQUEST_TIMEOUT_MS / 1000}s` : `Gemini request thất bại (network): ${err.message}`,
+      GEMINI_API_KEY,
+    );
+    // Request chưa từng chạm tới server Gemini (timeout/network) — Google không tính phí, vẫn
+    // ghi lại để biết tần suất lỗi mạng/timeout.
+    appendCostEntry({ slug, task: "content-generation", model, status: "error", errorMessage: reason, attempt });
+    console.warn(`[gemini-error] model=${model} ${reason}`);
+    throw new RetryableError(reason, {
+      userMessage: isTimeout
+        ? "Gemini không phản hồi kịp (timeout), vui lòng thử lại sau."
+        : "Không kết nối được tới Gemini, vui lòng kiểm tra mạng rồi thử lại.",
+    });
   } finally {
     clearTimeout(timeout);
   }
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
-    // 401/403: sai/thiếu API key hoặc không có quyền — retry không giúp ích gì.
-    if (res.status === 401 || res.status === 403) {
-      throw new NonRetryableError(
-        `Gemini API từ chối truy cập (HTTP ${res.status}) — kiểm tra lại GEMINI_API_KEY. Chi tiết: ${errText}`,
-      );
-    }
-    // 400: request sai format (vd ảnh hỏng, schema sai) — cũng không đổi kết quả khi retry.
-    if (res.status === 400) {
-      throw new NonRetryableError(`Gemini API báo request không hợp lệ (HTTP 400): ${errText}`);
-    }
-    // 429 / 5xx: rate limit hoặc lỗi tạm thời phía server — đáng để retry.
-    throw new Error(`Gemini API lỗi HTTP ${res.status}: ${errText}`);
+    // Mọi lỗi HTTP (429/400/401/403/5xx...) đều KHÔNG bị Google tính phí request đó — chỉ ghi
+    // sổ để theo dõi tần suất lỗi/retry, cost_usd luôn 0 (ép trong appendCostEntry).
+    appendCostEntry({
+      slug,
+      task: "content-generation",
+      model,
+      status: "error",
+      httpStatus: res.status,
+      errorMessage: redactKey(errText, GEMINI_API_KEY).slice(0, 500),
+      attempt,
+    });
+    // Phân loại (429 theo phút/theo ngày, 503, 401/403, 400, 5xx) + thông báo tiếng Việt cho người
+    // dùng — JSON gốc CHỈ ghi vào log server (dòng [gemini-error]), không nằm trong err.userMessage.
+    const classified = classifyGeminiHttpError({ httpStatus: res.status, bodyText: errText, model });
+    console.warn(`[gemini-error] ${describeGeminiErrorForLog(classified, { bodyText: errText, apiKey: GEMINI_API_KEY })}`);
+    throw classified;
   }
 
-  const json = await res.json();
+  // Body 200 không parse được = lỗi phía Gemini/mạng (đứt giữa chừng) -> đáng retry.
+  const json = await res.json().catch((e) => {
+    throw new RetryableError(`Gemini response không phải JSON hợp lệ: ${e.message}`);
+  });
   if (process.env.DEBUG_GEMINI) {
     console.warn(
       "[debug] finishReason=" + json?.candidates?.[0]?.finishReason +
       " usageMetadata=" + JSON.stringify(json?.usageMetadata),
     );
   }
+
+  // HTTP 200 từ đây trở xuống LUÔN được coi là lần gọi ĐÃ TÍNH PHÍ (Google bill theo response
+  // hợp lệ trả về, không quan tâm ứng dụng có dùng được nội dung hay không) — kể cả khi bị
+  // safety block hoặc thiếu text, nên ghi cost_usd > 0 TRƯỚC khi ném lỗi ở các nhánh dưới.
+  const usage = json?.usageMetadata || {};
+  const inputTokens = usage.promptTokenCount || 0;
+  const outputTokens = usage.candidatesTokenCount || 0;
+  appendCostEntry({
+    slug,
+    task: "content-generation",
+    model,
+    status: "success",
+    httpStatus: res.status,
+    inputTokens,
+    outputTokens,
+    costUsd: calcContentCost(model, inputTokens, outputTokens),
+    attempt,
+  });
+
   const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
   if (!text) {
     const blockReason = json?.promptFeedback?.blockReason;
     if (blockReason) {
       throw new NonRetryableError(`Gemini từ chối xử lý ảnh (blockReason: ${blockReason}).`);
     }
-    throw new Error("Gemini response không có nội dung text (candidates[0].content.parts[0].text rỗng).");
+    throw new RetryableError("Gemini response không có nội dung text (candidates[0].content.parts[0].text rỗng).");
   }
   return text;
 }
@@ -444,7 +355,7 @@ function parseAndValidate(rawText, catalog) {
   try {
     parsed = JSON.parse(rawText);
   } catch {
-    throw new Error(`Gemini trả về không phải JSON hợp lệ: ${rawText.slice(0, 200)}`);
+    throw new RetryableError(`Gemini trả về không phải JSON hợp lệ: ${rawText.slice(0, 200)}`);
   }
 
   // Gemini tự báo 2 ảnh không so sánh được — đây là kết quả hợp lệ về mặt xử lý, không
@@ -455,49 +366,68 @@ function parseAndValidate(rawText, catalog) {
 
   const missing = ["title", "label_left", "label_right", "points"].filter((k) => !(k in parsed));
   if (missing.length) {
-    throw new Error(
+    throw new RetryableError(
       `Response thiếu field bắt buộc: ${missing.join(", ")}. Raw: ${rawText.slice(0, 300)}`,
     );
   }
   if (typeof parsed.title !== "string" || !parsed.title.trim()) {
-    throw new Error("Field 'title' rỗng hoặc không phải string.");
+    throw new RetryableError("Field 'title' rỗng hoặc không phải string.");
   }
   if (typeof parsed.label_left !== "string" || !parsed.label_left.trim()) {
-    throw new Error("Field 'label_left' rỗng hoặc không phải string.");
+    throw new RetryableError("Field 'label_left' rỗng hoặc không phải string.");
   }
   if (typeof parsed.label_right !== "string" || !parsed.label_right.trim()) {
-    throw new Error("Field 'label_right' rỗng hoặc không phải string.");
+    throw new RetryableError("Field 'label_right' rỗng hoặc không phải string.");
   }
   if (!Array.isArray(parsed.points) || parsed.points.length === 0) {
-    throw new Error("Field 'points' phải là mảng có ít nhất 1 phần tử.");
+    throw new RetryableError("Field 'points' phải là mảng có ít nhất 1 phần tử.");
   }
   for (const [i, p] of parsed.points.entries()) {
     if (!["left", "right", "both"].includes(p.side)) {
-      throw new Error(`points[${i}].side = "${p.side}" phải là "left" | "right" | "both".`);
+      throw new RetryableError(`points[${i}].side = "${p.side}" phải là "left" | "right" | "both".`);
     }
     if (typeof p.tag !== "string" || !p.tag.trim()) {
-      throw new Error(`points[${i}].tag rỗng hoặc không phải string.`);
+      throw new RetryableError(`points[${i}].tag rỗng hoặc không phải string.`);
     }
     if (typeof p.sub !== "string") {
-      throw new Error(`points[${i}].sub phải là string (dùng "" nếu không cần dòng phụ).`);
+      throw new RetryableError(`points[${i}].sub phải là string (dùng "" nếu không cần dòng phụ).`);
     }
     if (typeof p.text !== "string" || !p.text.trim()) {
-      throw new Error(`points[${i}].text rỗng hoặc không phải string.`);
+      throw new RetryableError(`points[${i}].text rỗng hoặc không phải string.`);
     }
     if (typeof p.suggested_action !== "string" || !catalog.allIds.includes(p.suggested_action)) {
-      throw new Error(
+      throw new RetryableError(
         `points[${i}].suggested_action = "${p.suggested_action}" không khớp id nào trong actions.json.`,
       );
     }
     if (typeof p.needs_context_image !== "boolean") {
-      throw new Error(`points[${i}].needs_context_image phải là boolean.`);
+      throw new RetryableError(`points[${i}].needs_context_image phải là boolean.`);
     }
     if (typeof p.image_concept !== "string") {
-      throw new Error(`points[${i}].image_concept phải là string (dùng "" nếu needs_context_image=false).`);
+      throw new RetryableError(`points[${i}].image_concept phải là string (dùng "" nếu needs_context_image=false).`);
     }
   }
 
+  normalizeHashtagFields(parsed);
   return parsed;
+}
+
+// Field hashtag KHÔNG bắt buộc hợp lệ (khác 4 field lõi): thiếu/sai kiểu -> [] thay vì retry/lỗi, vì
+// caption vẫn có fallback theo label (xem scripts/lib/hashtags.mjs). topicTags hậu kiểm bằng code
+// theo whitelist dù schema đã có enum — không tin tuyệt đối vào model (cùng triết lý enforceJewelryGating).
+function normalizeHashtagFields(parsed) {
+  const cfg = loadHashtagConfig();
+  parsed.materials = (Array.isArray(parsed.materials) ? parsed.materials : [])
+    .filter((m) => typeof m === "string" && m.trim())
+    .map((m) => m.trim())
+    .slice(0, 2);
+  parsed.topicTags = resolveTopicTags(parsed.topicTags, cfg);
+  const suggested = [];
+  for (const raw of Array.isArray(parsed.suggestedTags) ? parsed.suggestedTags : []) {
+    const t = typeof raw === "string" ? cleanTag(raw, cfg) : null;
+    if (t && !suggested.includes(t)) suggested.push(t);
+  }
+  parsed.suggestedTags = suggested.slice(0, 2);
 }
 
 // Hậu kiểm bằng code, KHÔNG chỉ dựa vào prompt: nếu topic không phải trang sức mà Gemini
@@ -572,29 +502,34 @@ function enforceContextImageLimits(content) {
   return { content, corrections };
 }
 
-function sleep(ms) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
-
+// Chỉ retry lỗi từ Gemini/mạng (RetryableError — xem scripts/lib/gemini-retry.mjs); lỗi lập trình
+// (ReferenceError/TypeError/...) và NonRetryableError throw ngay, không đốt thêm lần gọi tính phí.
+//
+// 429: đợi đúng RetryInfo.retryDelay (+ padding) thay vì backoff cố định. Hết quota THEO NGÀY thì không
+// retry: chuyển sang GEMINI_FALLBACK_MODEL nếu có, không có thì báo lỗi ngay. Trả { content, model }
+// với model = model THỰC SỰ sinh ra nội dung.
 async function generateWithRetry(args) {
-  let lastErr;
-  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
-    try {
-      const rawText = await callGeminiOnce(args);
-      return parseAndValidate(rawText, args.catalog);
-    } catch (err) {
-      if (err instanceof NonRetryableError) {
-        // Lỗi không đáng retry (key sai, ảnh không so sánh được, request hỏng) — dừng ngay.
-        throw err;
-      }
-      lastErr = err;
-      console.warn(`[attempt ${attempt}/${MAX_ATTEMPTS}] ${err.message}`);
-      if (attempt < MAX_ATTEMPTS) {
-        await sleep(RETRY_BASE_DELAY_MS * attempt);
-      }
-    }
-  }
-  throw new Error(`Gemini call thất bại sau ${MAX_ATTEMPTS} lần thử. Lỗi cuối cùng: ${lastErr.message}`);
+  return runWithModelFallback({
+    primaryModel: GEMINI_MODEL,
+    fallbackModel: GEMINI_FALLBACK_MODEL,
+    run: async (model) => ({
+      model,
+      content: await withRetry(
+        async (attempt) => parseAndValidate(await callGeminiOnce({ ...args, attempt, model }), args.catalog),
+        {
+          maxAttempts: MAX_ATTEMPTS,
+          baseDelayMs: RETRY_BASE_DELAY_MS,
+          label: "Gemini call",
+          onRetryableError: (err, attempt, waitMs) =>
+            console.warn(
+              `[attempt ${attempt}/${MAX_ATTEMPTS}] ${redactKey(err.message, GEMINI_API_KEY)}` +
+                (attempt < MAX_ATTEMPTS ? ` — thử lại sau ${(waitMs / 1000).toFixed(1)}s` : ""),
+            ),
+        },
+      ),
+    }),
+    log: (msg) => console.warn(`[gemini] ${msg}`),
+  });
 }
 
 // ============================================================
@@ -603,13 +538,13 @@ async function generateWithRetry(args) {
 // real error objects instead of parsed stdout). The CLI `main()` below is a thin wrapper
 // around this same function — no behavior duplication between the two entry points.
 // ============================================================
-async function runCompareContent({ left, right, topicHint, contentAngleId, customAngleText } = {}) {
+async function runCompareContent({ left, right, topicHint, contentAngleId, customAngleText, slug = null } = {}) {
   const catalog = loadActionCatalog();
   const leftImg = loadImage(left, "trái");
   const rightImg = loadImage(right, "phải");
   const angleInstruction = resolveAngleInstruction(contentAngleId, customAngleText);
 
-  const content = await generateWithRetry({ left: leftImg, right: rightImg, topicHint, angleInstruction, catalog });
+  const { content, model: usedModel } = await generateWithRetry({ left: leftImg, right: rightImg, topicHint, angleInstruction, catalog, slug });
 
   // Log chẩn đoán: Gemini tự đánh dấu bao nhiêu point cần ảnh minh hoạ NGAY SAU khi nhận
   // response, TRƯỚC mọi hậu kiểm (jewelry gate / cap MAX_CONTEXT_IMAGES ảnh / liền-kề-cùng-bên) — để phân biệt
@@ -641,7 +576,7 @@ async function runCompareContent({ left, right, topicHint, contentAngleId, custo
     content,
     corrections,
     contextImageCorrections,
-    model: GEMINI_MODEL,
+    model: usedModel,
     source_images: {
       left: left.startsWith("data:") ? "<inline base64>" : path.resolve(left),
       right: right.startsWith("data:") ? "<inline base64>" : path.resolve(right),
@@ -665,6 +600,7 @@ async function main() {
     topicHint: opts.topicHint,
     contentAngleId: opts.contentAngleId,
     customAngleText: opts.customAngleText,
+    slug: opts.slug,
   });
 
   if (corrections.length) {
@@ -711,7 +647,10 @@ const isMainModule = process.argv[1] && import.meta.url === pathToFileURL(proces
 if (isMainModule) {
   main().catch((err) => {
     // Không bao giờ ghi file output khi lỗi — composition không được đọc data rỗng/undefined.
-    console.error(`\nTHẤT BẠI: ${err.message}`);
+    // userMessage (tiếng Việt, không có JSON gốc) nếu là lỗi Gemini; chi tiết kỹ thuật nằm ở các dòng
+    // [gemini-error] phía trên trong log. Server chỉ trích dòng "THẤT BẠI:" này ra UI.
+    if (err.userMessage && err.userMessage !== err.message) console.error(`[gemini-error] ${redactKey(err.message, GEMINI_API_KEY)}`);
+    console.error(`\nTHẤT BẠI: ${redactKey(err.userMessage || err.message, GEMINI_API_KEY)}`);
     // process.exitCode (không phải process.exit()) — thoát êm, tránh crash libuv trên Windows
     // khi vừa có AbortController timeout/abort đang dọn dẹp dở (đã gặp thực tế khi test).
     process.exitCode = 1;

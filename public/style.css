@@ -26,6 +26,41 @@
   padding: 0;
 }
 
+/* -------------------------------------------------------------
+ * Custom scrollbars (thin, rounded, theme-matched) — applies to every
+ * scrollable element (modal-body, cost-table-wrap, terminal-body, ...)
+ * instead of the default thick OS scrollbar.
+ * ------------------------------------------------------------- */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--panel-edge) transparent;
+}
+
+::-webkit-scrollbar {
+  width: 9px;
+  height: 9px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--panel-edge);
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-cyan);
+  background-clip: padding-box;
+}
+
+::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
 body {
   background-color: var(--bg);
   background-image: 
@@ -426,6 +461,13 @@ body {
   font-size: 12px;
 }
 
+.btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
 /* -------------------------------------------------------------
  * Studio Points Editor
  * ------------------------------------------------------------- */
@@ -772,6 +814,396 @@ body {
   margin-top: 12px;
 }
 
+/* -------------------------------------------------------------
+ * Cost Stats Modal
+ * ------------------------------------------------------------- */
+.cost-filter-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px 20px;
+  margin-bottom: 18px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid var(--panel-edge);
+}
+
+.cost-filter-group {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+}
+
+.cost-filter-group > label {
+  font-size: 11px;
+  color: var(--fg-dim);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  white-space: nowrap;
+}
+
+/* Custom select: kill native browser chrome, draw our own chevron + focus glow
+   so it matches the rest of the dark-neon form controls instead of the OS default. */
+.select-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.select-wrap::after {
+  content: "";
+  position: absolute;
+  right: 14px;
+  top: 50%;
+  width: 8px;
+  height: 8px;
+  border-right: 2px solid var(--accent-cyan);
+  border-bottom: 2px solid var(--accent-cyan);
+  transform: translateY(-70%) rotate(45deg);
+  pointer-events: none;
+}
+
+.cost-range-select {
+  width: auto;
+  min-width: 190px;
+  padding: 10px 38px 10px 14px;
+  font-size: 13px;
+  font-weight: 700;
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: var(--panel);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cost-range-select:hover {
+  border-color: var(--accent-cyan);
+}
+
+.cost-range-select:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 10px rgba(55, 230, 196, 0.25);
+}
+
+.cost-range-select option {
+  background: var(--panel);
+  color: var(--fg);
+}
+
+/* ---- Custom date range picker ---- */
+.cost-custom-range {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  background: var(--bg);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-md);
+}
+
+.cost-custom-range-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cost-custom-range-field label {
+  font-size: 10px;
+  color: var(--fg-dim);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+.cost-date-input {
+  width: auto;
+  padding: 7px 10px;
+  font-size: 12px;
+  color-scheme: dark;
+}
+
+.cost-custom-range-sep {
+  color: var(--fg-dim);
+  font-weight: 700;
+  padding-bottom: 8px;
+}
+
+.cost-summary-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 14px;
+  margin-bottom: 20px;
+}
+
+.cost-summary-card {
+  background: var(--bg);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-md);
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cost-summary-card.highlight {
+  border-color: var(--accent-cyan);
+  box-shadow: var(--shadow-glow-cyan);
+}
+
+.cost-summary-label {
+  font-size: 12px;
+  color: var(--fg-dim);
+  font-weight: 600;
+}
+
+.cost-summary-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: #fff;
+}
+
+.cost-summary-vnd {
+  font-size: 12px;
+  color: var(--fg-dim);
+  font-weight: 500;
+}
+
+.cost-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--accent-cyan);
+  margin-bottom: 10px;
+}
+
+.cost-table-header-row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 24px;
+}
+
+.cost-table-hint {
+  font-size: 11px;
+  color: var(--fg-dim);
+}
+
+/* ---- Loading skeleton ---- */
+.cost-skeleton-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.cost-skeleton {
+  border-radius: var(--radius-md);
+  background: linear-gradient(90deg, var(--panel) 25%, var(--panel-hover) 50%, var(--panel) 75%);
+  background-size: 200% 100%;
+  animation: cost-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.cost-skeleton-chart {
+  height: 160px;
+}
+
+.cost-skeleton-row {
+  height: 36px;
+}
+
+@keyframes cost-skeleton-pulse {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* ---- Empty / error state messages ---- */
+.cost-state-msg {
+  color: var(--fg-dim);
+  background: var(--bg);
+  border: 1px dashed var(--panel-edge);
+  border-radius: var(--radius-md);
+  padding: 20px;
+  text-align: center;
+  font-size: 13px;
+}
+
+.cost-state-error {
+  color: var(--danger);
+  border: 1px solid var(--danger);
+  border-style: solid;
+  background: rgba(255, 77, 77, 0.08);
+  text-align: left;
+}
+
+/* ---- Chart ---- */
+.cost-chart-wrap {
+  position: relative;
+  background: var(--bg);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-md);
+  padding: 12px 12px 8px;
+  margin-bottom: 20px;
+}
+
+.cost-chart-svg {
+  display: block;
+}
+
+.cost-chart-baseline {
+  stroke: var(--panel-edge);
+  stroke-width: 1;
+}
+
+.cost-chart-bar {
+  fill: var(--accent-cyan);
+  transition: fill 0.15s ease;
+}
+
+.cost-chart-bar-hover {
+  fill: var(--accent-pink);
+}
+
+.cost-chart-hit {
+  pointer-events: all;
+  cursor: pointer;
+}
+
+.cost-chart-labels {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--fg-dim);
+  margin-top: 4px;
+}
+
+.cost-chart-tooltip {
+  position: absolute;
+  transform: translate(-50%, -100%);
+  background: var(--panel-hover);
+  border: 1px solid var(--accent-pink);
+  border-radius: var(--radius-sm);
+  padding: 6px 10px;
+  font-size: 12px;
+  white-space: nowrap;
+  pointer-events: none;
+  z-index: 10;
+  margin-top: -8px;
+}
+
+.cost-chart-tooltip strong {
+  color: #fff;
+  margin-right: 4px;
+}
+
+.cost-chart-tooltip span {
+  color: var(--fg-dim);
+}
+
+/* ---- Table ---- */
+.cost-table-wrap {
+  overflow-x: auto;
+}
+
+.cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.cost-table th,
+.cost-table td {
+  text-align: left;
+  padding: 10px 12px;
+  border-bottom: 1px solid var(--panel-edge);
+  white-space: nowrap;
+}
+
+.cost-table th {
+  color: var(--fg-dim);
+  font-weight: 700;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  user-select: none;
+}
+
+.cost-table th:hover {
+  color: #fff;
+}
+
+.cost-table th .sort-arrow {
+  color: var(--accent-cyan);
+  font-size: 10px;
+}
+
+.cost-table tbody tr:hover {
+  background: var(--panel-hover);
+}
+
+.cost-table-empty-row {
+  text-align: center !important;
+  color: var(--fg-dim);
+  white-space: normal !important;
+  padding: 24px !important;
+}
+
+.cost-td-slug {
+  font-family: monospace;
+  color: var(--accent-cyan);
+}
+
+.cost-td-content {
+  color: var(--accent-cyan);
+}
+
+.cost-td-image {
+  color: var(--accent-pink);
+}
+
+.cost-td-total {
+  font-weight: 800;
+  color: #fff;
+}
+
+.cost-td-total-vnd {
+  display: block;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--fg-dim);
+}
+
+.cost-badge {
+  display: inline-block;
+  margin-right: 2px;
+}
+
+.cost-total-row td {
+  border-bottom: none;
+  border-top: 2px solid var(--panel-edge);
+  font-weight: 800;
+  color: #fff;
+  background: var(--panel);
+}
+
+/* ---- Pagination ---- */
+.cost-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.cost-page-label {
+  font-size: 12px;
+  color: var(--fg-dim);
+  font-weight: 600;
+}
+
 /* Utilities */
 .hidden { display: none !important; }
 
@@ -787,3 +1219,37 @@ body {
 @keyframes spin {
   to { transform: rotate(360deg); }
 }
+
+/* Hashtag chips (Studio Bước 2) */
+.hashtag-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-bottom: 8px;
+  min-height: 28px;
+}
+.hashtag-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 6px 4px 10px;
+  border: 1px solid var(--accent-cyan);
+  border-radius: 999px;
+  font-size: 13px;
+  color: var(--fg);
+}
+.hashtag-chip.topic { border-style: dashed; }
+.hashtag-chip.over-limit { opacity: 0.4; text-decoration: line-through; }
+.hashtag-chip button {
+  border: 0;
+  background: transparent;
+  color: var(--fg-dim);
+  cursor: pointer;
+  font-size: 12px;
+  line-height: 1;
+  padding: 2px 4px;
+}
+.hashtag-chip button:hover { color: var(--danger, #ff5c7a); }
+.hashtag-add-row { display: flex; gap: 8px; }
+.hashtag-add-row .input-text { flex: 1; }
+.hashtag-note { margin-top: 6px; font-size: 11px; color: var(--fg-dim); }

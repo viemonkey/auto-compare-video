@@ -240,6 +240,51 @@ npm run publish   # xuất bản, lấy link chia sẻ
 
 </details>
 
+### 5. Thống kê chi phí sử dụng AI
+
+Web UI (`npm run ui`) có tab **"💰 Thống kê chi phí"** cạnh "Danh sách video đã dựng" — hiển thị:
+
+- 3 thẻ tổng cố định: hôm nay / 7 ngày gần nhất / toàn thời gian (USD + quy đổi VNĐ ước tính,
+  tỷ giá cố định ~26.000đ, **không phải tỷ giá thời gian thực**).
+- Biểu đồ cột chi phí theo ngày (zero-fill ngày không phát sinh chi phí để trục thời gian đúng
+  thực tế), có tooltip khi hover từng cột.
+- Bộ lọc khoảng ngày (7 ngày / 30 ngày / tất cả) — lọc cả biểu đồ lẫn bảng chi tiết cùng lúc
+  (3 thẻ tổng phía trên KHÔNG bị lọc, luôn cố định).
+- Bảng chi tiết theo từng video — bấm tiêu đề cột để sắp xếp, có dòng TỔNG cuối bảng, phân trang
+  20 video/trang, và nút xuất CSV (xuất đúng tập đã lọc + sắp xếp, không giới hạn theo trang).
+
+Cách hoạt động:
+
+- **`config/pricing.mjs`** — bảng giá tập trung (USD/1M token cho sinh kịch bản, USD/ảnh cho
+  sinh ảnh minh hoạ), kèm ngày cập nhật giá gần nhất. Đổi model (`GEMINI_MODEL`/`IMAGE_GEN_MODEL`
+  trong `.env`) hoặc khi Google đổi giá thì sửa trực tiếp file này.
+- **`output/cost-ledger.jsonl`** — sổ chi phí, mỗi dòng là 1 lần gọi Gemini thật (append-only,
+  ghi bởi `scripts/lib/cost-ledger.mjs` từ `generate-compare-content.mjs` và
+  `generate-context-image.mjs`). Lần gọi lỗi (429/400/timeout...) vẫn được ghi lại để theo dõi
+  nhưng **không tính phí** (`cost_usd: 0`) — đúng chính sách billing của Google.
+- **`GET /api/cost-stats`** — server đọc `cost-ledger.jsonl`, tổng hợp theo ngày/tác vụ/video
+  cho tab thống kê.
+
+**Test giao diện khi CHƯA có credit Gemini (dữ liệu mẫu):**
+
+```bash
+node scripts/seed-fake-cost-data.mjs   # thêm ~8 dòng dữ liệu giả lập vào cost-ledger.jsonl
+npm run ui                              # mở web UI, bấm "💰 Thống kê chi phí" để xem
+```
+
+**Xoá dữ liệu mẫu** sau khi test xong (bắt buộc trước khi dùng dữ liệu thật, để không bị lẫn số liệu demo vào số liệu thật):
+
+```bash
+node scripts/seed-fake-cost-data.mjs --clear
+```
+
+Lệnh `--clear` chỉ xoá đúng các dòng do script này sinh ra (đánh dấu `"seed": true`), không đụng
+tới dòng chi phí thật nào khác đã có trong file.
+
+## 📣 Đăng Reels lên Facebook tự động
+
+Hàng đợi đăng luân phiên nhiều page, ảnh bìa tự chọn, xử lý rate limit và tắt an toàn — xem [docs/facebook-auto-post.md](docs/facebook-auto-post.md). Chạy test: `npm test`.
+
 ## 🤝 Đóng góp
 
 Repo mở cho việc nhân bản/tuỳ biến. Nếu thêm video mới hoặc sửa template, giữ đúng layout 3-zone cố định trong `DESIGN.md` (đây là "hợp đồng" giúp cả series đồng nhất) — mọi thay đổi khác (chủ đề, kịch bản, icon) đều được hoan nghênh. Mở PR hoặc issue nếu bạn tìm thấy lỗi hoặc muốn đề xuất cải tiến.

@@ -25,6 +25,9 @@
         </div>
       </div>
       <div class="header-actions">
+        <button id="btn-cost-stats" class="btn btn-secondary">
+          <span class="icon">💰</span> Thống kê chi phí
+        </button>
         <button id="btn-existing-videos" class="btn btn-secondary">
           <span class="icon">📁</span> Danh sách video đã dựng
         </button>
@@ -190,6 +193,17 @@
           </div>
 
           <div class="form-group">
+            <label>#️⃣ Hashtag dự kiến (caption Reel)</label>
+            <div id="hashtag-chips" class="hashtag-chips"></div>
+            <div class="hashtag-add-row">
+              <input type="text" id="hashtag-add-input" class="input-text" placeholder="Thêm hashtag, ví dụ: thạch anh tím" />
+              <button type="button" id="btn-add-hashtag" class="btn-secondary">+ Thêm</button>
+              <button type="button" id="btn-refresh-hashtags" class="btn-secondary" title="Tính lại tag theo label hiện tại (giữ tag thêm tay)">↻ Cập nhật tag</button>
+            </div>
+            <div id="hashtag-note" class="hashtag-note"></div>
+          </div>
+
+          <div class="form-group">
             <label>📁 Tên thư mục video (Slug ID)</label>
             <input type="text" id="script-slug" class="input-text" placeholder="Tự sinh nếu để rỗng, ví dụ: dev-vs-devops" />
           </div>
@@ -276,6 +290,132 @@
     </div>
   </div>
 
+  <!-- Cost Stats Modal -->
+  <div id="cost-stats-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog wide">
+      <div class="modal-header">
+        <h3>THỐNG KÊ CHI PHÍ SỬ DỤNG AI</h3>
+        <button id="btn-close-cost-modal" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-subtitle">
+          Tổng hợp từ <code>output/cost-ledger.jsonl</code> — mỗi lần gọi Gemini (sinh kịch bản /
+          sinh ảnh minh hoạ) ghi 1 dòng. Lần gọi lỗi (429/400/timeout...) không bị tính phí, chỉ
+          hiện trong log chứ không cộng vào tổng. Quy đổi VNĐ chỉ để dễ hình dung, dùng tỷ giá
+          ước tính cố định — KHÔNG phải tỷ giá thời gian thực.
+        </p>
+
+        <!-- Filter row: date range scopes chart + table + export cùng lúc -->
+        <div class="cost-filter-row">
+          <div class="cost-filter-group">
+            <label for="cost-range-select">Khoảng thời gian</label>
+            <div class="select-wrap">
+              <select id="cost-range-select" class="input-text cost-range-select">
+                <option value="7">7 ngày gần nhất</option>
+                <option value="30">30 ngày gần nhất</option>
+                <option value="all" selected>Tất cả</option>
+                <option value="custom">Tùy chọn ngày…</option>
+              </select>
+            </div>
+            <div id="cost-custom-range" class="cost-custom-range hidden">
+              <div class="cost-custom-range-field">
+                <label for="cost-date-from">Từ ngày</label>
+                <input type="date" id="cost-date-from" class="input-text cost-date-input" />
+              </div>
+              <span class="cost-custom-range-sep">→</span>
+              <div class="cost-custom-range-field">
+                <label for="cost-date-to">Đến ngày</label>
+                <input type="date" id="cost-date-to" class="input-text cost-date-input" />
+              </div>
+              <button id="btn-apply-custom-range" class="btn btn-small btn-primary">Áp dụng</button>
+            </div>
+          </div>
+          <button id="btn-export-csv" class="btn btn-small btn-secondary" disabled>
+            ⬇ Xuất CSV
+          </button>
+        </div>
+
+        <div class="cost-summary-grid">
+          <div class="cost-summary-card">
+            <span class="cost-summary-label">Hôm nay</span>
+            <span class="cost-summary-value" id="cost-total-today">$0.0000</span>
+            <span class="cost-summary-vnd" id="cost-total-today-vnd">≈ 0₫</span>
+          </div>
+          <div class="cost-summary-card">
+            <span class="cost-summary-label">7 ngày gần nhất</span>
+            <span class="cost-summary-value" id="cost-total-7d">$0.0000</span>
+            <span class="cost-summary-vnd" id="cost-total-7d-vnd">≈ 0₫</span>
+          </div>
+          <div class="cost-summary-card highlight">
+            <span class="cost-summary-label">Toàn thời gian</span>
+            <span class="cost-summary-value" id="cost-total-all">$0.0000</span>
+            <span class="cost-summary-vnd" id="cost-total-all-vnd">≈ 0₫</span>
+          </div>
+        </div>
+
+        <!-- Loading skeleton -->
+        <div id="cost-state-loading" class="cost-skeleton-wrap hidden">
+          <div class="cost-skeleton cost-skeleton-chart"></div>
+          <div class="cost-skeleton cost-skeleton-row"></div>
+          <div class="cost-skeleton cost-skeleton-row"></div>
+          <div class="cost-skeleton cost-skeleton-row"></div>
+        </div>
+
+        <!-- Error state -->
+        <div id="cost-state-error" class="cost-state-msg cost-state-error hidden"></div>
+
+        <!-- Empty state (không có video nào trong khoảng ngày đang lọc) -->
+        <div id="cost-state-empty" class="cost-state-msg hidden">
+          Chưa có dữ liệu chi phí nào trong khoảng thời gian này. Dựng video thật hoặc chạy
+          <code>node scripts/seed-fake-cost-data.mjs</code> để xem dữ liệu mẫu.
+        </div>
+
+        <!-- Main content: chart + table (chỉ hiện khi có dữ liệu) -->
+        <div id="cost-content" class="hidden">
+          <h4 class="cost-section-title">Xu hướng chi phí theo ngày (USD)</h4>
+          <div id="cost-chart-wrap" class="cost-chart-wrap"></div>
+
+          <div class="cost-table-header-row">
+            <h4 class="cost-section-title">Chi phí theo từng video</h4>
+            <span class="cost-table-hint">Bấm tiêu đề cột để sắp xếp</span>
+          </div>
+          <div class="cost-table-wrap">
+            <table class="cost-table">
+              <thead>
+                <tr>
+                  <th data-sort="slug">Video / Slug<span class="sort-arrow"></span></th>
+                  <th data-sort="createdAt">Ngày tạo<span class="sort-arrow"></span></th>
+                  <th data-sort="contentCost"><span class="cost-badge cost-badge-content">📝</span> Chi phí kịch bản<span class="sort-arrow"></span></th>
+                  <th data-sort="imageCost"><span class="cost-badge cost-badge-image">🖼️</span> Chi phí ảnh<span class="sort-arrow"></span></th>
+                  <th data-sort="imagesGenerated">Số ảnh đã sinh<span class="sort-arrow"></span></th>
+                  <th data-sort="totalCost">Tổng<span class="sort-arrow"></span></th>
+                </tr>
+              </thead>
+              <tbody id="cost-videos-tbody">
+                <!-- Rows injected via JS -->
+              </tbody>
+              <tfoot>
+                <tr class="cost-total-row">
+                  <td colspan="2">TỔNG (theo bộ lọc hiện tại)</td>
+                  <td id="cost-foot-content">$0.0000</td>
+                  <td id="cost-foot-image">$0.0000</td>
+                  <td id="cost-foot-images-count">0</td>
+                  <td id="cost-foot-total">$0.0000</td>
+                </tr>
+              </tfoot>
+            </table>
+          </div>
+
+          <div class="cost-pagination">
+            <button id="cost-page-prev" class="btn btn-small btn-secondary">← Trước</button>
+            <span id="cost-page-label" class="cost-page-label">Trang 1/1</span>
+            <button id="cost-page-next" class="btn btn-small btn-secondary">Sau →</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Existing Videos Drawer/Modal -->
   <div id="videos-modal" class="modal-backdrop hidden">
     <div class="modal-dialog wide">
@@ -284,6 +424,7 @@
         <button id="btn-close-videos-modal" class="modal-close">✕</button>
       </div>
       <div class="modal-body">
+        <div id="social-alerts"></div>
         <div id="videos-list-grid" class="videos-grid">
           <!-- Videos injected via JS -->
         </div>

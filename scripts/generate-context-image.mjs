@@ -26,6 +26,8 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { calcImageCost } from "../config/pricing.mjs";
+import { appendCostEntry } from "./lib/cost-ledger.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -53,11 +55,12 @@ function loadEnv() {
 }
 
 const ENV = loadEnv();
-// Tách riêng khỏi GEMINI_API_KEY (dùng cho Vision ở generate-compare-content.mjs) để theo dõi
-// chi phí sinh ảnh riêng — xem .env.example. KHÔNG process.exit khi thiếu: đây là tính năng
-// phụ tuỳ chọn, thiếu key chỉ nên tắt tính năng (trả null), không được chặn cả pipeline dựng
-// video như GEMINI_API_KEY (bắt buộc) đang làm.
-const IMAGE_GEN_API_KEY = ENV.IMAGE_GEN_API_KEY;
+// Dùng chung GEMINI_API_KEY với generate-compare-content.mjs (trước đây tách riêng
+// IMAGE_GEN_API_KEY để theo dõi chi phí riêng, nhưng thực tế luôn trỏ cùng 1 key/project nên
+// gộp lại cho gọn — 2026-09-26). KHÔNG process.exit khi thiếu ở ĐÂY: đây là tính năng phụ tuỳ
+// chọn, thiếu key chỉ nên tắt tính năng (trả null), không được chặn cả pipeline dựng video —
+// việc chặn bắt buộc khi thiếu key đã do generate-compare-content.mjs đảm nhiệm.
+const IMAGE_GEN_API_KEY = ENV.GEMINI_API_KEY;
 // Mặc định đọc từ .env — xem .env.example cho model hiện hành + lịch ngừng hoạt động.
 // 2026-09: đã verify request/response shape dưới đây (responseModalities, imageConfig.aspectRatio)
 // giống hệt nhau giữa gemini-2.5-flash-image và gemini-3-pro-image-preview, nên đổi
@@ -104,7 +107,7 @@ function sleep(ms) {
 // cùng kết quả, retry chỉ tốn thời gian.
 class NonRetryableImageGenError extends Error {}
 
-async function callImageGenOnce({ concept, outBase, label }) {
+async function callImageGenOnce({ concept, outBase, label, slug, attempt }) {
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${IMAGE_GEN_MODEL}:generateContent?key=${IMAGE_GEN_API_KEY}`;
   const body = {
     contents: [{ role: "user", parts: [{ text: STYLE_PREFIX + concept.trim() }] }],
@@ -127,6 +130,8 @@ async function callImageGenOnce({ concept, outBase, label }) {
   } catch (err) {
     const reason =
       err.name === "AbortError" ? `timeout sau ${REQUEST_TIMEOUT_MS / 1000}s` : `network: ${err.message}`;
+    // Chưa chạm tới server (network/timeout) — Google không tính phí, chỉ ghi sổ để theo dõi.
+    appendCostEntry({ slug, task: "context-image", model: IMAGE_GEN_MODEL, status: "error", errorMessage: reason, attempt });
     throw new Error(`gọi API thất bại (${reason})`); // retryable
   } finally {
     clearTimeout(timeout);
@@ -134,6 +139,16 @@ async function callImageGenOnce({ concept, outBase, label }) {
 
   if (!res.ok) {
     const errText = await res.text().catch(() => "");
+    // Mọi lỗi HTTP (429/400/401/403/5xx) đều không bị Google tính phí — cost_usd luôn 0.
+    appendCostEntry({
+      slug,
+      task: "context-image",
+      model: IMAGE_GEN_MODEL,
+      status: "error",
+      httpStatus: res.status,
+      errorMessage: errText.slice(0, 500),
+      attempt,
+    });
     // 401/403 (key sai/thiếu quyền) và 400 (request sai format) — retry vô ích.
     if (res.status === 401 || res.status === 403 || res.status === 400) {
       throw new NonRetryableImageGenError(`HTTP ${res.status} — ${errText.slice(0, 300)}`);
@@ -146,11 +161,31 @@ async function callImageGenOnce({ concept, outBase, label }) {
   try {
     json = await res.json();
   } catch {
+    appendCostEntry({
+      slug,
+      task: "context-image",
+      model: IMAGE_GEN_MODEL,
+      status: "error",
+      httpStatus: res.status,
+      errorMessage: "response không phải JSON hợp lệ",
+      attempt,
+    });
     throw new Error("response không phải JSON hợp lệ"); // retryable — có thể do response cụt giữa chừng
   }
 
   const blockReason = json?.promptFeedback?.blockReason;
   if (blockReason) {
+    // Không sinh ra ảnh nào -> không tính phí (chưa xác nhận Google có bill phần input đã xử lý
+    // hay không ở trường hợp này, coi là 0 cho an toàn — tránh phóng đại chi phí hiển thị).
+    appendCostEntry({
+      slug,
+      task: "context-image",
+      model: IMAGE_GEN_MODEL,
+      status: "error",
+      httpStatus: res.status,
+      errorMessage: `bị safety block (${blockReason})`,
+      attempt,
+    });
     throw new NonRetryableImageGenError(`bị safety block (${blockReason})`);
   }
 
@@ -158,8 +193,30 @@ async function callImageGenOnce({ concept, outBase, label }) {
   const imagePart = parts.find((p) => p.inlineData?.data);
   if (!imagePart) {
     const finishReason = json?.candidates?.[0]?.finishReason || "unknown";
+    appendCostEntry({
+      slug,
+      task: "context-image",
+      model: IMAGE_GEN_MODEL,
+      status: "error",
+      httpStatus: res.status,
+      errorMessage: `response không có ảnh (finishReason: ${finishReason})`,
+      attempt,
+    });
     throw new Error(`response không có ảnh (finishReason: ${finishReason})`); // retryable
   }
+
+  // Ảnh đã sinh thành công — Google tính phí request này bất kể sau đây ghi file cục bộ có lỗi
+  // hay không (lỗi ghi đĩa là vấn đề phía chúng ta, không liên quan tới billing của Google).
+  appendCostEntry({
+    slug,
+    task: "context-image",
+    model: IMAGE_GEN_MODEL,
+    status: "success",
+    httpStatus: res.status,
+    imageCount: 1,
+    costUsd: calcImageCost(IMAGE_GEN_MODEL, 1),
+    attempt,
+  });
 
   const mimeType = imagePart.inlineData.mimeType || "image/png";
   const ext = EXT_BY_MIME[mimeType] || ".png";
@@ -187,7 +244,7 @@ async function callImageGenOnce({ concept, outBase, label }) {
  *   outBase: đường dẫn output KHÔNG kèm đuôi file — đuôi do mimeType Gemini trả về quyết định.
  * @returns {Promise<string|null>} đường dẫn file đã ghi (kèm đuôi), hoặc null nếu lỗi/fallback.
  */
-async function generateContextImage({ concept, outBase }) {
+async function generateContextImage({ concept, outBase, slug = null }) {
   const label = outBase ? path.basename(outBase) : "(?)";
 
   if (!concept || !concept.trim()) {
@@ -196,7 +253,7 @@ async function generateContextImage({ concept, outBase }) {
   }
   if (!IMAGE_GEN_API_KEY) {
     console.warn(
-      `⚠ [generate-context-image] "${label}": thiếu IMAGE_GEN_API_KEY trong .env — bỏ qua, giữ ảnh gốc.`,
+      `⚠ [generate-context-image] "${label}": thiếu GEMINI_API_KEY trong .env — bỏ qua, giữ ảnh gốc.`,
     );
     return null;
   }
@@ -204,7 +261,7 @@ async function generateContextImage({ concept, outBase }) {
   let lastErr;
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     try {
-      return await callImageGenOnce({ concept, outBase, label });
+      return await callImageGenOnce({ concept, outBase, label, slug, attempt });
     } catch (err) {
       lastErr = err;
       if (err instanceof NonRetryableImageGenError) break;

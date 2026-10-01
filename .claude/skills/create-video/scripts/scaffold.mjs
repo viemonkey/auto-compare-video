@@ -120,13 +120,17 @@ if (dryRun) {
 // ---------- 1. hyperframes init ----------
 fs.mkdirSync(target, { recursive: true });
 console.log("\n[1/5] hyperframes init …");
-// npx needs a shell on Windows (it is npx.cmd there). Passed as one command string rather
-// than a string + args array — node deprecates the latter combination. Safe to interpolate:
-// slug is validated kebab-case above, and HF_VERSION is a matched semver.
-const initCmd =
-  `npx --yes hyperframes@${HF_VERSION} init ${slug} ` +
-  "--example blank --resolution portrait --non-interactive --skip-transcribe";
-const init = spawnSync(initCmd, { cwd: target, stdio: "inherit", shell: true });
+// Không dùng shell (DEP0190): trên Windows npx là .cmd nên chạy thẳng npx-cli.js bằng node.
+const npxCli = process.platform === "win32"
+  ? path.join(path.dirname(process.execPath), "node_modules", "npm", "bin", "npx-cli.js")
+  : null;
+const initArgs = [
+  "--yes", `hyperframes@${HF_VERSION}`, "init", slug,
+  "--example", "blank", "--resolution", "portrait", "--non-interactive", "--skip-transcribe",
+];
+const init = npxCli
+  ? spawnSync(process.execPath, [npxCli, ...initArgs], { cwd: target, stdio: "inherit" })
+  : spawnSync("npx", initArgs, { cwd: target, stdio: "inherit" });
 if (init.status !== 0) {
   fail(`hyperframes init thất bại (exit ${init.status}). Xem references/scaffold-manual.md.`);
 }

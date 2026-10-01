@@ -26,11 +26,62 @@ import express from "express";
 import multer from "multer";
 import fs from "node:fs";
 import path from "node:path";
+import crypto from "node:crypto";
 import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { CONTENT_ANGLES } from "./config/content-angles.mjs";
+import { COST_LEDGER_PATH, renameCostLedgerSlug } from "./scripts/lib/cost-ledger.mjs";
+import { getConfiguredPages } from "./scripts/lib/facebook-pages.mjs";
+import { graphVersion, inspectPages, isAutoPostEnabled, makeLogger, redactSecrets } from "./scripts/lib/fb-config.mjs";
+import { classifyError } from "./scripts/lib/fb-errors.mjs";
+import { npmCommand } from "./scripts/lib/npm-cmd.mjs";
+import { extractFailureMessage as geminiFailureMessage } from "./scripts/lib/gemini-retry.mjs";
+import { publishVideo, checkReelStatus } from "./scripts/lib/facebook-post.mjs";
+import {
+  loadQueue,
+  enqueueVideo,
+  pickEligiblePage,
+  nextPendingJob,
+  recordPost,
+  recordFailure,
+  disablePage,
+  recordVerifying,
+  finalizeVerifiedPost,
+  failJobTerminal,
+  verifyingJobs,
+  verifyTimeoutMs,
+  rateLimitBackoffMinutes,
+  publicQueueState,
+  listDisabledPages,
+} from "./scripts/lib/social-queue.mjs";
+import {
+  loadHashtagConfig,
+  planHashtags,
+  resolveMaterialGroups,
+  alignTopicTags,
+  sanitizePlan,
+  finalizeHashtags,
+  buildCaption,
+  cleanTag,
+  maxHashtags,
+  recordHashtagSuggestions,
+} from "./scripts/lib/hashtags.mjs";
+import { checkFfmpeg, extractPoseTimeline, setReelThumbnail } from "./scripts/lib/reel-thumbnail.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
+
+// .env ở gốc repo KHÔNG được tự nạp trước dòng này — server chạy bằng `node server.mjs` trơn
+// (npm start/ui), không qua dotenv hay `--env-file`. Phát hiện khi debug tính năng đăng
+// Facebook: FB_PAGE_*/GEMINI_API_KEY chỉ có tác dụng nếu đã export ra biến môi trường HỆ THỐNG
+// từ trước — sửa .env rồi lưu KHÔNG có tác dụng gì nếu thiếu dòng này. process.loadEnvFile()
+// (Node 20.6+) không ghi đè biến đã có sẵn trong process.env thật, nên biến môi trường hệ thống
+// (nếu ai đó set kiểu đó) vẫn được ưu tiên như trước.
+try {
+  process.loadEnvFile(path.join(__dirname, ".env"));
+} catch (e) {
+  if (e.code !== "ENOENT") console.error(`⚠ Không đọc được .env: ${e.message}`);
+}
+
 const PORT = Number(process.env.PORT) || 3002;
 
 const PUBLIC_DIR = path.join(__dirname, "public");
@@ -50,8 +101,12 @@ const LOG_DIR = path.join(OUTPUT_DIR, "logs");
 // sau khi scaffold xong — archiveAndCleanup() xoá sạch videos/<slug>/ sau khi render thành
 // công nên đây là bản sao DUY NHẤT còn sống sót của 2 thứ đó, xem persistContentRecord().
 const CONTENT_ARCHIVE_DIR = path.join(OUTPUT_DIR, "content");
+// data/social-queue.json — hàng đợi đăng Facebook + lịch sử đăng từng page, xem
+// scripts/lib/social-queue.mjs. Riêng ngoài output/ vì đây là trạng thái vận hành đang chạy
+// (không phải thành phẩm/log), cần sống sót qua restart server.
+const DATA_DIR = path.join(__dirname, "data");
 
-for (const d of [UPLOAD_DIR, TEMP_DIR, OUTPUT_DIR, LOG_DIR, CONTENT_ARCHIVE_DIR]) fs.mkdirSync(d, { recursive: true });
+for (const d of [UPLOAD_DIR, TEMP_DIR, OUTPUT_DIR, LOG_DIR, CONTENT_ARCHIVE_DIR, DATA_DIR]) fs.mkdirSync(d, { recursive: true });
 
 function writeRunLog(name, text) {
   try {
@@ -209,6 +264,11 @@ app.post("/api/generate-content", async (req, res) => {
     return res.status(400).json({ error: e.message });
   }
 
+  // slug thật của video chưa xác định ở Bước 1 (người dùng chỉ đặt/sửa slug ở Bước 2, sau khi
+  // thấy label_left/label_right Gemini vừa sinh ra) — dùng slug TẠM để dòng content-generation
+  // ghi vào cost-ledger.jsonl không bị "slug": null. Client giữ pendingSlug này và gửi lại ở
+  // /api/create-video, nơi nó được đổi thành slug thật (xem renameCostLedgerSlug bên dưới).
+  const pendingSlug = `_pending-${crypto.randomUUID()}`;
   const outPath = path.join(TEMP_DIR, `content-${Date.now()}.json`);
   const args = [
     path.join(SCRIPTS_DIR, "generate-compare-content.mjs"),
@@ -216,6 +276,8 @@ app.post("/api/generate-content", async (req, res) => {
     rightPath,
     "--out",
     outPath,
+    "--slug",
+    pendingSlug,
   ];
   const hint = String(req.body?.topicHint || "").trim();
   if (hint) args.push("--topic-hint", hint);
@@ -235,9 +297,12 @@ app.post("/api/generate-content", async (req, res) => {
   // needs_context_image=true cho X/N point" (xem generate-compare-content.mjs), một khi client
   // rời trang thì output/logs/ là chỗ duy nhất còn xem lại được.
   writeRunLog(`generate-content-${Date.now()}.log`, `ARGS: ${args.join(" ")}\n\n${out}`);
+  // Chi tiết kỹ thuật lỗi Gemini (model, mã lỗi, quotaId, retryDelay, body gốc) chỉ ra log server —
+  // UI chỉ nhận thông báo tiếng Việt ở dòng "THẤT BẠI:" (xem geminiFailureMessage()).
+  for (const l of out.split("\n")) if (l.startsWith("[gemini-error]")) console.warn(l);
 
   if (code !== 0 || !fs.existsSync(outPath)) {
-    return res.status(500).json({ error: out.trim().split("\n").slice(-6).join("\n") || "Gemini thất bại." });
+    return res.status(500).json({ error: geminiFailureMessage(out) });
   }
 
   try {
@@ -245,10 +310,36 @@ app.post("/api/generate-content", async (req, res) => {
     // client giữ nội dung trong state và POST lại ở /api/create-video, nên
     // file tạm này không cần sống tiếp
     fs.rmSync(outPath, { force: true });
-    res.json({ content });
+    // Hashtag dự kiến cho Studio Bước 2 (chip có thể xoá/thêm) — cùng logic với lúc đăng.
+    const { plan } = planHashtags(content, loadHashtagConfig());
+    res.json({ content, pendingSlug, hashtags: plan, hashtagMax: maxHashtags() });
   } catch (e) {
     res.status(500).json({ error: `Không đọc được kết quả Gemini: ${e.message}` });
   }
+});
+
+// Chuẩn hoá 1 hashtag người dùng gõ tay ở Studio (bỏ dấu, thường, <=25 ký tự, lọc blocked) — để UI
+// dùng ĐÚNG luật của server thay vì tự cài lại. tier="topic" nếu tag nằm trong whitelist chủ đề.
+app.post("/api/normalize-hashtag", (req, res) => {
+  const cfg = loadHashtagConfig();
+  const tag = cleanTag(req.body?.tag, cfg);
+  if (!tag) {
+    return res.status(422).json({ error: "Hashtag không hợp lệ hoặc nằm trong danh sách cấm." });
+  }
+  res.json({ tag, tier: cfg.groupOf.has(tag) ? "topic" : "specific" });
+});
+
+// Tính lại plan hashtag theo label HIỆN TẠI (sau khi người dùng sửa label ở Bước 2). Bỏ `materials`
+// cũ của Gemini để label mới quyết định tag cụ thể. topicTags được căn lại theo NHÓM của vật liệu mới:
+// cùng nhóm thì giữ, khác nhóm thì thay bằng 1 tag ngẫu nhiên trong nhóm đúng. Trả kèm topicTags mới
+// để client dùng cho lần tính lại sau.
+app.post("/api/plan-hashtags", (req, res) => {
+  const b = req.body || {};
+  const cfg = loadHashtagConfig();
+  const labels = { label_left: b.label_left, label_right: b.label_right };
+  const topicTags = alignTopicTags(b.topicTags, resolveMaterialGroups(labels, cfg), cfg);
+  const { plan } = planHashtags({ ...labels, topicTags }, cfg);
+  res.json({ hashtags: plan, topicTags });
 });
 
 // ------------------------------------------------------------------
@@ -293,7 +384,7 @@ app.post("/api/create-video", async (req, res) => {
   let contentPath = null;
   let slugForLog = null;
   try {
-    const { content, slug: rawSlug, topicHint, ttsProvider, vieneuVoice, vieneuRefPath } = req.body || {};
+    const { content, slug: rawSlug, topicHint, ttsProvider, vieneuVoice, vieneuRefPath, pendingSlug } = req.body || {};
     const leftPath = assertInsideUploads(req.body?.leftPath, "leftPath");
     const rightPath = assertInsideUploads(req.body?.rightPath, "rightPath");
 
@@ -308,9 +399,26 @@ app.post("/api/create-video", async (req, res) => {
     if (slug !== rawSlug) {
       say(`ℹ slug "${rawSlug}" đã tồn tại — dùng "${slug}" thay thế.`);
     }
+    // Chốt lại slug tạm dùng lúc gọi Gemini ở Bước 1 (/api/generate-content) thành slug thật
+    // vừa xác định — để dòng content-generation trong cost-ledger.jsonl không còn mồ côi
+    // "slug" tạm (xem renameCostLedgerSlug trong scripts/lib/cost-ledger.mjs).
+    if (pendingSlug) {
+      const renamed = renameCostLedgerSlug(pendingSlug, slug);
+      if (renamed > 0) {
+        say(`ℹ Đã gắn ${renamed} dòng chi phí Gemini (Bước 1) vào slug "${slug}".`);
+      }
+    }
     if (!content || !Array.isArray(content.points) || content.points.length === 0) {
       return fail("Thiếu nội dung kịch bản (content.points rỗng).");
     }
+
+    // Hashtag: plan Studio gửi lên (đã cho người dùng sửa) — luôn làm sạch lại phía server. Không có
+    // (client cũ/API gọi trực tiếp) thì tự dựng từ content, video thiếu dữ liệu mới rơi về label.
+    const hashtagCfg = loadHashtagConfig();
+    const planned = planHashtags(content, hashtagCfg);
+    const hashtagPlan = sanitizePlan(req.body?.hashtags, hashtagCfg) ?? planned.plan;
+    // Gợi ý (vật liệu chưa có trong bảng + suggestedTags) chỉ ghi ra file cho người duyệt, KHÔNG đăng.
+    recordHashtagSuggestions({ slug, unmapped: planned.unmapped, suggestedTags: content.suggestedTags }, hashtagCfg);
 
     say("▶ Đang khởi động quy trình dựng video...");
 
@@ -319,7 +427,10 @@ app.post("/api/create-video", async (req, res) => {
     // Bản sao BỀN của content JSON gốc (needs_context_image/image_concept từng point) — TEMP_DIR
     // chỉ tồn tại trong request này (xoá ở finally), còn videos/<slug>/ có thể bị
     // archiveAndCleanup() xoá sạch sau khi render xong. Đây mới là bản duy nhất còn sống lâu dài.
-    fs.writeFileSync(path.join(CONTENT_ARCHIVE_DIR, `${slug}.compare-content.json`), JSON.stringify(content, null, 2));
+    fs.writeFileSync(
+      path.join(CONTENT_ARCHIVE_DIR, `${slug}.compare-content.json`),
+      JSON.stringify({ ...content, hashtagPlan }, null, 2),
+    );
 
     const args = [
       path.join(SCRIPTS_DIR, "scaffold-compare-video.mjs"),
@@ -351,6 +462,9 @@ app.post("/api/create-video", async (req, res) => {
 
     const target = path.join(VIDEOS_DIR, slug);
     let renderUrl = null;
+    // Đọc TRƯỚC khi archiveAndCleanup() có thể xoá videos/<slug>/ — dùng làm caption fallback
+    // khi chưa có output/content/<slug>.compare-content.json (xem resolveSocialPost()).
+    const videoDisplayName = readMetaName(slug) || slug;
 
     // Sao lưu BRIEF.md TRƯỚC khi archiveAndCleanup() có thể xoá sạch videos/<slug>/ ở dưới —
     // đây là bản ghi NGƯỜI ĐỌC ĐƯỢC duy nhất còn lại của việc ảnh minh hoạ ngữ cảnh nào đã
@@ -365,13 +479,24 @@ app.post("/api/create-video", async (req, res) => {
       }
     }
 
+    try {
+      const indexHtml = fs.readFileSync(path.join(target, "index.html"), "utf8");
+      const poseTimeline = extractPoseTimeline(indexHtml);
+      if (poseTimeline) {
+        fs.writeFileSync(path.join(CONTENT_ARCHIVE_DIR, `${slug}.pose-timeline.json`), JSON.stringify(poseTimeline, null, 2));
+      }
+    } catch (e) {
+      say(`⚠ Không lưu được timeline pose (ảnh bìa Reel sẽ chọn frame ngẫu nhiên): ${e.message}`);
+    }
+
     const wantRender = req.body?.render !== false && process.env.AUTO_RENDER !== "0";
     const keepProject = req.body?.keepProject === true || process.env.KEEP_PROJECT === "1";
     if (wantRender) {
       say("");
       say("▶ Đang render MP4 (bước này lâu, khoảng 1-3 phút)...");
       const render = await new Promise((resolve) => {
-        const child = spawn("npm", ["run", "render"], { cwd: target, shell: true });
+        const npmRender = npmCommand("npm", ["run", "render"]);
+        const child = spawn(npmRender.command, npmRender.args, { cwd: target });
         let tail = "";
         const feed = (buf) => {
           tail += buf.toString();
@@ -402,6 +527,28 @@ app.post("/api/create-video", async (req, res) => {
         } else {
           renderUrl = archiveAndCleanup(slug, file, say);
         }
+      }
+    }
+
+    // Vào hàng đợi đăng Facebook (xem processSocialQueueTick() ở dưới) — chỉ khi thật sự có MP4
+    // thành phẩm. Tắt bằng FB_AUTO_POST=0. Không throw: đăng bài là tính năng phụ, lỗi ở đây
+    // không được phép làm hỏng response /api/create-video.
+    if (renderUrl && isAutoPostEnabled()) {
+      try {
+        const absoluteVideoPath = path.join(__dirname, renderUrl.replace(/^\//, ""));
+        if (!fs.existsSync(absoluteVideoPath)) {
+          say(`⚠ Không thêm vào hàng đợi đăng Facebook: file không tồn tại: ${absoluteVideoPath}`);
+        } else {
+          const { title: caption, hashtags } = resolveSocialPost(slug, videoDisplayName, hashtagPlan);
+          const item = enqueueVideo({ slug, videoPath: absoluteVideoPath, caption, hashtags });
+          if (item) {
+            say("ℹ Đã thêm vào hàng đợi đăng Facebook (đăng luân phiên các page, cách nhau 30-60 phút).");
+          } else {
+            say("ℹ Slug này đã đăng / đang chờ đăng — không thêm trùng vào hàng đợi.");
+          }
+        }
+      } catch (e) {
+        say(`⚠ Không thêm được vào hàng đợi đăng Facebook: ${e.message}`);
       }
     }
 
@@ -449,24 +596,36 @@ function archiveAndCleanup(slug, renderWebPath, say) {
   const src = path.join(__dirname, renderWebPath.replace(/^\//, ""));
   const dest = path.join(OUTPUT_DIR, `${slug}${path.extname(src)}`);
 
+  let moved = false;
   try {
     const size = fs.statSync(src).size;
     if (size < 100 * 1024) throw new Error(`MP4 chỉ ${size} byte — nghi ngờ render lỗi`);
 
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
     fs.renameSync(src, dest); // cùng volume nên rename là đủ, không cần copy
+    moved = true;
     if (!fs.existsSync(dest) || fs.statSync(dest).size !== size) {
       throw new Error("MP4 không đến nơi nguyên vẹn");
     }
 
     // chỉ xoá SAU khi đã xác nhận MP4 nằm an toàn ở output/
-    fs.rmSync(path.join(VIDEOS_DIR, slug), { recursive: true, force: true });
+    // maxRetries/retryDelay: ngay sau khi child render (Chrome headless) vừa
+    // thoát, Windows/AV đôi khi còn giữ handle trên vài file trong node_modules
+    // hoặc renders/ trong vài trăm ms -> rmSync bắn EPERM dù thư mục hợp lệ để
+    // xoá. Node tự lùi tuyến tính và thử lại thay vì bỏ cuộc ngay lần đầu.
+    fs.rmSync(path.join(VIDEOS_DIR, slug), {
+      recursive: true,
+      force: true,
+      maxRetries: 5,
+      retryDelay: 300,
+    });
     say(`✔ Đã lưu: /output/${path.basename(dest)}  (${(size / 1048576).toFixed(1)} MB)`);
     say(`  Đã xoá videos/${slug}/ — chỉ giữ MP4. Muốn giữ source: KEEP_PROJECT=1`);
     return `/output/${path.basename(dest)}`;
   } catch (e) {
     say(`⚠ Không dọn được (${e.message}) — giữ nguyên videos/${slug}/ cho an toàn.`);
-    return renderWebPath;
+    // MP4 đã rename sang output/ thì đường dẫn renders/ cũ không còn tồn tại
+    return moved && fs.existsSync(dest) ? `/output/${path.basename(dest)}` : renderWebPath;
   }
 }
 
@@ -487,6 +646,54 @@ function latestRender(slug) {
     .map((f) => ({ f, t: fs.statSync(path.join(dir, f)).mtimeMs }))
     .sort((a, b) => b.t - a.t);
   return mp4s.length ? `/videos/${slug}/renders/${mp4s[0].f}` : null;
+}
+
+// Caption đăng Facebook: "title" (câu hook Gemini sinh ở Bước 1) + plan hashtag, từ bản lưu bền
+// output/content/<slug>.compare-content.json — xem CONTENT_ARCHIVE_DIR ở đầu file. `livePlan` là plan
+// vừa chốt ở /api/create-video (ưu tiên hơn bản lưu). Video cũ dựng trước khi tính năng này tồn tại
+// (không có file content / không có materials, topicTags) rơi về tên hiển thị/slug + hashtag theo label.
+function resolveSocialPost(slug, fallbackName, livePlan = null) {
+  const cfg = loadHashtagConfig();
+  let title = "";
+  let plan = livePlan;
+  try {
+    const p = path.join(CONTENT_ARCHIVE_DIR, `${slug}.compare-content.json`);
+    if (fs.existsSync(p)) {
+      const content = JSON.parse(fs.readFileSync(p, "utf8"));
+      if (content.title && String(content.title).trim()) title = String(content.title).trim();
+      if (!plan) plan = sanitizePlan(content.hashtagPlan, cfg) ?? planHashtags(content, cfg).plan;
+    }
+  } catch {
+    // rơi về fallback bên dưới
+  }
+  return { title: title || fallbackName || slug, hashtags: plan && plan.length ? plan : null };
+}
+
+// Gộp trạng thái đăng Facebook (data/social-queue.json) theo slug, cho GET /api/videos.
+function socialStatusBySlug() {
+  const { queue, posts } = loadQueue();
+  const map = new Map();
+  for (const p of posts) {
+    // mới nhất thắng nếu 1 slug lỡ có nhiều lần đăng (không nên xảy ra, nhưng không giả định)
+    map.set(p.slug, {
+      status: "posted",
+      pageName: p.pageName,
+      postedAt: p.postedAt,
+      postType: p.postType || "video",
+      fallbackReason: p.fallbackReason || null,
+    });
+  }
+  for (const j of queue) {
+    if (map.has(j.slug)) continue;
+    if (j.status === "verifying") {
+      map.set(j.slug, { status: "verifying", pageName: j.verifyPageName, fbVideoId: j.fbVideoId, verifyStartedAt: j.verifyStartedAt });
+    } else if (j.status === "failed") {
+      map.set(j.slug, { status: "failed", lastError: redactSecrets(j.lastError || "") });
+    } else {
+      map.set(j.slug, { status: "pending" });
+    }
+  }
+  return map;
 }
 
 app.get("/api/videos", (_req, res) => {
@@ -531,8 +738,19 @@ app.get("/api/videos", (_req, res) => {
     }
   }
 
+  // 3. Trạng thái đăng Facebook (data/social-queue.json) — gắn thêm, không thay đổi field cũ.
+  const social = socialStatusBySlug();
+  for (const v of out) {
+    const s = social.get(v.slug);
+    if (s) v.social = s;
+  }
+
   out.sort((a, b) => a.slug.localeCompare(b.slug));
   res.json(out);
+});
+
+app.get("/api/social-queue", (_req, res) => {
+  res.json(publicQueueState());
 });
 
 // ------------------------------------------------------------------
@@ -553,6 +771,346 @@ app.get("/api/actions", (_req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`Auto Compare Video UI  ->  http://localhost:${PORT}`);
+// ------------------------------------------------------------------
+// Thống kê chi phí AI — đọc output/cost-ledger.jsonl (xem scripts/lib/cost-ledger.mjs),
+// tổng hợp theo ngày/tác vụ/video cho tab "Thống kê chi phí" ở public/app.js.
+//
+// XOÁ DỮ LIỆU MẪU: scripts/seed-fake-cost-data.mjs sinh vài dòng giả lập để test giao diện
+// trước khi có credit Gemini thật — xoá bằng cách chạy lại chính script đó với cờ --clear
+// (xem README hoặc phần comment đầu file đó), KHÔNG xoá tay từng dòng trong file .jsonl.
+// ------------------------------------------------------------------
+// Trả { rows } khi đọc/parse OK (kể cả file chưa tồn tại -> rows: [], đó là trạng thái
+// "chưa có dữ liệu" hợp lệ, KHÔNG phải lỗi). Trả { error } riêng khi tự bản thân việc ĐỌC FILE
+// thất bại (quyền truy cập, đĩa lỗi...) — route handler cần phân biệt 2 trường hợp này để trả
+// đúng 200 (rỗng) hay 500 (lỗi thật) cho client, tránh giao diện hiểu nhầm "lỗi" thành "rỗng".
+function readCostLedger() {
+  if (!fs.existsSync(COST_LEDGER_PATH)) return { rows: [] };
+  let raw;
+  try {
+    raw = fs.readFileSync(COST_LEDGER_PATH, "utf8");
+  } catch (e) {
+    return { error: `Không đọc được ${COST_LEDGER_PATH}: ${e.message}` };
+  }
+  const rows = [];
+  for (const line of raw.split("\n")) {
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    try {
+      rows.push(JSON.parse(trimmed));
+    } catch {
+      // dòng hỏng (vd ghi dở khi crash) — bỏ qua, không chặn cả thống kê.
+    }
+  }
+  return { rows };
+}
+
+app.get("/api/cost-stats", (_req, res) => {
+  const { rows, error } = readCostLedger();
+  if (error) return res.status(500).json({ error });
+
+  const DAY_MS = 24 * 60 * 60 * 1000;
+  const now = Date.now();
+  const todayStr = new Date(now).toISOString().slice(0, 10);
+  const sevenDaysAgoMs = now - 7 * DAY_MS;
+
+  let totalAllTime = 0;
+  let totalToday = 0;
+  let totalLast7Days = 0;
+  // Không giới hạn 30 ngày ở đây nữa — trả TOÀN BỘ lịch sử theo ngày, để client tự cắt theo bộ
+  // lọc khoảng ngày (7/30/tất cả) chọn trong UI mà không cần gọi lại API mỗi lần đổi bộ lọc.
+  const byDayMap = new Map();
+  const byTaskMap = new Map();
+  const videoMap = new Map();
+
+  for (const row of rows) {
+    const cost = typeof row.cost_usd === "number" ? row.cost_usd : 0;
+    const task = row.task || "unknown";
+    const timestamp = typeof row.timestamp === "string" ? row.timestamp : null;
+    const ts = timestamp ? Date.parse(timestamp) : NaN;
+    const dateStr = timestamp ? timestamp.slice(0, 10) : null;
+
+    totalAllTime += cost;
+    if (dateStr === todayStr) totalToday += cost;
+    if (!Number.isNaN(ts) && ts >= sevenDaysAgoMs) totalLast7Days += cost;
+    if (dateStr) {
+      byDayMap.set(dateStr, (byDayMap.get(dateStr) || 0) + cost);
+    }
+    byTaskMap.set(task, (byTaskMap.get(task) || 0) + cost);
+
+    if (row.slug) {
+      if (!videoMap.has(row.slug)) {
+        videoMap.set(row.slug, {
+          slug: row.slug,
+          createdAt: timestamp,
+          totalCost: 0,
+          byTask: {},
+          callCount: 0,
+          errorCount: 0,
+          imagesGenerated: 0,
+          _lastTimestamp: timestamp,
+        });
+      }
+      const v = videoMap.get(row.slug);
+      v.totalCost += cost;
+      v.byTask[task] = (v.byTask[task] || 0) + cost;
+      v.callCount += 1;
+      if (row.status === "error") v.errorCount += 1;
+      // Đếm ẢNH THẬT ĐÃ SINH RA (context-image, status success) — khác với đếm số LẦN GỌI, vì
+      // 1 lần gọi thành công luôn ra đúng 1 ảnh ở tính năng này (xem generate-context-image.mjs),
+      // nhưng dùng image_count thay vì cộng cứng 1 để không sai nếu sau này 1 lần gọi ra >1 ảnh.
+      if (task === "context-image" && row.status === "success") {
+        v.imagesGenerated += typeof row.image_count === "number" ? row.image_count : 1;
+      }
+      if (timestamp && (!v.createdAt || timestamp < v.createdAt)) v.createdAt = timestamp;
+      if (timestamp && (!v._lastTimestamp || timestamp > v._lastTimestamp)) v._lastTimestamp = timestamp;
+    }
+  }
+
+  const byDay = [...byDayMap.entries()]
+    .map(([date, cost]) => ({ date, cost }))
+    .sort((a, b) => a.date.localeCompare(b.date));
+
+  const byTask = Object.fromEntries(byTaskMap);
+
+  // mới nhất lên đầu — dựa theo lần gọi API gần nhất ghi nhận cho video đó.
+  const videos = [...videoMap.values()]
+    .sort((a, b) => String(b._lastTimestamp).localeCompare(String(a._lastTimestamp)))
+    .map(({ _lastTimestamp, ...v }) => v);
+
+  res.json({
+    generatedAt: new Date(now).toISOString(),
+    totalAllTime,
+    totalToday,
+    totalLast7Days,
+    byDay,
+    byTask,
+    videos,
+  });
 });
+
+// ------------------------------------------------------------------
+// Đăng Facebook luân phiên — đăng MỖI VIDEO lên ĐÚNG 1 page (không nhân bản lên cả 4), page
+// được chọn NGẪU NHIÊN trong số các page đã "nghỉ" đủ 30-60 phút kể từ lần đăng gần nhất của
+// CHÍNH page đó (xem pickEligiblePage() trong scripts/lib/social-queue.mjs). Mỗi tick chỉ đăng
+// TỐI ĐA 1 video (job cũ nhất trong hàng đợi) để không dồn dập khi có nhiều page cùng rảnh.
+//
+// Tắt bằng FB_AUTO_POST=0 hoặc để trống .env (getConfiguredPages() trả mảng rỗng thì tick
+// không làm gì). KHÔNG throw ra ngoài setInterval — 1 lần đăng lỗi không được phép làm crash
+// server hay chặn các video khác trong hàng đợi ở tick sau.
+// ------------------------------------------------------------------
+const FB_POST_MIN_GAP_MINUTES = Number(process.env.FB_POST_MIN_GAP_MINUTES) || 30;
+const FB_POST_MAX_GAP_MINUTES = Number(process.env.FB_POST_MAX_GAP_MINUTES) || 60;
+const SOCIAL_TICK_MS = 60_000;
+const SHUTDOWN_GRACE_MS = 60_000;
+const fbLog = makeLogger("facebook");
+
+// Khoá trong-process: 1 lần đăng có thể lâu hơn SOCIAL_TICK_MS, tick sau không được chạy chồng
+// (cả 2 cùng thấy job còn "pending" -> đăng trùng).
+let socialTickInFlight = false;
+let currentTick = null;
+let shuttingDown = false;
+
+// Ảnh bìa Reel — lỗi chỉ log cảnh báo, không fail job. Kết quả (thời điểm frame) lưu vào posts[].
+async function applyReelThumbnail(job, page, videoId) {
+  const tlog = makeLogger("thumbnail");
+  const r = await setReelThumbnail({
+    videoId,
+    page,
+    videoPath: job.videoPath,
+    poseTimelinePath: path.join(CONTENT_ARCHIVE_DIR, `${job.slug}.pose-timeline.json`),
+  });
+  if (r.ok) {
+    tlog.info(`Đã đặt ảnh bìa "${job.slug}" tại ${r.timeSec}s (${r.source}${r.pose ? `, pose ${r.pose}` : ""}).`);
+  } else {
+    tlog.warn(`Không đặt được ảnh bìa "${job.slug}": ${r.error}`);
+  }
+  return r;
+}
+
+// Kiểm tra các job đang "verifying" (Reel đã tồn tại trên Facebook, video_id thật, nhưng chưa
+// thấy publishing_phase xong) — mỗi tick gọi lại đúng 1 GET nhẹ/job, KHÔNG đăng lại từ đầu.
+// Chốt "posted" khi complete, "failed" khi Facebook báo lỗi HOẶC quá verifyTimeoutMs().
+async function checkVerifyingJobsTick(pages) {
+  const { queue } = loadQueue();
+  for (const job of verifyingJobs(queue)) {
+    if (shuttingDown) return;
+    const page = pages.find((p) => p.id === job.verifyPageId);
+    if (!page) {
+      fbLog.warn(`Job "${job.slug}" đang verifying nhưng page "${job.verifyPageName || job.verifyPageId}" không còn trong .env — bỏ qua tick này.`);
+      continue;
+    }
+    try {
+      const result = await checkReelStatus(job.fbVideoId, page);
+      if (result.state === "complete") {
+        const thumbnail = await applyReelThumbnail(job, page, job.fbVideoId);
+        finalizeVerifiedPost(job.id, job.fbVideoId, { thumbnail });
+        fbLog.info(`Reel "${job.slug}" (video_id=${job.fbVideoId}) publish xong trên "${page.name}".`);
+      } else if (result.state === "error") {
+        failJobTerminal(job.id, result.reason);
+        fbLog.error(`Reel "${job.slug}" (video_id=${job.fbVideoId}) bị Facebook từ chối: ${result.reason}`);
+      } else {
+        const startedMs = Date.parse(job.verifyStartedAt);
+        if (!Number.isNaN(startedMs) && Date.now() - startedMs > verifyTimeoutMs()) {
+          failJobTerminal(job.id, `Hết ~${verifyTimeoutMs() / 60_000} phút xác minh mà Facebook chưa báo xong (video_id=${job.fbVideoId}) — kiểm tra thủ công trên Page.`);
+          fbLog.error(`Reel "${job.slug}" hết hạn xác minh (video_id=${job.fbVideoId}, page "${page.name}").`);
+        }
+      }
+    } catch (e) {
+      if (e.permanent) {
+        // Token lỗi khi CHỈ ĐANG KIỂM TRA: tắt page cho job MỚI, job đang verifying GIỮ NGUYÊN.
+        disablePage(page, e.message);
+        fbLog.error(`Page "${page.name}" lỗi token vĩnh viễn khi kiểm tra Reel "${job.slug}" — đã tắt page (không huỷ job). (${e.message})`);
+      } else {
+        fbLog.warn(`Không kiểm tra được trạng thái Reel "${job.slug}" (video_id=${job.fbVideoId})${e.rateLimited ? " [rate limit]" : ""}: ${e.message} — thử lại tick sau.`);
+      }
+    }
+  }
+}
+
+// Thử đăng job "pending" tiếp theo (nếu có page nào rảnh) — xem publishVideo() trong
+// facebook-post.mjs cho ý nghĩa outcome "complete"/"verifying"/"error".
+async function tryPostNextPendingJobTick(pages) {
+  if (shuttingDown) return;
+  const { queue, pageHistory, disabledPages } = loadQueue();
+  const job = nextPendingJob(queue);
+  if (!job) return;
+
+  const page = pickEligiblePage(pages, pageHistory, FB_POST_MIN_GAP_MINUTES, FB_POST_MAX_GAP_MINUTES, disabledPages);
+  if (!page) return;
+
+  if (!fs.existsSync(job.videoPath)) {
+    failJobTerminal(job.id, `File không còn tồn tại: ${job.videoPath}`);
+    fbLog.error(`Job "${job.slug}" failed (không retry): file không còn tồn tại: ${job.videoPath}`);
+    return;
+  }
+
+  try {
+    // onSubmitted: ngay khi finish đã tới Facebook (đã có video_id) -> lưu "verifying". Nếu server
+    // tắt/crash sau điểm này, job không bị đăng lại. Trước điểm này job còn "pending" (chưa có gì
+    // được publish) nên thử lại là an toàn.
+    // Caption dựng MỖI LẦN đăng: tag chủ đề đổi ngẫu nhiên trong cùng nhóm để các page không trùng
+    // caption. Job không có plan hashtag (job cũ) đăng đúng `caption` như trước.
+    const caption = job.hashtags?.length
+      ? buildCaption(job.caption, finalizeHashtags(job.hashtags, loadHashtagConfig()))
+      : job.caption;
+    const result = await publishVideo(page, job.videoPath, caption, {
+      onSubmitted: (videoId) => recordVerifying(job.id, page, videoId, { postType: "reel", caption }),
+    });
+
+    if (result.outcome === "verifying") {
+      recordVerifying(job.id, page, result.id, { postType: result.postType, caption });
+      fbLog.info(`"${job.slug}" đã tạo Reel (video_id=${result.id}) trên "${page.name}" — Facebook còn xử lý, tự kiểm tra tiếp ở các tick sau (tối đa ~${verifyTimeoutMs() / 60_000} phút).`);
+    } else if (result.outcome === "error") {
+      // Reel ĐÃ TỒN TẠI nhưng bị từ chối ngay — KHÔNG retry (sẽ tạo Reel MỚI trùng).
+      failJobTerminal(job.id, result.reason);
+      fbLog.error(`Reel "${job.slug}" (video_id=${result.id}) bị Facebook từ chối ngay sau khi tạo: ${result.reason}`);
+    } else {
+      const thumbnail = result.postType === "reel" ? await applyReelThumbnail(job, page, result.id) : null;
+      recordPost(job.id, page, result.id, { postType: result.postType, fallbackReason: result.fallbackReason, thumbnail, caption });
+      const fallbackNote = result.fallbackReason ? ` (fallback từ reel: ${result.fallbackReason})` : "";
+      fbLog.info(`Đã đăng "${job.slug}" lên page "${page.name}" dạng ${result.postType}${fallbackNote} (post id ${result.id}).`);
+    }
+  } catch (e) {
+    // Chỉ throw từ ĐÂY (start/upload/finish rõ ràng lỗi, hoặc postVideoToPage) mới vào nhánh retry
+    // — nghĩa là CHƯA có Reel nào được tạo, thử lại an toàn.
+    const kind = classifyError(e);
+    if (kind === "permanent") {
+      // Lỗi VỀ PAGE (token) — tắt page, job giữ "pending" để tick sau thử page khác.
+      disablePage(page, e.message);
+      fbLog.error(`Page "${page.name}" lỗi token vĩnh viễn — đã TẮT page này (sửa FB_PAGE_*_ACCESS_TOKEN trong .env rồi restart để bật lại). Job "${job.slug}" giữ nguyên hàng đợi, sẽ thử page khác. (${e.message})`);
+    } else if (kind === "rate_limit") {
+      recordFailure(job.id, e);
+      fbLog.warn(`Facebook giới hạn tốc độ (rate limit) khi đăng "${job.slug}" lên "${page.name}" — hoãn job ${rateLimitBackoffMinutes()} phút, không tính vào số lần thử. (${e.message})`);
+    } else {
+      recordFailure(job.id, e);
+      fbLog.error(`Đăng "${job.slug}" lên "${page.name}" thất bại: ${e.message}`);
+    }
+  }
+}
+
+async function processSocialQueueTick() {
+  if (!isAutoPostEnabled() || shuttingDown) return;
+  if (socialTickInFlight) return; // tick trước chưa xong — bỏ qua, không đăng chồng
+  const pages = getConfiguredPages();
+  if (!pages.length) return;
+
+  socialTickInFlight = true;
+  try {
+    await checkVerifyingJobsTick(pages);
+    await tryPostNextPendingJobTick(pages);
+  } finally {
+    socialTickInFlight = false;
+  }
+}
+
+// ------------------------------------------------------------------
+// Trạng thái vận hành Facebook cho UI (modal "Danh sách video đã dựng"): page bị tắt vì lỗi
+// token, lỗi cấu hình, ffmpeg. KHÔNG trả token/secret.
+// ------------------------------------------------------------------
+let ffmpegStatus = { ok: null, detail: "chưa kiểm tra" };
+app.get("/api/social-status", (_req, res) => {
+  const { pages, problems } = inspectPages();
+  const { disabledPages } = loadQueue();
+  res.json({
+    autoPost: isAutoPostEnabled(),
+    configuredPages: pages.map((p) => ({ id: p.id, name: p.name })),
+    configProblems: problems,
+    disabledPages: listDisabledPages(pages, disabledPages).map((d) => ({
+      ...d,
+      howToEnable: "Tạo lại Page Access Token đúng, sửa FB_PAGE_n_ACCESS_TOKEN trong .env rồi restart server (xem docs/facebook-auto-post.md).",
+    })),
+    ffmpeg: { ok: ffmpegStatus.ok, detail: redactSecrets(ffmpegStatus.detail || "") },
+  });
+});
+
+// ------------------------------------------------------------------
+// Khởi động + tắt an toàn
+// ------------------------------------------------------------------
+function validateFbConfigAtStartup() {
+  const { pages, problems } = inspectPages();
+  for (const p of problems) fbLog.warn(p);
+  const enabled = isAutoPostEnabled();
+  if (enabled && !pages.length) {
+    fbLog.warn("FB_AUTO_POST đang bật nhưng KHÔNG có page hợp lệ nào (cần FB_PAGE_n_ID + FB_PAGE_n_ACCESS_TOKEN) — sẽ không đăng gì.");
+  } else if (enabled) {
+    fbLog.info(`Tự động đăng bật: ${pages.length} page (${pages.map((p) => p.name).join(", ")}), Graph API ${graphVersion()}.`);
+  }
+  if (enabled && pages.length) {
+    const ff = checkFfmpeg();
+    ffmpegStatus = ff;
+    if (!ff.ok) makeLogger("thumbnail").warn(`ffmpeg không chạy được (${ff.detail}) — ảnh bìa Reel sẽ không đặt được; đăng bài vẫn bình thường.`);
+  }
+}
+
+const tickTimer = setInterval(() => {
+  currentTick = processSocialQueueTick()
+    .catch((e) => fbLog.error(`Lỗi không mong đợi ở tick: ${e.message}`))
+    .finally(() => {
+      currentTick = null;
+    });
+}, SOCIAL_TICK_MS);
+
+const httpServer = app.listen(PORT, () => {
+  console.log(`Auto Compare Video UI  ->  http://localhost:${PORT}`);
+  validateFbConfigAtStartup();
+});
+
+async function shutdown(signal) {
+  if (shuttingDown) return;
+  shuttingDown = true;
+  fbLog.info(`Nhận ${signal} — dừng nhận tick mới${currentTick ? `, đợi lần đăng đang chạy tối đa ${SHUTDOWN_GRACE_MS / 1000}s` : ""}.`);
+  clearInterval(tickTimer);
+  httpServer.close();
+  if (currentTick) {
+    const timedOut = await Promise.race([
+      currentTick.then(() => false),
+      new Promise((resolve) => setTimeout(() => resolve(true), SHUTDOWN_GRACE_MS)),
+    ]);
+    // Hết giờ: job chưa có video_id vẫn "pending" (chưa coi là đã đăng); job đã finish thì đã
+    // được lưu "verifying" qua onSubmitted — queue nhất quán, restart sẽ tiếp tục đúng.
+    if (timedOut) fbLog.warn("Hết thời gian chờ — thoát; job đang upload dở giữ nguyên trạng thái trong queue.");
+  }
+  process.exit(0);
+}
+process.on("SIGINT", () => shutdown("SIGINT"));
+process.on("SIGTERM", () => shutdown("SIGTERM"));
