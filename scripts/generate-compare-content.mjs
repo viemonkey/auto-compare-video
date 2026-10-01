@@ -15,6 +15,7 @@
 // Options:
 //   --out <path>          Đường dẫn file JSON output (mặc định ./compare-content.json)
 //   --topic-hint <text>   Gợi ý ngữ cảnh thêm cho Gemini (tuỳ chọn, vd "đồ trang sức")
+//   --locale <code>       Thị trường mục tiêu (mã file trong config/locales/, vd ja-JP); bỏ trống = DEFAULT_LOCALE
 //   --slug <slug>         Gắn slug (thật hoặc TẠM/placeholder) vào dòng cost-ledger.jsonl ghi
 //                         cho lần gọi Gemini này — xem scripts/lib/cost-ledger.mjs
 //                         renameCostLedgerSlug() nếu cần đổi lại slug tạm thành slug thật sau đó.
@@ -88,7 +89,7 @@ if (!GEMINI_API_KEY) {
 // ============================================================
 function parseArgs(argv) {
   const positional = [];
-  const opts = { out: null, topicHint: null, contentAngleId: null, customAngleText: null, slug: null };
+  const opts = { out: null, topicHint: null, contentAngleId: null, customAngleText: null, slug: null, locale: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--out") {
@@ -97,6 +98,8 @@ function parseArgs(argv) {
       opts.topicHint = argv[++i];
     } else if (a === "--slug") {
       opts.slug = argv[++i];
+    } else if (a === "--locale") {
+      opts.locale = argv[++i];
     } else if (a === "--content-angle-id") {
       opts.contentAngleId = argv[++i];
     } else if (a === "--custom-angle-text") {
@@ -111,7 +114,7 @@ function parseArgs(argv) {
   if (positional.length !== 2) {
     console.error(
       "Usage: node scripts/generate-compare-content.mjs <left-image> <right-image> [--out <path>] " +
-        "[--topic-hint <text>] [--content-angle-id <id>] [--custom-angle-text <text>] [--slug <slug>]",
+        "[--topic-hint <text>] [--content-angle-id <id>] [--custom-angle-text <text>] [--slug <slug>] [--locale <code>]",
     );
     process.exit(1);
   }
@@ -429,6 +432,7 @@ async function main() {
     contentAngleId: opts.contentAngleId,
     customAngleText: opts.customAngleText,
     slug: opts.slug,
+    locale: opts.locale,
   });
 
   if (corrections.length) {

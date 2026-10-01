@@ -80,7 +80,7 @@ function fail(msg) {
 // ============================================================
 function parseArgs(argv) {
   const positional = [];
-  const opts = { slug: null, contentPath: null, topicHint: null, skipCheck: false, ttsProvider: null, vieneuVoice: null };
+  const opts = { slug: null, contentPath: null, topicHint: null, skipCheck: false, ttsProvider: null, vieneuVoice: null, edgeVoice: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--slug") opts.slug = argv[++i];
@@ -89,13 +89,14 @@ function parseArgs(argv) {
     else if (a === "--skip-check") opts.skipCheck = true;
     else if (a === "--tts-provider") opts.ttsProvider = argv[++i];
     else if (a === "--vieneu-voice") opts.vieneuVoice = argv[++i];
+    else if (a === "--edge-voice") opts.edgeVoice = argv[++i];
     else if (!a.startsWith("--")) positional.push(a);
     else fail(`Cờ không nhận diện được: ${a}`);
   }
   if (positional.length !== 2) {
     fail(
       "Usage: node scripts/scaffold-compare-video.mjs <left-image> <right-image> " +
-        "[--slug <name>] [--content <path>] [--topic-hint <text>] [--skip-check] [--tts-provider <name>] [--vieneu-voice <voice_or_path>]",
+        "[--slug <name>] [--content <path>] [--topic-hint <text>] [--skip-check] [--tts-provider <name>] [--vieneu-voice <voice_or_path>] [--edge-voice <voice>]",
     );
   }
   opts.left = positional[0];
@@ -815,6 +816,7 @@ async function main() {
   const localEnvLines = [];
   if (opts.ttsProvider) localEnvLines.push(`TTS_PROVIDER=${opts.ttsProvider}`);
   if (opts.vieneuVoice) localEnvLines.push(`VIENEU_VOICE=${opts.vieneuVoice}`);
+  if (opts.edgeVoice) localEnvLines.push(`EDGE_VOICE=${opts.edgeVoice}`);
   if (localEnvLines.length) {
     fs.writeFileSync(path.join(target, ".env"), localEnvLines.join("\n") + "\n");
   }

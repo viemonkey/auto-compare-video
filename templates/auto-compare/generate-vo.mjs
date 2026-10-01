@@ -12,7 +12,7 @@
 // boundary), plus assets/vo/durations.json and assets/vo/words.json.
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
 
@@ -71,7 +71,17 @@ const VBEE_ACCESS_TOKEN = ENV.VBEE_ACCESS_TOKEN;
 const VOICE_CODE = ENV.VBEE_VOICE_CODE || "n_hanoi_male_protrainer_education_vc";
 
 // --- Edge TTS config (only required when TTS_PROVIDER=edge) ---
-const EDGE_VOICE = ENV.EDGE_VOICE || "vi-VN-NamMinhNeural";
+// Giọng mặc định theo thị trường lấy từ config/tts-engines/edge.json (không hard-code tên giọng ở đây).
+// Thị trường của video = VIDEO_LOCALE (.env cục bộ của video), không có thì DEFAULT_LOCALE (process.env / .env gốc).
+async function edgeDefaultVoice() {
+  const { defaultLocaleCode } = await import(pathToFileURL(path.join(REPO_ROOT, "scripts", "lib", "locales.mjs")).href);
+  const localeCode = ENV.VIDEO_LOCALE || defaultLocaleCode();
+  const cfg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "config", "tts-engines", "edge.json"), "utf8"));
+  const voice = cfg.defaultVoices?.[localeCode];
+  if (!voice) throw new Error(`Chưa có giọng Edge TTS mặc định cho "${localeCode}" — đặt EDGE_VOICE trong .env hoặc thêm vào config/tts-engines/edge.json.`);
+  return voice;
+}
+const EDGE_VOICE = ENV.EDGE_VOICE || (await edgeDefaultVoice());
 
 // --- VieNeu TTS config (only required when TTS_PROVIDER=vieneu) ---
 const VIENEU_VOICE = ENV.VIENEU_VOICE || "Adam";

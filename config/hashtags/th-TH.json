@@ -1,0 +1,300 @@
+{
+  "_readme": "Bộ từ vựng hashtag có kiểm soát cho caption Reel của thị trường này (cùng cấu trúc config/hashtags/vi-VN.json). Gemini CHỈ được chọn tag trong `topic`; tag vật liệu lấy từ `materials` (khoá = tên theo ngôn ngữ đích); `blocked` luôn bị loại. Mỗi tag/vật liệu có `vi` = nghĩa tiếng Việt (hiện ở tooltip). Nhóm: อัญมณี / โลหะ / เครื่องประดับ / ความรู้.",
+  "topic": [
+    {
+      "tag": "#อัญมณี",
+      "group": "อัญมณี",
+      "vi": "đá quý"
+    },
+    {
+      "tag": "#พลอย",
+      "group": "อัญมณี",
+      "vi": "đá quý (nói chung)"
+    },
+    {
+      "tag": "#ความรู้เรื่องอัญมณี",
+      "group": "อัญมณี",
+      "vi": "kiến thức đá quý"
+    },
+    {
+      "tag": "#แยกพลอยแท้",
+      "group": "อัญมณี",
+      "vi": "phân biệt đá thật"
+    },
+    {
+      "tag": "#โลหะมีค่า",
+      "group": "โลหะ",
+      "vi": "kim loại quý"
+    },
+    {
+      "tag": "#วัสดุเครื่องประดับ",
+      "group": "โลหะ",
+      "vi": "chất liệu trang sức"
+    },
+    {
+      "tag": "#ทองคำ",
+      "group": "โลหะ",
+      "vi": "vàng"
+    },
+    {
+      "tag": "#เครื่องประดับ",
+      "group": "เครื่องประดับ",
+      "vi": "trang sức"
+    },
+    {
+      "tag": "#แหวน",
+      "group": "เครื่องประดับ",
+      "vi": "nhẫn"
+    },
+    {
+      "tag": "#จิวเวลรี่",
+      "group": "เครื่องประดับ",
+      "vi": "trang sức (jewelry)"
+    },
+    {
+      "tag": "#เครื่องประดับแฟชั่น",
+      "group": "เครื่องประดับ",
+      "vi": "trang sức thời trang"
+    },
+    {
+      "tag": "#ความรู้",
+      "group": "ความรู้",
+      "vi": "kiến thức"
+    },
+    {
+      "tag": "#รู้ไหมว่า",
+      "group": "ความรู้",
+      "vi": "bạn có biết"
+    },
+    {
+      "tag": "#เทคนิคเลือกเครื่องประดับ",
+      "group": "ความรู้",
+      "vi": "mẹo chọn trang sức"
+    }
+  ],
+  "materials": {
+    "เพชร": {
+      "tags": [
+        "#เพชร",
+        "#diamond"
+      ],
+      "group": "อัญมณี",
+      "vi": "kim cương"
+    },
+    "เพชรธรรมชาติ": {
+      "tags": [
+        "#เพชรธรรมชาติ",
+        "#เพชร"
+      ],
+      "group": "อัญมณี",
+      "vi": "kim cương tự nhiên"
+    },
+    "มอยส์ซาไนต์": {
+      "tags": [
+        "#มอยส์ซาไนต์",
+        "#moissanite"
+      ],
+      "group": "อัญมณี",
+      "vi": "moissanite"
+    },
+    "อเมทิสต์": {
+      "tags": [
+        "#อเมทิสต์",
+        "#amethyst"
+      ],
+      "group": "อัญมณี",
+      "vi": "thạch anh tím"
+    },
+    "ซิทริน": {
+      "tags": [
+        "#ซิทริน",
+        "#citrine"
+      ],
+      "group": "อัญมณี",
+      "vi": "thạch anh vàng"
+    },
+    "ทับทิม": {
+      "tags": [
+        "#ทับทิม",
+        "#ruby"
+      ],
+      "group": "อัญมณี",
+      "vi": "ruby"
+    },
+    "แซฟไฟร์": {
+      "tags": [
+        "#แซฟไฟร์",
+        "#sapphire"
+      ],
+      "group": "อัญมณี",
+      "vi": "sapphire"
+    },
+    "มรกต": {
+      "tags": [
+        "#มรกต",
+        "#emerald"
+      ],
+      "group": "อัญมณี",
+      "vi": "ngọc lục bảo"
+    },
+    "โทแพซ": {
+      "tags": [
+        "#โทแพซ",
+        "#topaz"
+      ],
+      "group": "อัญมณี",
+      "vi": "topaz"
+    },
+    "เพอริดอต": {
+      "tags": [
+        "#เพอริดอต",
+        "#peridot"
+      ],
+      "group": "อัญมณี",
+      "vi": "peridot"
+    },
+    "โกเมน": {
+      "tags": [
+        "#โกเมน",
+        "#garnet"
+      ],
+      "group": "อัญมณี",
+      "vi": "garnet"
+    },
+    "สปิเนล": {
+      "tags": [
+        "#สปิเนล",
+        "#spinel"
+      ],
+      "group": "อัญมณี",
+      "vi": "spinel"
+    },
+    "ทัวร์มาลีน": {
+      "tags": [
+        "#ทัวร์มาลีน",
+        "#tourmaline"
+      ],
+      "group": "อัญมณี",
+      "vi": "tourmaline"
+    },
+    "แทนซาไนต์": {
+      "tags": [
+        "#แทนซาไนต์",
+        "#tanzanite"
+      ],
+      "group": "อัญมณี",
+      "vi": "tanzanite"
+    },
+    "อความารีน": {
+      "tags": [
+        "#อความารีน",
+        "#aquamarine"
+      ],
+      "group": "อัญมณี",
+      "vi": "aquamarine"
+    },
+    "ไข่มุก": {
+      "tags": [
+        "#ไข่มุก",
+        "#pearl"
+      ],
+      "group": "อัญมณี",
+      "vi": "ngọc trai"
+    },
+    "ทองคำ": {
+      "tags": [
+        "#ทองคำ",
+        "#gold"
+      ],
+      "group": "โลหะ",
+      "vi": "vàng"
+    },
+    "ทองคำขาว": {
+      "tags": [
+        "#ทองคำขาว",
+        "#whitegold"
+      ],
+      "group": "โลหะ",
+      "vi": "vàng trắng"
+    },
+    "แพลทินัม": {
+      "tags": [
+        "#แพลทินัม",
+        "#platinum"
+      ],
+      "group": "โลหะ",
+      "vi": "bạch kim"
+    },
+    "เงินสเตอร์ลิง 925": {
+      "tags": [
+        "#เงินสเตอร์ลิง",
+        "#เงิน925"
+      ],
+      "group": "โลหะ",
+      "vi": "bạc 925"
+    },
+    "ไทเทเนียม": {
+      "tags": [
+        "#ไทเทเนียม",
+        "#titanium"
+      ],
+      "group": "โลหะ",
+      "vi": "titanium"
+    },
+    "แหวนแต่งงาน": {
+      "tags": [
+        "#แหวนแต่งงาน",
+        "#แหวนคู่"
+      ],
+      "group": "เครื่องประดับ",
+      "vi": "nhẫn cưới"
+    },
+    "แหวนหมั้น": {
+      "tags": [
+        "#แหวนหมั้น"
+      ],
+      "group": "เครื่องประดับ",
+      "vi": "nhẫn đính hôn"
+    },
+    "สร้อยคอ": {
+      "tags": [
+        "#สร้อยคอ"
+      ],
+      "group": "เครื่องประดับ",
+      "vi": "dây chuyền"
+    },
+    "กำไล": {
+      "tags": [
+        "#กำไล"
+      ],
+      "group": "เครื่องประดับ",
+      "vi": "vòng tay"
+    },
+    "ต่างหู": {
+      "tags": [
+        "#ต่างหู"
+      ],
+      "group": "เครื่องประดับ",
+      "vi": "khuyên tai"
+    }
+  },
+  "blocked": [
+    "#fyp",
+    "#foryou",
+    "#viral",
+    "#ฟีด",
+    "#เข้าฟีด",
+    "#ไวรัล",
+    "#ติดเทรนด์",
+    "#เทรนด์",
+    "#ติดตาม",
+    "#แจกฟรี",
+    "#รวย",
+    "#เสริมดวง",
+    "#tiffany",
+    "#cartier",
+    "#pandora",
+    "#shopee",
+    "#lazada"
+  ]
+}

@@ -15,6 +15,11 @@ function section(sections, name) {
   return sections[name];
 }
 
+// "18 ký tự" / "3 từ" — mảnh chữ theo đơn vị đo của locale (fragment.unit.<unit> trong template).
+function lengthText(sections, unit, n) {
+  return renderTemplate(section(sections, `fragment.unit.${unit}`), { n });
+}
+
 // ============================================================
 // Prompt construction — inject danh sách action id + use_case động từ actions.json,
 // không hardcode, để tự đồng bộ khi actions.json đổi.
@@ -38,6 +43,8 @@ export function buildSystemPrompt(catalog, hashtagCfg, locale = getDefaultLocale
   return renderTemplate(section(sections, "system"), {
     ...locale.prompt,
     limits: locale.limits,
+    tagLength: lengthText(sections, locale.limits.unit, locale.limits.tag),
+    subLength: lengthText(sections, locale.limits.unit, locale.limits.sub),
     styleGuide: locale.styleGuide.trim(),
     glossary: glossaryLines,
     forbidden: locale.forbiddenPhrases.map((p) => `"${p}"`).join(", "),
@@ -55,8 +62,16 @@ export function buildUserPrompt(topicHint, angleInstruction, templateFile = PROM
 // ============================================================
 // Gemini call
 // ============================================================
+// Giới hạn của locale tính theo `unit` (grapheme/word) -> maxLength (ký tự) cho response schema của Gemini.
+// unit "word": nhân charsPerWord (đã làm trần rộng, vì maxLength chỉ để chặn model lặp vô hạn; kiểm tra chính xác theo
+// từ làm sau khi có kết quả). Hashtag (topicTag/suggestedTag) luôn đếm theo grapheme.
+const WORD_UNIT_KEYS = new Set(["title", "label", "point", "tag", "sub", "material"]);
+export function schemaMaxLength(limits, key) {
+  return limits.unit === "word" && WORD_UNIT_KEYS.has(key) ? limits[key] * limits.charsPerWord : limits[key];
+}
+
 export function buildResponseSchema(allIds, hashtagCfg, locale = getDefaultLocale()) {
-  const limits = locale.limits;
+  const limits = Object.fromEntries(Object.keys(locale.limits).map((k) => [k, schemaMaxLength(locale.limits, k)]));
   // Lowercase JSON Schema type strings — the REST generateContent body wants "object"/"string"/
   // "array", NOT the SDK's Type.OBJECT/Type.STRING enum constants (which serialize uppercase).
   // Sending uppercase here is accepted without an HTTP error but silently fails to constrain the

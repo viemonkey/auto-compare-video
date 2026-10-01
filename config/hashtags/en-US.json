@@ -1,0 +1,343 @@
+{
+  "_readme": "Bộ từ vựng hashtag có kiểm soát cho caption Reel của thị trường này (cùng cấu trúc config/hashtags/vi-VN.json). Gemini CHỈ được chọn tag trong `topic`; tag vật liệu lấy từ `materials` (khoá = tên theo ngôn ngữ đích); `blocked` luôn bị loại. Mỗi tag/vật liệu có `vi` = nghĩa tiếng Việt (hiện ở tooltip). Nhóm: gemstones / metals / jewelry / jewelry tips.",
+  "topic": [
+    {
+      "tag": "#gemstones",
+      "group": "gemstones",
+      "vi": "đá quý"
+    },
+    {
+      "tag": "#gemstoneknowledge",
+      "group": "gemstones",
+      "vi": "kiến thức đá quý"
+    },
+    {
+      "tag": "#gemstonefacts",
+      "group": "gemstones",
+      "vi": "sự thật về đá quý"
+    },
+    {
+      "tag": "#naturalgemstones",
+      "group": "gemstones",
+      "vi": "đá quý tự nhiên"
+    },
+    {
+      "tag": "#preciousmetals",
+      "group": "metals",
+      "vi": "kim loại quý"
+    },
+    {
+      "tag": "#jewelrymetals",
+      "group": "metals",
+      "vi": "kim loại làm trang sức"
+    },
+    {
+      "tag": "#metalfacts",
+      "group": "metals",
+      "vi": "sự thật về kim loại"
+    },
+    {
+      "tag": "#jewelry",
+      "group": "jewelry",
+      "vi": "trang sức"
+    },
+    {
+      "tag": "#finejewelry",
+      "group": "jewelry",
+      "vi": "trang sức cao cấp"
+    },
+    {
+      "tag": "#jewelrylover",
+      "group": "jewelry",
+      "vi": "người yêu trang sức"
+    },
+    {
+      "tag": "#ringstyle",
+      "group": "jewelry",
+      "vi": "phong cách nhẫn"
+    },
+    {
+      "tag": "#jewelrytips",
+      "group": "jewelry tips",
+      "vi": "mẹo về trang sức"
+    },
+    {
+      "tag": "#jewelryeducation",
+      "group": "jewelry tips",
+      "vi": "kiến thức trang sức"
+    },
+    {
+      "tag": "#jewelryguide",
+      "group": "jewelry tips",
+      "vi": "hướng dẫn chọn trang sức"
+    },
+    {
+      "tag": "#didyouknow",
+      "group": "jewelry tips",
+      "vi": "bạn có biết"
+    }
+  ],
+  "materials": {
+    "diamond": {
+      "tags": [
+        "#diamond",
+        "#diamonds"
+      ],
+      "group": "gemstones",
+      "vi": "kim cương"
+    },
+    "natural diamond": {
+      "tags": [
+        "#naturaldiamond",
+        "#diamond"
+      ],
+      "group": "gemstones",
+      "vi": "kim cương tự nhiên"
+    },
+    "lab-grown diamond": {
+      "tags": [
+        "#labgrowndiamond",
+        "#labdiamond"
+      ],
+      "group": "gemstones",
+      "vi": "kim cương nhân tạo"
+    },
+    "moissanite": {
+      "tags": [
+        "#moissanite"
+      ],
+      "group": "gemstones",
+      "vi": "moissanite"
+    },
+    "cubic zirconia": {
+      "tags": [
+        "#cubiczirconia",
+        "#cz"
+      ],
+      "group": "gemstones",
+      "vi": "đá CZ"
+    },
+    "amethyst": {
+      "tags": [
+        "#amethyst"
+      ],
+      "group": "gemstones",
+      "vi": "thạch anh tím"
+    },
+    "citrine": {
+      "tags": [
+        "#citrine"
+      ],
+      "group": "gemstones",
+      "vi": "thạch anh vàng"
+    },
+    "quartz": {
+      "tags": [
+        "#quartz"
+      ],
+      "group": "gemstones",
+      "vi": "thạch anh"
+    },
+    "ruby": {
+      "tags": [
+        "#ruby"
+      ],
+      "group": "gemstones",
+      "vi": "ruby"
+    },
+    "sapphire": {
+      "tags": [
+        "#sapphire"
+      ],
+      "group": "gemstones",
+      "vi": "sapphire"
+    },
+    "emerald": {
+      "tags": [
+        "#emerald"
+      ],
+      "group": "gemstones",
+      "vi": "ngọc lục bảo"
+    },
+    "topaz": {
+      "tags": [
+        "#topaz"
+      ],
+      "group": "gemstones",
+      "vi": "topaz"
+    },
+    "peridot": {
+      "tags": [
+        "#peridot"
+      ],
+      "group": "gemstones",
+      "vi": "peridot"
+    },
+    "garnet": {
+      "tags": [
+        "#garnet"
+      ],
+      "group": "gemstones",
+      "vi": "garnet"
+    },
+    "spinel": {
+      "tags": [
+        "#spinel"
+      ],
+      "group": "gemstones",
+      "vi": "spinel"
+    },
+    "tourmaline": {
+      "tags": [
+        "#tourmaline"
+      ],
+      "group": "gemstones",
+      "vi": "tourmaline"
+    },
+    "tanzanite": {
+      "tags": [
+        "#tanzanite"
+      ],
+      "group": "gemstones",
+      "vi": "tanzanite"
+    },
+    "aquamarine": {
+      "tags": [
+        "#aquamarine"
+      ],
+      "group": "gemstones",
+      "vi": "aquamarine"
+    },
+    "pearl": {
+      "tags": [
+        "#pearl",
+        "#pearls"
+      ],
+      "group": "gemstones",
+      "vi": "ngọc trai"
+    },
+    "yellow gold": {
+      "tags": [
+        "#yellowgold",
+        "#gold"
+      ],
+      "group": "metals",
+      "vi": "vàng"
+    },
+    "gold": {
+      "tags": [
+        "#gold"
+      ],
+      "group": "metals",
+      "vi": "vàng"
+    },
+    "white gold": {
+      "tags": [
+        "#whitegold"
+      ],
+      "group": "metals",
+      "vi": "vàng trắng"
+    },
+    "rose gold": {
+      "tags": [
+        "#rosegold"
+      ],
+      "group": "metals",
+      "vi": "vàng hồng"
+    },
+    "platinum": {
+      "tags": [
+        "#platinum"
+      ],
+      "group": "metals",
+      "vi": "bạch kim"
+    },
+    "sterling silver": {
+      "tags": [
+        "#sterlingsilver",
+        "#silver925"
+      ],
+      "group": "metals",
+      "vi": "bạc 925"
+    },
+    "silver": {
+      "tags": [
+        "#silver"
+      ],
+      "group": "metals",
+      "vi": "bạc"
+    },
+    "titanium": {
+      "tags": [
+        "#titanium"
+      ],
+      "group": "metals",
+      "vi": "titanium"
+    },
+    "wedding band": {
+      "tags": [
+        "#weddingband",
+        "#weddingring"
+      ],
+      "group": "jewelry",
+      "vi": "nhẫn cưới"
+    },
+    "engagement ring": {
+      "tags": [
+        "#engagementring"
+      ],
+      "group": "jewelry",
+      "vi": "nhẫn đính hôn"
+    },
+    "necklace": {
+      "tags": [
+        "#necklace"
+      ],
+      "group": "jewelry",
+      "vi": "dây chuyền"
+    },
+    "bracelet": {
+      "tags": [
+        "#bracelet"
+      ],
+      "group": "jewelry",
+      "vi": "vòng tay"
+    },
+    "earrings": {
+      "tags": [
+        "#earrings"
+      ],
+      "group": "jewelry",
+      "vi": "bông tai"
+    }
+  },
+  "blocked": [
+    "#fyp",
+    "#foryou",
+    "#foryoupage",
+    "#viral",
+    "#trending",
+    "#tiktok",
+    "#reels",
+    "#explore",
+    "#follow",
+    "#followme",
+    "#like",
+    "#likeforlike",
+    "#l4l",
+    "#f4f",
+    "#love",
+    "#instagood",
+    "#tiffany",
+    "#tiffanyandco",
+    "#cartier",
+    "#bulgari",
+    "#vancleef",
+    "#harrywinston",
+    "#swarovski",
+    "#pandora",
+    "#amazon",
+    "#shein",
+    "#temu"
+  ]
+}

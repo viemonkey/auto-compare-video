@@ -167,8 +167,9 @@ document.addEventListener("DOMContentLoaded", () => {
   // Initial Setup: Fetch Action Catalog & VieNeu Preset Voices
   // -------------------------------------------------------------
   fetchActionCatalog();
-  fetchVieNeuVoices();
   fetchContentAngles();
+  // Chạy sau khi cả handler DOMContentLoaded khai báo xong các const (initMarket dùng chúng).
+  Promise.resolve().then(initMarket);
 
   async function fetchActionCatalog() {
     try {
@@ -180,23 +181,235 @@ document.addEventListener("DOMContentLoaded", () => {
     }
   }
 
-  async function fetchVieNeuVoices() {
-    if (!vieneuPresetSelect) return;
+  // -------------------------------------------------------------
+  // Target market (locale), TTS engines and video themes — everything below is built from the
+  // server registries (GET /api/locales, /api/tts-engines, /api/themes), nothing is hard-coded here.
+  // -------------------------------------------------------------
+  const LOCALE_STORAGE_KEY = "acv.locale";
+  const localeButtons = document.getElementById("locale-buttons");
+  const localeStyleLine = document.getElementById("locale-style-line");
+  const localeRenderNote = document.getElementById("locale-render-note");
+  const ttsNotice = document.getElementById("tts-notice");
+  const videoThemeSelect = document.getElementById("video-theme");
+  const voiceSelectLabel = document.getElementById("voice-select-label");
+  let localesData = []; // [{code, displayName, flag, styleSummary, renderable, blockers, ...}]
+  let currentLocale = null; // selected locale code
+  let enginesData = []; // engines for the current locale
+  let marketRequestId = 0; // ignore stale responses when the user clicks quickly
+
+  function readStoredLocale() {
     try {
-      const res = await fetch("/api/vieneu-voices");
-      const data = await res.json();
-      const voices = data.voices || [];
-      vieneuPresetSelect.innerHTML = "";
-      voices.forEach((v) => {
-        const opt = document.createElement("option");
-        opt.value = v.id;
-        opt.textContent = v.label;
-        if (v.id === data.defaultVoice) opt.selected = true;
-        vieneuPresetSelect.appendChild(opt);
-      });
-    } catch (err) {
-      console.error("Failed to load VieNeu voices:", err);
+      return localStorage.getItem(LOCALE_STORAGE_KEY);
+    } catch {
+      return null;
     }
+  }
+  function storeLocale(code) {
+    try {
+      localStorage.setItem(LOCALE_STORAGE_KEY, code);
+    } catch {
+      // private mode / blocked storage — selection just isn't remembered
+    }
+  }
+
+  function currentLocaleInfo() {
+    return localesData.find((l) => l.code === currentLocale) || null;
+  }
+
+  function hasStep2Content() {
+    return pointsData.length > 0 || scriptTitle.value.trim() !== "";
+  }
+
+  // Wipe Step 2 (generated content belongs to one market) — called after the user confirms a market change.
+  function resetStep2Content() {
+    pointsData = [];
+    pendingContentSlug = null;
+    scriptTitle.value = "";
+    scriptLabelLeft.value = "";
+    scriptLabelRight.value = "";
+    scriptSlug.value = "";
+    hashtagPlan = [];
+    geminiHashtagMeta = { materials: [], topicTags: [], suggestedTags: [] };
+    renderPointsList();
+    renderHashtagChips();
+  }
+
+  function renderLocaleButtons() {
+    localeButtons.innerHTML = "";
+    localesData.forEach((l) => {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "locale-btn";
+      btn.setAttribute("role", "radio");
+      btn.setAttribute("aria-checked", String(l.code === currentLocale));
+      btn.dataset.code = l.code;
+      btn.title = l.renderable ? l.styleSummary : l.blockers.map((b) => b.message).join(" ");
+      const label = document.createElement("span");
+      label.textContent = `${l.flag} ${l.displayName}`;
+      btn.appendChild(label);
+      if (!l.renderable) {
+        const lock = document.createElement("span");
+        lock.className = "locale-lock";
+        lock.textContent = "🔒 chưa dựng được";
+        btn.appendChild(lock);
+      }
+      btn.addEventListener("click", () => selectLocale(l.code));
+      localeButtons.appendChild(btn);
+    });
+    const info = currentLocaleInfo();
+    localeStyleLine.textContent = info ? `Văn phong: ${info.styleSummary}` : "";
+    if (info && !info.renderable) {
+      localeRenderNote.textContent =
+        "Thị trường này chưa dựng được video — vẫn tạo/sửa/lưu nháp kịch bản bình thường. Lý do: " +
+        info.blockers.map((b) => b.message).join(" ");
+      localeRenderNote.classList.remove("hidden");
+    } else {
+      localeRenderNote.classList.add("hidden");
+    }
+  }
+
+  async function loadLocales() {
+    const theme = videoThemeSelect && videoThemeSelect.value ? `?theme=${encodeURIComponent(videoThemeSelect.value)}` : "";
+    const res = await fetch(`/api/locales${theme}`);
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || "Không tải được danh sách thị trường.");
+    return data;
+  }
+
+  async function initMarket() {
+    if (!localeButtons) return;
+    try {
+      const data = await loadLocales();
+      localesData = data.locales || [];
+      const stored = readStoredLocale();
+      currentLocale = [stored, data.defaultLocale].find((c) => c && localesData.some((l) => l.code === c)) || (localesData[0] && localesData[0].code) || null;
+      renderLocaleButtons();
+      await refreshMarketDependents();
+    } catch (err) {
+      console.error("Failed to load markets:", err);
+      localeStyleLine.textContent = "Không tải được danh sách thị trường — kiểm tra server.";
+    }
+  }
+
+  async function selectLocale(code) {
+    if (code === currentLocale) return;
+    if (hasStep2Content()) {
+      const target = localesData.find((l) => l.code === code);
+      const ok = confirm(
+        `Đổi thị trường sang ${target ? target.displayName : code} sẽ XOÁ nội dung kịch bản ở Bước 2 (nội dung gắn với thị trường hiện tại) — bạn phải tạo lại. Tiếp tục?`,
+      );
+      if (!ok) return;
+      resetStep2Content();
+    }
+    currentLocale = code;
+    storeLocale(code);
+    renderLocaleButtons();
+    await refreshMarketDependents();
+  }
+
+  // Themes and voice engines depend on the market: re-filter both, then refresh renderability for the chosen theme.
+  async function refreshMarketDependents() {
+    const requestId = ++marketRequestId;
+    await Promise.all([loadThemes(requestId), loadEngines(requestId)]);
+  }
+
+  async function loadThemes(requestId) {
+    if (!videoThemeSelect || !currentLocale) return;
+    try {
+      const res = await fetch(`/api/themes?locale=${encodeURIComponent(currentLocale)}`);
+      const data = await res.json();
+      if (requestId !== marketRequestId) return;
+      if (!res.ok) throw new Error(data.error || "Không tải được giao diện.");
+      const previous = videoThemeSelect.value;
+      videoThemeSelect.innerHTML = "";
+      (data.themes || []).forEach((t) => {
+        const opt = document.createElement("option");
+        opt.value = t.id;
+        opt.disabled = !t.supported;
+        opt.textContent = t.supported ? t.label : `${t.label} — ${t.reason}`;
+        videoThemeSelect.appendChild(opt);
+      });
+      const usable = (data.themes || []).filter((t) => t.supported);
+      const pick = [previous, data.defaultTheme].find((id) => usable.some((t) => t.id === id)) || (usable[0] && usable[0].id);
+      if (pick) videoThemeSelect.value = pick;
+      else videoThemeSelect.selectedIndex = 0; // mọi theme đều bị khoá: vẫn hiện nhãn + lý do thay vì ô trống
+      const themeNotice = document.getElementById("theme-notice");
+      if (themeNotice) {
+        themeNotice.textContent = usable.length ? "" : "Chưa có giao diện video nào hỗ trợ chữ của thị trường này (thiếu font) — chưa dựng được video.";
+        themeNotice.classList.toggle("hidden", usable.length > 0);
+      }
+      // Renderability is relative to the selected theme (a market is unrenderable if NO usable theme exists).
+      const fresh = await loadLocales();
+      if (requestId !== marketRequestId) return;
+      localesData = fresh.locales || localesData;
+      renderLocaleButtons();
+    } catch (err) {
+      console.error("Failed to load themes:", err);
+    }
+  }
+
+  async function loadEngines(requestId) {
+    if (!ttsProviderSelect || !currentLocale) return;
+    try {
+      const res = await fetch(`/api/tts-engines?locale=${encodeURIComponent(currentLocale)}`);
+      const data = await res.json();
+      if (requestId !== marketRequestId) return;
+      if (!res.ok) throw new Error(data.error || "Không tải được danh sách giọng đọc.");
+      enginesData = data.engines || [];
+      const previous = ttsProviderSelect.value;
+      ttsProviderSelect.innerHTML = "";
+      enginesData.forEach((e) => {
+        (e.modes || []).forEach((m) => {
+          const opt = document.createElement("option");
+          opt.value = `${e.id}:${m.id}`;
+          const usable = e.supported && e.ready;
+          opt.disabled = !usable;
+          opt.textContent = usable
+            ? m.label
+            : `${m.label} — ${e.supported ? `chưa sẵn sàng: ${e.notReadyReason}` : "không hỗ trợ ngôn ngữ này"}`;
+          ttsProviderSelect.appendChild(opt);
+        });
+      });
+      const firstUsable = Array.from(ttsProviderSelect.options).find((o) => !o.disabled);
+      const keep = Array.from(ttsProviderSelect.options).find((o) => o.value === previous && !o.disabled);
+      if (keep) ttsProviderSelect.value = keep.value;
+      else if (firstUsable) ttsProviderSelect.value = firstUsable.value;
+
+      const anySupported = enginesData.some((e) => e.supported);
+      if (!anySupported || !firstUsable) {
+        ttsNotice.textContent = data.message || "Chưa có giọng đọc nào sẵn sàng cho thị trường này.";
+        ttsNotice.classList.remove("hidden");
+      } else {
+        ttsNotice.classList.add("hidden");
+      }
+      ttsProviderSelect.classList.toggle("hidden", !firstUsable);
+      applyTtsSelection();
+    } catch (err) {
+      console.error("Failed to load TTS engines:", err);
+    }
+  }
+
+  function selectedEngine() {
+    const [engineId, modeId] = (ttsProviderSelect ? ttsProviderSelect.value : "").split(":");
+    return { engine: enginesData.find((e) => e.id === engineId) || null, modeId };
+  }
+
+  // Show the voice list (or the clone uploader) of the selected engine/mode.
+  function applyTtsSelection() {
+    const { engine, modeId } = selectedEngine();
+    const isClone = modeId === "clone";
+    const voices = engine && !isClone ? engine.voices || [] : [];
+    vieneuPresetContainer.classList.toggle("hidden", voices.length === 0);
+    vieneuCloneContainer.classList.toggle("hidden", !isClone);
+    vieneuPresetSelect.innerHTML = "";
+    voices.forEach((v) => {
+      const opt = document.createElement("option");
+      opt.value = v.id;
+      opt.textContent = v.label;
+      if (v.id === engine.defaultVoice) opt.selected = true;
+      vieneuPresetSelect.appendChild(opt);
+    });
+    if (voiceSelectLabel) voiceSelectLabel.textContent = engine ? `🗣️ Chọn giọng ${engine.label}:` : "🗣️ Chọn giọng:";
   }
 
   async function fetchContentAngles() {
@@ -240,17 +453,18 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Handle TTS Provider Change
   if (ttsProviderSelect) {
-    ttsProviderSelect.addEventListener("change", () => {
-      const val = ttsProviderSelect.value;
-      if (val === "vieneu_preset") {
-        vieneuPresetContainer.classList.remove("hidden");
-        vieneuCloneContainer.classList.add("hidden");
-      } else if (val === "vieneu_clone") {
-        vieneuPresetContainer.classList.add("hidden");
-        vieneuCloneContainer.classList.remove("hidden");
-      } else {
-        vieneuPresetContainer.classList.add("hidden");
-        vieneuCloneContainer.classList.add("hidden");
+    ttsProviderSelect.addEventListener("change", applyTtsSelection);
+  }
+
+  // Theme change -> renderability of every market is relative to the selected theme
+  if (videoThemeSelect) {
+    videoThemeSelect.addEventListener("change", async () => {
+      try {
+        const fresh = await loadLocales();
+        localesData = fresh.locales || localesData;
+        renderLocaleButtons();
+      } catch (err) {
+        console.error("Failed to refresh markets:", err);
       }
     });
   }
@@ -383,6 +597,7 @@ document.addEventListener("DOMContentLoaded", () => {
           topicHint: topicHintInput.value.trim(),
           contentAngleId,
           customAngleText,
+          locale: currentLocale,
         }),
       });
 
@@ -658,21 +873,26 @@ document.addEventListener("DOMContentLoaded", () => {
     buildSuccessCard.classList.add("hidden");
 
     try {
-      const rawProvider = ttsProviderSelect ? ttsProviderSelect.value : "vieneu_preset";
-      let ttsProvider = "vieneu";
+      const { engine, modeId } = selectedEngine();
+      if (!engine) {
+        alert("Chưa có giọng đọc nào sẵn sàng cho thị trường này — không thể dựng video.");
+        return;
+      }
+      const ttsProvider = engine.id;
       let vieneuVoice = null;
       let vieneuRefPath = null;
+      let ttsVoice = null;
 
-      if (rawProvider === "vieneu_preset") {
-        ttsProvider = "vieneu";
-        vieneuVoice = vieneuPresetSelect ? vieneuPresetSelect.value : "Adam";
-      } else if (rawProvider === "vieneu_clone") {
-        ttsProvider = "vieneu";
+      if (modeId === "clone") {
         if (!uploadedRefAudioPath) {
           alert("Bạn chọn nhái giọng nhưng chưa tải lên file audio 3-5 giây!");
           return;
         }
         vieneuRefPath = uploadedRefAudioPath;
+      } else if (engine.voices && engine.voices.length) {
+        const voice = vieneuPresetSelect ? vieneuPresetSelect.value : engine.defaultVoice;
+        if (engine.id === "vieneu") vieneuVoice = voice;
+        else ttsVoice = voice;
       }
 
       const response = await fetch("/api/create-video", {
@@ -688,8 +908,10 @@ document.addEventListener("DOMContentLoaded", () => {
           topicHint: topicHintInput.value.trim(),
           theme: document.getElementById("video-theme") ? document.getElementById("video-theme").value : "paper",
           ttsProvider,
+          ttsVoice,
           vieneuVoice,
           vieneuRefPath,
+          locale: currentLocale,
         }),
       });
 

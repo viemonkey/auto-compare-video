@@ -1,8 +1,8 @@
 // Hệ thống thị trường (locale): mỗi thị trường = 1 file config/locales/<code>.json — thêm/bớt/sửa
 // thị trường CHỈ bằng file JSON, không sửa code. File lỗi bị log rõ + tắt locale đó, KHÔNG crash.
 //
-// Thị trường mặc định = DEFAULT_LOCALE (process.env, rồi .env, rồi .env.example — cùng quy ước
-// templates/auto-compare/generate-vo.mjs). Không đặt -> FALLBACK_LOCALE.
+// Thị trường mặc định = DEFAULT_LOCALE: process.env, rồi .env, rồi FALLBACK_LOCALE. (.env.example chỉ là tài liệu,
+// KHÔNG phải nguồn cấu hình runtime nên không bao giờ được đọc ở đây.)
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -19,8 +19,10 @@ export const FALLBACK_LOCALE = "vi-VN";
 
 export const LIMIT_UNITS = ["grapheme", "word"];
 // Các giới hạn độ dài bắt buộc (số nguyên dương) + readingRate (số dương, đơn vị/giây).
+// `unit` áp dụng cho title/label/point/tag/sub/material; topicTag/suggestedTag/hashtagTotal (hashtag) LUÔN đếm theo grapheme.
+// unit "word" cần thêm `charsPerWord` để đổi sang maxLength (ký tự) trong response schema của Gemini.
 export const LIMIT_KEYS = ["title", "label", "point", "tag", "sub", "topicTag", "suggestedTag", "material", "hashtagTotal"];
-const PROMPT_STRING_KEYS = ["language", "languageDetailed", "materialExamples", "topicGroupsHint", "suggestedTagStyle"];
+const PROMPT_STRING_KEYS = ["language", "languageDetailed", "titleLength", "pointLength", "materialExamples", "topicGroupsHint", "suggestedTagStyle"];
 
 const isObj = (v) => v !== null && typeof v === "object" && !Array.isArray(v);
 const isStr = (v) => typeof v === "string";
@@ -48,6 +50,7 @@ export function validateLocale(raw, { repoRoot = REPO_ROOT } = {}) {
   need(isNonEmptyStr(raw.flag), '"flag" phải là chuỗi không rỗng');
   need(typeof raw.enabled === "boolean", '"enabled" phải là boolean');
   need(isStr(raw.slugSuffix) && /^[a-z0-9]+(-[a-z0-9]+)*$|^$/.test(raw.slugSuffix), '"slugSuffix" phải là chuỗi a-z0-9 (có thể rỗng)');
+  need(isNonEmptyStr(raw.styleSummary), '"styleSummary" phải là chuỗi không rỗng (mô tả văn phong 1 dòng hiện ở UI)');
   need(isStr(raw.styleGuide), '"styleGuide" phải là chuỗi (có thể rỗng với thị trường mặc định)');
 
   need(isObj(raw.glossary) && Object.values(raw.glossary).every(isNonEmptyStr) && Object.keys(raw.glossary).every((k) => k.trim()),
@@ -59,6 +62,7 @@ export function validateLocale(raw, { repoRoot = REPO_ROOT } = {}) {
   } else {
     need(LIMIT_UNITS.includes(lim.unit), `"limits.unit" phải là ${LIMIT_UNITS.map((u) => `"${u}"`).join(" | ")}`);
     for (const k of LIMIT_KEYS) need(isPosInt(lim[k]), `"limits.${k}" phải là số nguyên dương`);
+    if (lim.unit === "word") need(isPosInt(lim.charsPerWord), '"limits.charsPerWord" phải là số nguyên dương khi unit = "word"');
     need(typeof lim.readingRate === "number" && Number.isFinite(lim.readingRate) && lim.readingRate > 0, '"limits.readingRate" phải là số dương');
   }
 
@@ -71,8 +75,6 @@ export function validateLocale(raw, { repoRoot = REPO_ROOT } = {}) {
     problems.push('"prompt" phải là object');
   } else {
     for (const k of PROMPT_STRING_KEYS) need(isNonEmptyStr(p[k]), `"prompt.${k}" phải là chuỗi không rỗng`);
-    need(isPosInt(p.titleWords), '"prompt.titleWords" phải là số nguyên dương');
-    need(isPosInt(p.pointWords), '"prompt.pointWords" phải là số nguyên dương');
     need(isObj(p.example) && ["text", "tag", "sub"].every((k) => isNonEmptyStr(p.example[k])), '"prompt.example" phải có text/tag/sub không rỗng');
   }
 
@@ -142,11 +144,13 @@ function dirStamp(dir) {
     return "";
   }
 }
+const STAMP_CHECK_MS = 1000; // đừng quét thư mục ở MỖI lần gọi (hàm này nằm trong đường nóng chuẩn hoá hashtag)
 function getRegistry() {
+  const now = Date.now();
+  if (registry && now - registry.checkedAt < STAMP_CHECK_MS) return registry;
   const stamp = dirStamp(LOCALES_DIR);
-  if (!registry || registry.stamp !== stamp) {
-    registry = { stamp, ...loadLocales() };
-  }
+  if (!registry || registry.stamp !== stamp) registry = { stamp, ...loadLocales() };
+  registry.checkedAt = now;
   return registry;
 }
 
@@ -166,30 +170,46 @@ export function localeErrors() {
   return getRegistry().errors;
 }
 
-function readEnvKey(key, env = process.env) {
-  if (env[key] && String(env[key]).trim()) return String(env[key]).trim();
-  for (const f of [".env", ".env.example"]) {
-    try {
-      const m = new RegExp(`^${key}=(.*)$`, "m").exec(fs.readFileSync(path.join(REPO_ROOT, f), "utf8"));
-      if (m && m[1].trim()) return m[1].trim();
-    } catch {
-      // thử file kế tiếp
+const dotenvCache = new Map();
+/** Đọc 1 file .env thành object (cache theo mtime — hàm này được gọi cho mỗi lần chuẩn hoá hashtag). */
+function readDotEnv(file) {
+  try {
+    const mtime = fs.statSync(file).mtimeMs;
+    const hit = dotenvCache.get(file);
+    if (hit && hit.mtime === mtime) return hit.values;
+    const values = {};
+    for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+      const m = line.trim().match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+      if (m) values[m[1]] = m[2].trim();
     }
+    dotenvCache.set(file, { mtime, values });
+    return values;
+  } catch {
+    return {};
   }
-  return "";
+}
+
+/** process.env trước, rồi .env; KHÔNG đọc .env.example. */
+function readEnvKey(key, env, envFile) {
+  if (env[key] && String(env[key]).trim()) return String(env[key]).trim();
+  return readDotEnv(envFile)[key] || "";
 }
 
 /** Code thị trường mặc định: DEFAULT_LOCALE hợp lệ & đang bật, không thì FALLBACK_LOCALE. */
-export function defaultLocaleCode(env = process.env) {
-  const wanted = readEnvKey("DEFAULT_LOCALE", env);
+export function defaultLocaleCode(env = process.env, { envFile = path.join(REPO_ROOT, ".env") } = {}) {
+  const wanted = readEnvKey("DEFAULT_LOCALE", env, envFile);
   if (wanted && getLocale(wanted)) return wanted;
-  if (wanted) log.warn(`DEFAULT_LOCALE="${wanted}" không phải locale hợp lệ/đang bật — dùng "${FALLBACK_LOCALE}".`);
+  if (wanted && !warnedBadDefault.has(wanted)) {
+    warnedBadDefault.add(wanted);
+    log.warn(`DEFAULT_LOCALE="${wanted}" không phải locale hợp lệ/đang bật — dùng "${FALLBACK_LOCALE}".`);
+  }
   return FALLBACK_LOCALE;
 }
+const warnedBadDefault = new Set();
 
 /** Locale mặc định. Thiếu cả locale dự phòng -> throw (không có thị trường nào chạy được). */
-export function getDefaultLocale(env = process.env) {
-  const code = defaultLocaleCode(env);
+export function getDefaultLocale(env = process.env, opts) {
+  const code = defaultLocaleCode(env, opts);
   const l = getLocale(code);
   if (!l) {
     const detail = getRegistry().errors.map((e) => `${e.file}: ${e.problems.join("; ")}`).join(" | ");

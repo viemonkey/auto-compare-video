@@ -1,0 +1,33 @@
+{
+  "id": "vieneu",
+  "label": "VieNeu-TTS (local)",
+  "enabled": true,
+  "order": 10,
+  "languages": [
+    "vi"
+  ],
+  "modes": [
+    {
+      "id": "preset",
+      "label": "🔥 VieNeu-TTS (Giọng Mẫu Local: Minh Quân, Adam, Trúc Ly, Ngọc Linh...)"
+    },
+    {
+      "id": "clone",
+      "label": "✨ VieNeu-TTS (Voice Cloning - Nhái giọng từ File Mẫu 3-5 giây)"
+    }
+  ],
+  "voicesFile": "VieNeu-TTS/src/vieneu/assets/voices_v3_turbo.json",
+  "defaultVoices": {
+    "vi-VN": "Minh Quân"
+  },
+  "voiceFallback": {
+    "id": "Adam",
+    "label": "Adam (Mặc định)"
+  },
+  "requires": {
+    "paths": [
+      "VieNeu-TTS/.venv"
+    ],
+    "hint": "Chạy `npm run setup:vieneu` ở gốc repo."
+  }
+}

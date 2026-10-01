@@ -69,6 +69,14 @@
           <p>Tải lên 2 hình ảnh minh họa cho 2 khái niệm/vật thể bạn muốn so sánh (ví dụ: Kim Cương vs Than Đá, Dev vs DevOps, Nhẫn Vàng vs Nhẫn Kim Cương).</p>
         </div>
 
+        <!-- Target market (locale) — buttons built from GET /api/locales -->
+        <div class="form-group" id="locale-picker-group" style="margin-bottom: 16px;">
+          <label id="locale-label">🌏 Thị trường mục tiêu:</label>
+          <div id="locale-buttons" class="locale-buttons" role="radiogroup" aria-labelledby="locale-label"></div>
+          <div id="locale-style-line" class="locale-style-line"></div>
+          <div id="locale-render-note" class="locale-render-note hidden"></div>
+        </div>
+
         <div class="dropzone-grid">
           <!-- Left Image Dropzone -->
           <div class="dropzone-box" id="dropzone-left">
@@ -125,25 +133,25 @@
         <div class="form-group" style="margin-bottom: 16px;">
           <label for="video-theme">🎨 Giao diện & Phong cách Video (TikTok Match):</label>
           <select id="video-theme" class="input-text" style="font-weight: 700; background-color: var(--panel);">
-            <option value="paper" selected>📝 TikTok Giấy Kẻ Ô (viesnap.vn match - Nền giấy tập, Sub Vàng Viền Đen, Host HuyK)</option>
-            <option value="dark">🌌 Cyber Dark (Nền Tím-Hồng-Cyan)</option>
+            <!-- Loaded dynamically from /api/themes?locale= -->
           </select>
+          <div id="theme-notice" class="locale-render-note hidden"></div>
         </div>
 
         <!-- TTS Voice Engine Selector -->
         <div class="form-group" style="margin-bottom: 16px;">
-          <label for="tts-provider">🎙️ Giọng Đọc Voiceover (VieNeu-TTS Local Engine):</label>
+          <label for="tts-provider">🎙️ Giọng Đọc Voiceover:</label>
           <select id="tts-provider" class="input-text" style="font-weight: 700; background-color: var(--panel);">
-            <option value="vieneu_preset" selected>🔥 VieNeu-TTS (Giọng Mẫu Local: Minh Quân, Adam, Trúc Ly, Ngọc Linh...)</option>
-            <option value="vieneu_clone">✨ VieNeu-TTS (Voice Cloning - Nhái giọng từ File Mẫu 3-5 giây)</option>
+            <!-- Loaded dynamically from /api/tts-engines?locale= -->
           </select>
+          <div id="tts-notice" class="locale-render-note hidden"></div>
         </div>
 
         <!-- VieNeu Preset Voice Selection -->
         <div id="vieneu-preset-container" class="form-group" style="margin-bottom: 16px;">
-          <label for="vieneu-preset-select">🗣️ Chọn Giọng Mẫu VieNeu-TTS:</label>
+          <label for="vieneu-preset-select" id="voice-select-label">🗣️ Chọn giọng:</label>
           <select id="vieneu-preset-select" class="input-text" style="font-weight: 600; background-color: var(--panel);">
-            <!-- Loaded dynamically from /api/vieneu-voices -->
+            <!-- Loaded dynamically from /api/tts-engines?locale= (voices of the selected engine) -->
           </select>
         </div>
 

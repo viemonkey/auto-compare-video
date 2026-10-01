@@ -1,0 +1,11 @@
+{
+  "id": "paper",
+  "name": "Giấy Kẻ Ô",
+  "label": "📝 TikTok Giấy Kẻ Ô (viesnap.vn match - Nền giấy tập, Sub Vàng Viền Đen, Host HuyK)",
+  "enabled": true,
+  "order": 10,
+  "default": true,
+  "scripts": [
+    "Latn"
+  ]
+}

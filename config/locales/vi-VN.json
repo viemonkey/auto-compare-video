@@ -6,6 +6,7 @@
   "flag": "🇻🇳",
   "enabled": true,
   "slugSuffix": "",
+  "styleSummary": "Gần gũi, tò mò kiểu viral, câu ngắn, giáo dục nhẹ",
   "styleGuide": "",
   "glossary": {},
   "limits": {
@@ -31,8 +32,8 @@
   "prompt": {
     "language": "tiếng Việt",
     "languageDetailed": "tiếng Việt có dấu",
-    "titleWords": 15,
-    "pointWords": 20,
+    "titleLength": "~15 từ",
+    "pointLength": "~20 từ",
     "example": {
       "text": "Kim cương cứng nhất hành tinh, đạt 10/10 trên thang Mohs.",
       "tag": "Rất cứng",

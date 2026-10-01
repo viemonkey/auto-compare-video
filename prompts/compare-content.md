@@ -9,7 +9,7 @@ Cú pháp:
   Nếu thẻ mở/đóng nằm riêng 1 dòng thì cả dòng thẻ bị bỏ (không để dòng trống thừa).
 - `@@@ <tên>` mở 1 phần (system, user, hoặc fragment.<tên> = mảnh chữ nhỏ do code ghép).
 
-Biến dùng chung: language, languageDetailed, titleWords, pointWords, example.{text,tag,sub},
+Biến dùng chung: language, languageDetailed, titleLength, pointLength, tagLength, subLength, example.{text,tag,sub},
 materialExamples, topicGroupsHint, suggestedTagStyle, limits.*, styleGuide, glossary, forbidden,
 topicTags, actionLines, maxContextImages. Hướng dẫn viết (meta) luôn bằng tiếng Việt; NGÔN NGỮ KẾT QUẢ
 do locale quyết định ({{language}}).
@@ -25,7 +25,7 @@ markdown/code fence nào. Chỉ JSON thuần.
 JSON trả về LUÔN LUÔN có đủ 8 field sau — không được bỏ bớt field nào, kể cả khi rỗng:
 {
   "error": "",
-  "title": "1 câu hỏi mở đầu ngắn (tối đa ~{{titleWords}} từ), giọng tò mò/viral, {{languageDetailed}}",
+  "title": "1 câu hỏi mở đầu ngắn (tối đa {{titleLength}}), giọng tò mò/viral, {{languageDetailed}}",
   "label_left": "tên gọi ngắn gọn (1-4 từ) của vật thể/khái niệm trong ảnh TRÁI",
   "label_right": "tên gọi ngắn gọn (1-4 từ) của vật thể/khái niệm trong ảnh PHẢI",
   "materials": ["tên chuẩn đối tượng TRÁI", "tên chuẩn đối tượng PHẢI"],
@@ -33,10 +33,10 @@ JSON trả về LUÔN LUÔN có đủ 8 field sau — không được bỏ bớt
   "suggestedTags": [],
   "points": [
     {
-      "text": "1 câu so sánh ngắn (tối đa ~{{pointWords}} từ), {{languageDetailed}} — đây là LỜI THOẠI đọc lên",
+      "text": "1 câu so sánh ngắn (tối đa {{pointLength}}), {{languageDetailed}} — đây là LỜI THOẠI đọc lên",
       "side": "left | right | both",
-      "tag": "nhãn NGẮN hiện trên màn hình, 1-3 từ, tối đa {{limits.tag}} ký tự",
-      "sub": "dòng phụ dưới nhãn, tối đa {{limits.sub}} ký tự, để chuỗi rỗng "" nếu không cần",
+      "tag": "nhãn NGẮN hiện trên màn hình, 1-3 từ, tối đa {{tagLength}}",
+      "sub": "dòng phụ dưới nhãn, tối đa {{subLength}}, để chuỗi rỗng "" nếu không cần",
       "suggested_action": "<id>",
       "needs_context_image": false,
       "image_concept": ""
@@ -58,7 +58,10 @@ JSON trả về LUÔN LUÔN có đủ 8 field sau — không được bỏ bớt
   đặc điểm nổi bật, ví dụ thực tế, điểm khác biệt cốt lõi...), giọng nhanh/giáo dục nhẹ,
   không nghiêm túc quá, phù hợp video 30-40 giây.
 {{#styleGuide}}
-- VĂN PHONG BẢN XỨ — viết trực tiếp bằng {{language}} như người bản xứ viết, KHÔNG viết tiếng Việt rồi dịch:
+- VĂN PHONG BẢN XỨ — viết trực tiếp bằng {{language}} như người bản xứ viết, KHÔNG viết tiếng Việt rồi dịch. Mọi nội dung hiển thị
+  (kể cả khi gợi ý ngữ cảnh/góc độ nội dung do người dùng viết bằng tiếng Việt) PHẢI được viết bằng {{language}}. Văn phong dưới đây
+  của thị trường được ƯU TIÊN hơn "giọng nhanh/giáo dục nhẹ, không nghiêm túc quá" ở trên khi hai bên mâu thuẫn
+  (vd mức lịch sự, độ khẳng định):
 {{styleGuide}}
 {{/styleGuide}}
 {{#glossary}}
@@ -121,6 +124,12 @@ JSON trả về LUÔN LUÔN có đủ 8 field sau — không được bỏ bớt
 Gợi ý ngữ cảnh thêm từ người dùng: {{contextHint}}{{/contextHint}}{{#angle}}
 
 Góc độ nội dung yêu cầu cho video này: {{angle}}{{/angle}}
+
+@@@ fragment.unit.grapheme
+{{n}} ký tự
+
+@@@ fragment.unit.word
+{{n}} từ
 
 @@@ fragment.actionLine
 - "{{id}}"{{#jewelryOnly}} [CHỈ DÙNG CHO CHỦ ĐỀ TRANG SỨC/ĐÁ QUÝ/KIM CƯƠNG]{{/jewelryOnly}}: {{useCase}}

@@ -1,0 +1,22 @@
+{
+  "id": "vbee",
+  "label": "Vbee TTS (cần tài khoản)",
+  "enabled": true,
+  "order": 30,
+  "languages": [
+    "vi"
+  ],
+  "modes": [
+    {
+      "id": "preset",
+      "label": "☁️ Vbee TTS (giọng đặt bằng VBEE_VOICE_CODE trong .env)"
+    }
+  ],
+  "requires": {
+    "env": [
+      "VBEE_APP_ID",
+      "VBEE_ACCESS_TOKEN"
+    ],
+    "hint": "Điền VBEE_APP_ID / VBEE_ACCESS_TOKEN trong .env."
+  }
+}

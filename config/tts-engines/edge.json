@@ -1,0 +1,74 @@
+{
+  "id": "edge",
+  "label": "Edge TTS (miễn phí)",
+  "enabled": true,
+  "order": 20,
+  "languages": [
+    "vi",
+    "ja",
+    "en",
+    "th"
+  ],
+  "modes": [
+    {
+      "id": "preset",
+      "label": "🆓 Edge TTS (miễn phí, không cần tài khoản)"
+    }
+  ],
+  "defaultVoices": {
+    "vi-VN": "vi-VN-NamMinhNeural",
+    "ja-JP": "ja-JP-NanamiNeural",
+    "en-US": "en-US-AndrewNeural",
+    "th-TH": "th-TH-PremwadeeNeural"
+  },
+  "voices": {
+    "vi-VN": [
+      {
+        "id": "vi-VN-NamMinhNeural",
+        "label": "Nam Minh (nam)"
+      },
+      {
+        "id": "vi-VN-HoaiMyNeural",
+        "label": "Hoài My (nữ)"
+      }
+    ],
+    "ja-JP": [
+      {
+        "id": "ja-JP-NanamiNeural",
+        "label": "Nanami (nữ)"
+      },
+      {
+        "id": "ja-JP-KeitaNeural",
+        "label": "Keita (nam)"
+      }
+    ],
+    "en-US": [
+      {
+        "id": "en-US-AndrewNeural",
+        "label": "Andrew (nam)"
+      },
+      {
+        "id": "en-US-AvaNeural",
+        "label": "Ava (nữ)"
+      },
+      {
+        "id": "en-US-BrianNeural",
+        "label": "Brian (nam)"
+      },
+      {
+        "id": "en-US-EmmaNeural",
+        "label": "Emma (nữ)"
+      }
+    ],
+    "th-TH": [
+      {
+        "id": "th-TH-PremwadeeNeural",
+        "label": "Premwadee (nữ)"
+      },
+      {
+        "id": "th-TH-NiwatNeural",
+        "label": "Niwat (nam)"
+      }
+    ]
+  }
+}

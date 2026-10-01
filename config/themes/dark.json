@@ -1,0 +1,10 @@
+{
+  "id": "dark",
+  "name": "Cyber Dark",
+  "label": "🌌 Cyber Dark (Nền Tím-Hồng-Cyan)",
+  "enabled": true,
+  "order": 20,
+  "scripts": [
+    "Latn"
+  ]
+}

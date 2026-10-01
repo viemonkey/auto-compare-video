@@ -67,6 +67,19 @@ import {
   recordHashtagSuggestions,
 } from "./scripts/lib/hashtags.mjs";
 import { checkFfmpeg, extractPoseTimeline, setReelThumbnail } from "./scripts/lib/reel-thumbnail.mjs";
+import { getLocale, listLocales, localeErrors, getDefaultLocale } from "./scripts/lib/locales.mjs";
+import {
+  listEngines,
+  listThemes,
+  getEngine,
+  getDefaultTheme,
+  enginesForLanguage,
+  themeSupportsScript,
+  engineReadiness,
+  defaultVoiceFor,
+  checkRenderability,
+  capabilityErrors,
+} from "./scripts/lib/capabilities.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -191,23 +204,107 @@ app.post("/api/upload-ref-audio", (req, res) => {
   });
 });
 
+// Danh sách giọng của 1 engine cho 1 thị trường — nguồn: file giọng của engine (vd VieNeu) hoặc `voices` khai báo trong
+// config/tts-engines/<id>.json; giọng mặc định / giọng dự phòng cũng khai báo ở đó (không hard-code trong code).
+function resolveEngineVoices(engine, localeCode) {
+  const fallback = engine.voiceFallback ? [{ id: engine.voiceFallback.id, label: engine.voiceFallback.label }] : [];
+  const fallbackId = engine.voiceFallback?.id ?? null;
+  if (engine.voicesFile) {
+    const file = path.join(__dirname, engine.voicesFile);
+    if (!fs.existsSync(file)) return { voices: fallback, defaultVoice: fallbackId };
+    try {
+      const data = JSON.parse(fs.readFileSync(file, "utf8"));
+      const presets = data.presets || {};
+      const voices = Object.keys(presets).map((name) => {
+        const info = presets[name];
+        const desc = info.description ? ` (${info.description})` : "";
+        return { id: name, label: `${name}${desc}` };
+      });
+      return { voices, defaultVoice: data.default_voice || defaultVoiceFor(engine, localeCode) || fallbackId };
+    } catch {
+      return { voices: fallback, defaultVoice: fallbackId };
+    }
+  }
+  const voices = engine.voices?.[localeCode] || [];
+  return { voices, defaultVoice: defaultVoiceFor(engine, localeCode) || voices[0]?.id || fallbackId };
+}
+
+// Tương thích client cũ: giọng VieNeu cho thị trường mặc định.
 app.get("/api/vieneu-voices", (_req, res) => {
-  const voicesFile = path.join(__dirname, "VieNeu-TTS", "src", "vieneu", "assets", "voices_v3_turbo.json");
-  if (!fs.existsSync(voicesFile)) {
-    return res.json({ voices: [{ id: "Adam", label: "Adam (Mặc định)" }], defaultVoice: "Adam" });
-  }
-  try {
-    const data = JSON.parse(fs.readFileSync(voicesFile, "utf8"));
-    const presets = data.presets || {};
-    const voices = Object.keys(presets).map((name) => {
-      const info = presets[name];
-      const desc = info.description ? ` (${info.description})` : "";
-      return { id: name, label: `${name}${desc}` };
-    });
-    res.json({ voices, defaultVoice: data.default_voice || "Minh Quân" });
-  } catch (e) {
-    res.json({ voices: [{ id: "Adam", label: "Adam (Mặc định)" }], defaultVoice: "Adam" });
-  }
+  const engine = getEngine("vieneu");
+  if (!engine) return res.json({ voices: [], defaultVoice: null });
+  res.json(resolveEngineVoices(engine, getDefaultLocale().code));
+});
+
+// Mô tả 1 locale cho UI + khả năng render (tính từ khai báo engine/theme, không có cờ cứng).
+function describeLocale(l, themeId) {
+  const r = checkRenderability(l, { themeId });
+  return {
+    code: l.code,
+    language: l.language,
+    script: l.script,
+    displayName: l.displayName,
+    flag: l.flag,
+    slugSuffix: l.slugSuffix,
+    styleSummary: l.styleSummary,
+    renderable: r.renderable,
+    blockers: r.blockers,
+    engines: r.engines,
+    themeId: r.themeId,
+  };
+}
+
+app.get("/api/locales", (req, res) => {
+  const themeId = String(req.query.theme || "").trim() || undefined;
+  res.json({
+    defaultLocale: getDefaultLocale().code,
+    // thị trường mặc định đứng đầu, còn lại theo mã
+    locales: listLocales()
+      .sort((a, b) => (a.code === getDefaultLocale().code ? -1 : b.code === getDefaultLocale().code ? 1 : 0))
+      .map((l) => describeLocale(l, themeId)),
+  });
+});
+
+// Engine TTS cho 1 thị trường: supported = engine khai báo ngôn ngữ của locale; ready = đủ cấu hình để chạy.
+app.get("/api/tts-engines", (req, res) => {
+  const locale = getLocale(String(req.query.locale || getDefaultLocale().code));
+  if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
+  const supportedIds = new Set(enginesForLanguage(locale.language).map((e) => e.id));
+  const engines = listEngines().map((e) => {
+    const { ready, reason } = engineReadiness(e);
+    const { voices, defaultVoice } = resolveEngineVoices(e, locale.code);
+    return {
+      id: e.id,
+      label: e.label,
+      languages: e.languages,
+      supported: supportedIds.has(e.id),
+      ready,
+      notReadyReason: reason,
+      modes: e.modes,
+      voices,
+      defaultVoice,
+    };
+  });
+  res.json({
+    locale: locale.code,
+    engines,
+    message: supportedIds.size ? "" : `Chưa có giọng đọc (TTS) nào hỗ trợ ${locale.displayName} (${locale.language}).`,
+  });
+});
+
+// Giao diện video: supported = theme khai báo hệ chữ (script) của locale.
+app.get("/api/themes", (req, res) => {
+  const locale = getLocale(String(req.query.locale || getDefaultLocale().code));
+  if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
+  const themes = listThemes().map((t) => ({
+    id: t.id,
+    name: t.name,
+    label: t.label,
+    scripts: t.scripts,
+    supported: themeSupportsScript(t, locale.script),
+    reason: themeSupportsScript(t, locale.script) ? "" : `chưa hỗ trợ chữ ${locale.script} (thiếu font)`,
+  }));
+  res.json({ locale: locale.code, defaultTheme: getDefaultTheme()?.id ?? null, themes });
 });
 
 app.get("/api/content-angles", (_req, res) => {
@@ -281,6 +378,13 @@ app.post("/api/generate-content", async (req, res) => {
   ];
   const hint = String(req.body?.topicHint || "").trim();
   if (hint) args.push("--topic-hint", hint);
+
+  // Thị trường mục tiêu (Bước 1). Không gửi -> thị trường mặc định; gửi mã không tồn tại/bị tắt -> 400.
+  const localeCode = String(req.body?.locale || "").trim();
+  if (localeCode) {
+    if (!getLocale(localeCode)) return res.status(400).json({ error: `Thị trường "${localeCode}" không tồn tại hoặc đang bị tắt.` });
+    args.push("--locale", localeCode);
+  }
 
   const contentAngleId = String(req.body?.contentAngleId || "").trim();
   if (contentAngleId) args.push("--content-angle-id", contentAngleId);
@@ -444,7 +548,16 @@ app.post("/api/create-video", async (req, res) => {
     const hint = String(topicHint || "").trim();
     if (hint) args.push("--topic-hint", hint);
 
-    if (ttsProvider) args.push("--tts-provider", ttsProvider);
+    if (ttsProvider) {
+      // engine phải là 1 engine khai báo trong config/tts-engines/ (UI sinh danh sách từ đó)
+      if (!getEngine(ttsProvider)) return fail(`Engine giọng đọc "${ttsProvider}" không tồn tại hoặc đang bị tắt (config/tts-engines/).`);
+      args.push("--tts-provider", ttsProvider);
+    }
+    if (ttsProvider === "edge" && req.body?.ttsVoice) {
+      const v = String(req.body.ttsVoice).trim();
+      if (!/^[A-Za-z0-9-]+$/.test(v)) return fail("Giọng Edge TTS không hợp lệ.");
+      args.push("--edge-voice", v);
+    }
     if (ttsProvider === "vieneu") {
       if (vieneuRefPath) {
         const refAbs = assertInsideUploads(vieneuRefPath, "vieneuRefPath");
@@ -1090,8 +1203,29 @@ const tickTimer = setInterval(() => {
     });
 }, SOCIAL_TICK_MS);
 
+// Nạp + kiểm tra config/locales, config/tts-engines, config/themes ngay lúc khởi động: file lỗi bị log rõ và tắt
+// (xem loadLocales/loadRegistry), server vẫn chạy. Chỉ thiếu cả locale mặc định mới không chạy được -> dừng.
+function validateLocalesAtStartup() {
+  const lg = makeLogger("locales");
+  try {
+    const def = getDefaultLocale();
+    const all = listLocales();
+    lg.info(`Thị trường mặc định: ${def.code}. Đang bật: ${all.map((l) => l.code).join(", ")}.`);
+    for (const l of all) {
+      const r = checkRenderability(l);
+      if (!r.renderable) lg.info(`${l.code}: chưa render được — ${r.blockers.map((b) => b.message).join(" ")}`);
+    }
+  } catch (e) {
+    lg.error(e.message);
+    process.exit(1);
+  }
+  void localeErrors();
+  void capabilityErrors();
+}
+
 const httpServer = app.listen(PORT, () => {
   console.log(`Auto Compare Video UI  ->  http://localhost:${PORT}`);
+  validateLocalesAtStartup();
   validateFbConfigAtStartup();
 });
 

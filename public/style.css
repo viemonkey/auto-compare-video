@@ -1253,3 +1253,21 @@ body {
 .hashtag-add-row { display: flex; gap: 8px; }
 .hashtag-add-row .input-text { flex: 1; }
 .hashtag-note { margin-top: 6px; font-size: 11px; color: var(--fg-dim); }
+
+/* Target market (locale) picker — Step 1 */
+.locale-buttons { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+.locale-btn {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 9px 14px; border-radius: var(--radius-md);
+  border: 1px solid var(--panel-edge); background: var(--panel); color: var(--fg);
+  font: inherit; font-weight: 700; cursor: pointer;
+}
+.locale-btn:hover { background: var(--panel-hover); }
+.locale-btn[aria-checked="true"] { border-color: var(--accent-cyan); box-shadow: var(--shadow-glow-cyan); }
+.locale-btn .locale-lock { font-size: 11px; font-weight: 600; color: var(--accent-yellow); }
+.locale-btn:focus-visible { outline: 2px solid var(--accent-pink); outline-offset: 2px; }
+.locale-style-line { margin-top: 8px; font-size: 12px; color: var(--fg-dim); }
+.locale-render-note {
+  margin-top: 8px; padding: 8px 12px; font-size: 12px; line-height: 1.5;
+  border-radius: var(--radius-sm); border: 1px solid var(--accent-yellow); color: var(--accent-yellow);
+}

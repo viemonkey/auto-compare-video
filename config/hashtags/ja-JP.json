@@ -1,0 +1,300 @@
+{
+  "_readme": "Bộ từ vựng hashtag có kiểm soát cho caption Reel của thị trường này (cùng cấu trúc config/hashtags/vi-VN.json). Gemini CHỈ được chọn tag trong `topic`; tag vật liệu lấy từ `materials` (khoá = tên theo ngôn ngữ đích); `blocked` luôn bị loại. Mỗi tag/vật liệu có `vi` = nghĩa tiếng Việt (hiện ở tooltip). Nhóm: 宝石 / 金属 / ジュエリー / 豆知識.",
+  "topic": [
+    {
+      "tag": "#宝石",
+      "group": "宝石",
+      "vi": "đá quý"
+    },
+    {
+      "tag": "#天然石",
+      "group": "宝石",
+      "vi": "đá thiên nhiên"
+    },
+    {
+      "tag": "#宝石の知識",
+      "group": "宝石",
+      "vi": "kiến thức đá quý"
+    },
+    {
+      "tag": "#宝石の違い",
+      "group": "宝石",
+      "vi": "sự khác nhau giữa các loại đá quý"
+    },
+    {
+      "tag": "#貴金属",
+      "group": "金属",
+      "vi": "kim loại quý"
+    },
+    {
+      "tag": "#金属アレルギー",
+      "group": "金属",
+      "vi": "dị ứng kim loại"
+    },
+    {
+      "tag": "#素材の違い",
+      "group": "金属",
+      "vi": "sự khác nhau về chất liệu"
+    },
+    {
+      "tag": "#ジュエリー",
+      "group": "ジュエリー",
+      "vi": "trang sức"
+    },
+    {
+      "tag": "#アクセサリー",
+      "group": "ジュエリー",
+      "vi": "phụ kiện / trang sức"
+    },
+    {
+      "tag": "#指輪",
+      "group": "ジュエリー",
+      "vi": "nhẫn"
+    },
+    {
+      "tag": "#ジュエリー選び",
+      "group": "ジュエリー",
+      "vi": "chọn trang sức"
+    },
+    {
+      "tag": "#豆知識",
+      "group": "豆知識",
+      "vi": "kiến thức vặt"
+    },
+    {
+      "tag": "#雑学",
+      "group": "豆知識",
+      "vi": "kiến thức tạp học"
+    },
+    {
+      "tag": "#ジュエリーの知識",
+      "group": "豆知識",
+      "vi": "kiến thức về trang sức"
+    }
+  ],
+  "materials": {
+    "ダイヤモンド": {
+      "tags": [
+        "#ダイヤモンド",
+        "#diamond"
+      ],
+      "group": "宝石",
+      "vi": "kim cương"
+    },
+    "天然ダイヤモンド": {
+      "tags": [
+        "#天然ダイヤモンド",
+        "#ダイヤモンド"
+      ],
+      "group": "宝石",
+      "vi": "kim cương tự nhiên"
+    },
+    "モアッサナイト": {
+      "tags": [
+        "#モアッサナイト",
+        "#moissanite"
+      ],
+      "group": "宝石",
+      "vi": "moissanite"
+    },
+    "アメジスト": {
+      "tags": [
+        "#アメジスト",
+        "#amethyst"
+      ],
+      "group": "宝石",
+      "vi": "thạch anh tím"
+    },
+    "シトリン": {
+      "tags": [
+        "#シトリン",
+        "#citrine"
+      ],
+      "group": "宝石",
+      "vi": "thạch anh vàng"
+    },
+    "ルビー": {
+      "tags": [
+        "#ルビー",
+        "#ruby"
+      ],
+      "group": "宝石",
+      "vi": "ruby"
+    },
+    "サファイア": {
+      "tags": [
+        "#サファイア",
+        "#sapphire"
+      ],
+      "group": "宝石",
+      "vi": "sapphire"
+    },
+    "エメラルド": {
+      "tags": [
+        "#エメラルド",
+        "#emerald"
+      ],
+      "group": "宝石",
+      "vi": "ngọc lục bảo"
+    },
+    "トパーズ": {
+      "tags": [
+        "#トパーズ",
+        "#topaz"
+      ],
+      "group": "宝石",
+      "vi": "topaz"
+    },
+    "ペリドット": {
+      "tags": [
+        "#ペリドット",
+        "#peridot"
+      ],
+      "group": "宝石",
+      "vi": "peridot"
+    },
+    "ガーネット": {
+      "tags": [
+        "#ガーネット",
+        "#garnet"
+      ],
+      "group": "宝石",
+      "vi": "garnet"
+    },
+    "スピネル": {
+      "tags": [
+        "#スピネル",
+        "#spinel"
+      ],
+      "group": "宝石",
+      "vi": "spinel"
+    },
+    "トルマリン": {
+      "tags": [
+        "#トルマリン",
+        "#tourmaline"
+      ],
+      "group": "宝石",
+      "vi": "tourmaline"
+    },
+    "タンザナイト": {
+      "tags": [
+        "#タンザナイト",
+        "#tanzanite"
+      ],
+      "group": "宝石",
+      "vi": "tanzanite"
+    },
+    "アクアマリン": {
+      "tags": [
+        "#アクアマリン",
+        "#aquamarine"
+      ],
+      "group": "宝石",
+      "vi": "aquamarine"
+    },
+    "真珠": {
+      "tags": [
+        "#真珠",
+        "#パール"
+      ],
+      "group": "宝石",
+      "vi": "ngọc trai"
+    },
+    "ゴールド": {
+      "tags": [
+        "#ゴールド",
+        "#金"
+      ],
+      "group": "金属",
+      "vi": "vàng"
+    },
+    "ホワイトゴールド": {
+      "tags": [
+        "#ホワイトゴールド"
+      ],
+      "group": "金属",
+      "vi": "vàng trắng"
+    },
+    "プラチナ": {
+      "tags": [
+        "#プラチナ",
+        "#platinum"
+      ],
+      "group": "金属",
+      "vi": "bạch kim"
+    },
+    "シルバー925": {
+      "tags": [
+        "#シルバー925",
+        "#シルバー"
+      ],
+      "group": "金属",
+      "vi": "bạc 925"
+    },
+    "チタン": {
+      "tags": [
+        "#チタン",
+        "#titanium"
+      ],
+      "group": "金属",
+      "vi": "titanium"
+    },
+    "結婚指輪": {
+      "tags": [
+        "#結婚指輪",
+        "#マリッジリング"
+      ],
+      "group": "ジュエリー",
+      "vi": "nhẫn cưới"
+    },
+    "婚約指輪": {
+      "tags": [
+        "#婚約指輪",
+        "#エンゲージリング"
+      ],
+      "group": "ジュエリー",
+      "vi": "nhẫn đính hôn"
+    },
+    "ネックレス": {
+      "tags": [
+        "#ネックレス"
+      ],
+      "group": "ジュエリー",
+      "vi": "dây chuyền"
+    },
+    "ピアス": {
+      "tags": [
+        "#ピアス"
+      ],
+      "group": "ジュエリー",
+      "vi": "khuyên tai"
+    },
+    "ブレスレット": {
+      "tags": [
+        "#ブレスレット"
+      ],
+      "group": "ジュエリー",
+      "vi": "vòng tay"
+    }
+  },
+  "blocked": [
+    "#fyp",
+    "#foryou",
+    "#viral",
+    "#バズれ",
+    "#バズりたい",
+    "#フォロー",
+    "#フォローミー",
+    "#いいね",
+    "#相互フォロー",
+    "#拡散希望",
+    "#ティファニー",
+    "#カルティエ",
+    "#ブルガリ",
+    "#ヴァンクリーフ",
+    "#ミキモト",
+    "#tiffany",
+    "#cartier"
+  ]
+}
