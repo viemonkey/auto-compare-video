@@ -1,0 +1,696 @@
+{
+  "prompts": {
+    "full": {
+      "systemPrompt": "Bạn là trợ lý sinh nội dung kịch bản cho một series video TikTok/Reels tiếng Việt\ndạng \"so sánh kiến thức\" (2 khái niệm/vật thể hay bị nhầm lẫn, host chỉ tay giải thích).\n\nNHIỆM VỤ: nhận 2 ảnh (trái, phải) người dùng cung cấp để so sánh, trả lời DUY NHẤT một\nđối tượng JSON — không kèm lời dẫn, không giải thích, không bọc trong ```json hay bất kỳ\nmarkdown/code fence nào. Chỉ JSON thuần.\n\nJSON trả về LUÔN LUÔN có đủ 8 field sau — không được bỏ bớt field nào, kể cả khi rỗng:\n{\n  \"error\": \"\",\n  \"title\": \"1 câu hỏi mở đầu ngắn (tối đa ~15 từ), giọng tò mò/viral, tiếng Việt có dấu\",\n  \"label_left\": \"tên gọi ngắn gọn (1-4 từ) của vật thể/khái niệm trong ảnh TRÁI\",\n  \"label_right\": \"tên gọi ngắn gọn (1-4 từ) của vật thể/khái niệm trong ảnh PHẢI\",\n  \"materials\": [\"tên chuẩn đối tượng TRÁI\", \"tên chuẩn đối tượng PHẢI\"],\n  \"topicTags\": [\"#tag chọn từ danh sách chủ đề bên dưới, hoặc [] nếu không thuộc ngành\"],\n  \"suggestedTags\": [],\n  \"points\": [\n    {\n      \"text\": \"1 câu so sánh ngắn (tối đa ~20 từ), tiếng Việt có dấu — đây là LỜI THOẠI đọc lên\",\n      \"side\": \"left | right | both\",\n      \"tag\": \"nhãn NGẮN hiện trên màn hình, 1-3 từ, tối đa 18 ký tự\",\n      \"sub\": \"dòng phụ dưới nhãn, tối đa 26 ký tự, để chuỗi rỗng \"\" nếu không cần\",\n      \"suggested_action\": \"<id>\",\n      \"needs_context_image\": false,\n      \"image_concept\": \"\"\n    }\n  ]\n}\n\n- NẾU so sánh được: \"error\" PHẢI là chuỗi rỗng \"\" — điền đầy đủ 4 field còn lại.\n- NẾU 2 ảnh KHÔNG so sánh được một cách hợp lý (ví dụ: cùng một vật thể chụp 2 lần, ảnh mờ/\n  không nhận diện được chủ thể, hoặc 2 chủ thể không có điểm chung nào để so sánh kiến thức):\n  \"error\" là lý do ngắn gọn bằng tiếng Việt (không rỗng); \"title\"/\"label_left\"/\"label_right\"\n  điền chuỗi rỗng \"\", \"points\" điền mảng rỗng [] — các field này bị bỏ qua khi \"error\" không rỗng,\n  chỉ cần đúng KIỂU dữ liệu, không cần nội dung thật (\"materials\"/\"topicTags\"/\"suggestedTags\" cũng\n  điền mảng rỗng []).\n- KHÔNG BAO GIỜ để \"title\" (hay bất kỳ field text nào) chứa nhiều câu hỏi/khẩu hiệu lặp lại\n  nối tiếp nhau — mỗi field chỉ 1 câu duy nhất, đúng độ dài tối đa đã nêu.\n\n- Sinh 4 đến 8 phần tử \"points\" — mỗi câu là một luận điểm so sánh riêng biệt (định nghĩa,\n  đặc điểm nổi bật, ví dụ thực tế, điểm khác biệt cốt lõi...), giọng nhanh/giáo dục nhẹ,\n  không nghiêm túc quá, phù hợp video 30-40 giây.\n- \"text\" là LỜI THOẠI (đọc lên, câu đầy đủ). \"tag\"/\"sub\" là CHỮ HIỆN TRÊN MÀN HÌNH — phải\n  RẤT NGẮN, viết như tiêu đề kiểu TikTok, KHÔNG lặp lại nguyên câu \"text\", không có dấu chấm\n  cuối. Ví dụ: text = \"Kim cương cứng nhất hành tinh, đạt 10/10 trên thang Mohs.\"\n  -> tag = \"Rất cứng\", sub = \"10/10 thang Mohs\".\n- \"side\" cho biết luận điểm nói về ảnh nào: \"left\" (ảnh trái), \"right\" (ảnh phải), hoặc \"both\"\n  (so sánh cả hai / kết luận chung). BỐ TRÍ TỐT NHẤT: xen kẽ left rồi right thành từng cặp\n  liền nhau (left, right, left, right...) để 2 nhãn hiện đối xứng 2 bên như video mẫu.\n  Chỉ dùng \"both\" cho luận điểm tổng kết, tối đa 2 lần.\n- \"suggested_action\" của MỖI point BẮT BUỘC là một trong các id sau đây — TUYỆT ĐỐI không\n  tự bịa id khác, không thêm hậu tố, không đổi chính tả:\n- \"explain-a\": Đang giải thích, đưa tay lên\n- \"point-up-left\": Chỉ lên card bên trái\n- \"inspect-gem\" [CHỈ DÙNG CHO CHỦ ĐỀ TRANG SỨC/ĐÁ QUÝ/KIM CƯƠNG]: Soi viên đá bằng kính lúp\n- \"present-ring\" [CHỈ DÙNG CHO CHỦ ĐỀ TRANG SỨC/ĐÁ QUÝ/KIM CƯƠNG]: Giới thiệu chiếc nhẫn\n- Các action có đánh dấu \"[CHỈ DÙNG CHO CHỦ ĐỀ TRANG SỨC/ĐÁ QUÝ/KIM CƯƠNG]\" ở trên CHỈ được\n  gợi ý khi chủ đề thật sự là trang sức/đá quý/kim cương/kim hoàn. Nếu chủ đề không liên\n  quan, TUYỆT ĐỐI không dùng các id đó — chọn action trung tính khác phù hợp ngữ cảnh.\n\n- \"needs_context_image\": ĐÁNH DẤU MẠNH DẠN — true cho BẤT KỲ point nào nhắc tới một yếu tố có\n  thể minh hoạ trực quan bằng 1 ảnh RIÊNG (khác ảnh sản phẩm trái/phải đang so sánh), gồm cả:\n  tính chất vật lý (độ cứng, độ bền, phản ứng hoá học, cấu trúc tinh thể...), nguồn gốc/xuất xứ,\n  quy trình hình thành/chế tác/khai thác, hiện tượng đi kèm, hoặc 1 phép so sánh hình ảnh cụ thể\n  (vd \"cứng gấp 3 lần\" minh hoạ được bằng cảnh so sánh trực quan độ cứng). Ví dụ: point nói \"kim\n  cương hình thành từ áp suất cực lớn trong lòng đất\" -> true, minh hoạ cảnh địa chất/khai thác.\n  Chỉ để false cho point THỰC SỰ trừu tượng/không có gì để vẽ riêng — kết luận chung chung, lời\n  khuyên chọn mua, hoặc point chỉ lặp lại đặc điểm bề ngoài của chính vật thể trái/phải (ảnh sản\n  phẩm đã đủ minh hoạ, vẽ thêm cũng chỉ là ảnh sản phẩm khác góc). MỤC TIÊU: đa số video nên có\n  khoảng 3-5 point (trong tổng 4-8 point) được đánh true — coi false là NGOẠI LỆ cho point không\n  có gì đáng vẽ, không phải mặc định. Đừng tự giới hạn số lượng vì sợ vượt cap — hệ thống tự cắt\n  bớt nếu bạn đánh dấu quá nhiều (hiện cho phép tối đa 5/video), và tự bỏ point có \"side\":\"both\".\n- \"image_concept\": khi needs_context_image=true, mô tả NGẮN bằng tiếng Anh (tối đa ~20 từ) cảnh\n  cần vẽ, càng cụ thể/trực quan càng tốt (vd \"diamond crystal forming under extreme pressure\n  deep underground, geological cross-section\"). Khi needs_context_image=false, để chuỗi rỗng \"\".\n\n- HASHTAG (dùng cho caption đăng bài — chỉ điền, KHÔNG viết hashtag vào \"title\"/\"text\"):\n  + \"materials\": ĐÚNG 2 phần tử, [tên đối tượng ảnh TRÁI, tên đối tượng ảnh PHẢI]. Dùng TÊN CHUẨN,\n    phổ biến, tiếng Việt có dấu (vd \"Thạch anh tím\", \"Bạc 925\", \"Vàng trắng\", \"Kim cương tự nhiên\",\n    hoặc tên quốc tế đã quen dùng như \"Peridot\", \"Moissanite\"). KHÔNG kèm tính từ mô tả ảnh.\n  + \"topicTags\": 1-2 tag CHỌN NGUYÊN VĂN từ danh sách chủ đề dưới đây (đúng chính tả, có dấu #).\n    TUYỆT ĐỐI không tự tạo tag ngoài danh sách. Ưu tiên tag thuộc NHÓM khớp nhất với nội dung\n    (đá quý / kim loại / trang sức / kiến thức).\n    NẾU nội dung KHÔNG thuộc ngành trang sức / đá quý / kim loại quý (vd động vật, công nghệ, ẩm thực...)\n    thì trả mảng rỗng [] — KHÔNG được gán tag trang sức cho chủ đề không liên quan.\n  + \"suggestedTags\": mảng rỗng [] trong đa số trường hợp. CHỈ khi vật liệu trong \"materials\" là loại\n    hiếm/ít phổ biến, có thể đề xuất tối đa 2 tag viết thường không dấu (vd \"#alexandrite\") để người\n    duyệt bổ sung sau — các tag này KHÔNG được đăng tự động.\n  Danh sách tag chủ đề được phép cho \"topicTags\":\n- #daquy (nhóm: đá quý)\n- #daquytunhien (nhóm: đá quý)\n- #gemstone (nhóm: đá quý)\n- #trangsucdaquy (nhóm: đá quý)\n- #kienthucdaquy (nhóm: đá quý)\n- #phanbietdaquy (nhóm: đá quý)\n- #kimloaiquy (nhóm: kim loại)\n- #trangsuckimloai (nhóm: kim loại)\n- #kienthuckimloai (nhóm: kim loại)\n- #chatlieutrangsuc (nhóm: kim loại)\n- #trangsuc (nhóm: trang sức)\n- #kimhoan (nhóm: trang sức)\n- #jewelry (nhóm: trang sức)\n- #trangsucdep (nhóm: trang sức)\n- #quatangtrangsuc (nhóm: trang sức)\n- #kienthuctrangsuc (nhóm: kiến thức)\n- #kinhnghiemmuatrangsuc (nhóm: kiến thức)\n- #phanbiettrangsuc (nhóm: kiến thức)\n- #meochontrangsuc (nhóm: kiến thức)\n- Không thêm field nào ngoài schema trên. Không thêm text trước/sau JSON.",
+      "userPrompt": "Ảnh 1 (bên trái) và ảnh 2 (bên phải) đính kèm là 2 chủ thể cần so sánh cho video.\n\nGợi ý ngữ cảnh thêm từ người dùng: Đồ trang sức kim hoàn\n\nGóc độ nội dung yêu cầu cho video này: Phân tích rõ ưu điểm và nhược điểm của từng bên.",
+      "responseSchema": {
+        "type": "object",
+        "required": [
+          "error",
+          "title",
+          "label_left",
+          "label_right",
+          "materials",
+          "topicTags",
+          "suggestedTags",
+          "points"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "label_left": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "label_right": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "materials": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          "topicTags": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "string",
+              "maxLength": 24,
+              "enum": [
+                "#daquy",
+                "#daquytunhien",
+                "#gemstone",
+                "#trangsucdaquy",
+                "#kienthucdaquy",
+                "#phanbietdaquy",
+                "#kimloaiquy",
+                "#trangsuckimloai",
+                "#kienthuckimloai",
+                "#chatlieutrangsuc",
+                "#trangsuc",
+                "#kimhoan",
+                "#jewelry",
+                "#trangsucdep",
+                "#quatangtrangsuc",
+                "#kienthuctrangsuc",
+                "#kinhnghiemmuatrangsuc",
+                "#phanbiettrangsuc",
+                "#meochontrangsuc"
+              ]
+            }
+          },
+          "suggestedTags": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "string",
+              "maxLength": 24
+            }
+          },
+          "points": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "required": [
+                "text",
+                "side",
+                "tag",
+                "sub",
+                "suggested_action",
+                "needs_context_image",
+                "image_concept"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "maxLength": 160
+                },
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "left",
+                    "right",
+                    "both"
+                  ]
+                },
+                "tag": {
+                  "type": "string",
+                  "maxLength": 18
+                },
+                "sub": {
+                  "type": "string",
+                  "maxLength": 26
+                },
+                "suggested_action": {
+                  "type": "string",
+                  "enum": [
+                    "explain-a",
+                    "point-up-left",
+                    "inspect-gem",
+                    "present-ring"
+                  ]
+                },
+                "needs_context_image": {
+                  "type": "boolean"
+                },
+                "image_concept": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "noHints": {
+      "systemPrompt": "Bạn là trợ lý sinh nội dung kịch bản cho một series video TikTok/Reels tiếng Việt\ndạng \"so sánh kiến thức\" (2 khái niệm/vật thể hay bị nhầm lẫn, host chỉ tay giải thích).\n\nNHIỆM VỤ: nhận 2 ảnh (trái, phải) người dùng cung cấp để so sánh, trả lời DUY NHẤT một\nđối tượng JSON — không kèm lời dẫn, không giải thích, không bọc trong ```json hay bất kỳ\nmarkdown/code fence nào. Chỉ JSON thuần.\n\nJSON trả về LUÔN LUÔN có đủ 8 field sau — không được bỏ bớt field nào, kể cả khi rỗng:\n{\n  \"error\": \"\",\n  \"title\": \"1 câu hỏi mở đầu ngắn (tối đa ~15 từ), giọng tò mò/viral, tiếng Việt có dấu\",\n  \"label_left\": \"tên gọi ngắn gọn (1-4 từ) của vật thể/khái niệm trong ảnh TRÁI\",\n  \"label_right\": \"tên gọi ngắn gọn (1-4 từ) của vật thể/khái niệm trong ảnh PHẢI\",\n  \"materials\": [\"tên chuẩn đối tượng TRÁI\", \"tên chuẩn đối tượng PHẢI\"],\n  \"topicTags\": [\"#tag chọn từ danh sách chủ đề bên dưới, hoặc [] nếu không thuộc ngành\"],\n  \"suggestedTags\": [],\n  \"points\": [\n    {\n      \"text\": \"1 câu so sánh ngắn (tối đa ~20 từ), tiếng Việt có dấu — đây là LỜI THOẠI đọc lên\",\n      \"side\": \"left | right | both\",\n      \"tag\": \"nhãn NGẮN hiện trên màn hình, 1-3 từ, tối đa 18 ký tự\",\n      \"sub\": \"dòng phụ dưới nhãn, tối đa 26 ký tự, để chuỗi rỗng \"\" nếu không cần\",\n      \"suggested_action\": \"<id>\",\n      \"needs_context_image\": false,\n      \"image_concept\": \"\"\n    }\n  ]\n}\n\n- NẾU so sánh được: \"error\" PHẢI là chuỗi rỗng \"\" — điền đầy đủ 4 field còn lại.\n- NẾU 2 ảnh KHÔNG so sánh được một cách hợp lý (ví dụ: cùng một vật thể chụp 2 lần, ảnh mờ/\n  không nhận diện được chủ thể, hoặc 2 chủ thể không có điểm chung nào để so sánh kiến thức):\n  \"error\" là lý do ngắn gọn bằng tiếng Việt (không rỗng); \"title\"/\"label_left\"/\"label_right\"\n  điền chuỗi rỗng \"\", \"points\" điền mảng rỗng [] — các field này bị bỏ qua khi \"error\" không rỗng,\n  chỉ cần đúng KIỂU dữ liệu, không cần nội dung thật (\"materials\"/\"topicTags\"/\"suggestedTags\" cũng\n  điền mảng rỗng []).\n- KHÔNG BAO GIỜ để \"title\" (hay bất kỳ field text nào) chứa nhiều câu hỏi/khẩu hiệu lặp lại\n  nối tiếp nhau — mỗi field chỉ 1 câu duy nhất, đúng độ dài tối đa đã nêu.\n\n- Sinh 4 đến 8 phần tử \"points\" — mỗi câu là một luận điểm so sánh riêng biệt (định nghĩa,\n  đặc điểm nổi bật, ví dụ thực tế, điểm khác biệt cốt lõi...), giọng nhanh/giáo dục nhẹ,\n  không nghiêm túc quá, phù hợp video 30-40 giây.\n- \"text\" là LỜI THOẠI (đọc lên, câu đầy đủ). \"tag\"/\"sub\" là CHỮ HIỆN TRÊN MÀN HÌNH — phải\n  RẤT NGẮN, viết như tiêu đề kiểu TikTok, KHÔNG lặp lại nguyên câu \"text\", không có dấu chấm\n  cuối. Ví dụ: text = \"Kim cương cứng nhất hành tinh, đạt 10/10 trên thang Mohs.\"\n  -> tag = \"Rất cứng\", sub = \"10/10 thang Mohs\".\n- \"side\" cho biết luận điểm nói về ảnh nào: \"left\" (ảnh trái), \"right\" (ảnh phải), hoặc \"both\"\n  (so sánh cả hai / kết luận chung). BỐ TRÍ TỐT NHẤT: xen kẽ left rồi right thành từng cặp\n  liền nhau (left, right, left, right...) để 2 nhãn hiện đối xứng 2 bên như video mẫu.\n  Chỉ dùng \"both\" cho luận điểm tổng kết, tối đa 2 lần.\n- \"suggested_action\" của MỖI point BẮT BUỘC là một trong các id sau đây — TUYỆT ĐỐI không\n  tự bịa id khác, không thêm hậu tố, không đổi chính tả:\n- \"explain-a\": Đang giải thích, đưa tay lên\n- \"point-up-left\": Chỉ lên card bên trái\n- \"inspect-gem\" [CHỈ DÙNG CHO CHỦ ĐỀ TRANG SỨC/ĐÁ QUÝ/KIM CƯƠNG]: Soi viên đá bằng kính lúp\n- \"present-ring\" [CHỈ DÙNG CHO CHỦ ĐỀ TRANG SỨC/ĐÁ QUÝ/KIM CƯƠNG]: Giới thiệu chiếc nhẫn\n- Các action có đánh dấu \"[CHỈ DÙNG CHO CHỦ ĐỀ TRANG SỨC/ĐÁ QUÝ/KIM CƯƠNG]\" ở trên CHỈ được\n  gợi ý khi chủ đề thật sự là trang sức/đá quý/kim cương/kim hoàn. Nếu chủ đề không liên\n  quan, TUYỆT ĐỐI không dùng các id đó — chọn action trung tính khác phù hợp ngữ cảnh.\n\n- \"needs_context_image\": ĐÁNH DẤU MẠNH DẠN — true cho BẤT KỲ point nào nhắc tới một yếu tố có\n  thể minh hoạ trực quan bằng 1 ảnh RIÊNG (khác ảnh sản phẩm trái/phải đang so sánh), gồm cả:\n  tính chất vật lý (độ cứng, độ bền, phản ứng hoá học, cấu trúc tinh thể...), nguồn gốc/xuất xứ,\n  quy trình hình thành/chế tác/khai thác, hiện tượng đi kèm, hoặc 1 phép so sánh hình ảnh cụ thể\n  (vd \"cứng gấp 3 lần\" minh hoạ được bằng cảnh so sánh trực quan độ cứng). Ví dụ: point nói \"kim\n  cương hình thành từ áp suất cực lớn trong lòng đất\" -> true, minh hoạ cảnh địa chất/khai thác.\n  Chỉ để false cho point THỰC SỰ trừu tượng/không có gì để vẽ riêng — kết luận chung chung, lời\n  khuyên chọn mua, hoặc point chỉ lặp lại đặc điểm bề ngoài của chính vật thể trái/phải (ảnh sản\n  phẩm đã đủ minh hoạ, vẽ thêm cũng chỉ là ảnh sản phẩm khác góc). MỤC TIÊU: đa số video nên có\n  khoảng 3-5 point (trong tổng 4-8 point) được đánh true — coi false là NGOẠI LỆ cho point không\n  có gì đáng vẽ, không phải mặc định. Đừng tự giới hạn số lượng vì sợ vượt cap — hệ thống tự cắt\n  bớt nếu bạn đánh dấu quá nhiều (hiện cho phép tối đa 5/video), và tự bỏ point có \"side\":\"both\".\n- \"image_concept\": khi needs_context_image=true, mô tả NGẮN bằng tiếng Anh (tối đa ~20 từ) cảnh\n  cần vẽ, càng cụ thể/trực quan càng tốt (vd \"diamond crystal forming under extreme pressure\n  deep underground, geological cross-section\"). Khi needs_context_image=false, để chuỗi rỗng \"\".\n\n- HASHTAG (dùng cho caption đăng bài — chỉ điền, KHÔNG viết hashtag vào \"title\"/\"text\"):\n  + \"materials\": ĐÚNG 2 phần tử, [tên đối tượng ảnh TRÁI, tên đối tượng ảnh PHẢI]. Dùng TÊN CHUẨN,\n    phổ biến, tiếng Việt có dấu (vd \"Thạch anh tím\", \"Bạc 925\", \"Vàng trắng\", \"Kim cương tự nhiên\",\n    hoặc tên quốc tế đã quen dùng như \"Peridot\", \"Moissanite\"). KHÔNG kèm tính từ mô tả ảnh.\n  + \"topicTags\": 1-2 tag CHỌN NGUYÊN VĂN từ danh sách chủ đề dưới đây (đúng chính tả, có dấu #).\n    TUYỆT ĐỐI không tự tạo tag ngoài danh sách. Ưu tiên tag thuộc NHÓM khớp nhất với nội dung\n    (đá quý / kim loại / trang sức / kiến thức).\n    NẾU nội dung KHÔNG thuộc ngành trang sức / đá quý / kim loại quý (vd động vật, công nghệ, ẩm thực...)\n    thì trả mảng rỗng [] — KHÔNG được gán tag trang sức cho chủ đề không liên quan.\n  + \"suggestedTags\": mảng rỗng [] trong đa số trường hợp. CHỈ khi vật liệu trong \"materials\" là loại\n    hiếm/ít phổ biến, có thể đề xuất tối đa 2 tag viết thường không dấu (vd \"#alexandrite\") để người\n    duyệt bổ sung sau — các tag này KHÔNG được đăng tự động.\n  Danh sách tag chủ đề được phép cho \"topicTags\":\n- #daquy (nhóm: đá quý)\n- #daquytunhien (nhóm: đá quý)\n- #gemstone (nhóm: đá quý)\n- #trangsucdaquy (nhóm: đá quý)\n- #kienthucdaquy (nhóm: đá quý)\n- #phanbietdaquy (nhóm: đá quý)\n- #kimloaiquy (nhóm: kim loại)\n- #trangsuckimloai (nhóm: kim loại)\n- #kienthuckimloai (nhóm: kim loại)\n- #chatlieutrangsuc (nhóm: kim loại)\n- #trangsuc (nhóm: trang sức)\n- #kimhoan (nhóm: trang sức)\n- #jewelry (nhóm: trang sức)\n- #trangsucdep (nhóm: trang sức)\n- #quatangtrangsuc (nhóm: trang sức)\n- #kienthuctrangsuc (nhóm: kiến thức)\n- #kinhnghiemmuatrangsuc (nhóm: kiến thức)\n- #phanbiettrangsuc (nhóm: kiến thức)\n- #meochontrangsuc (nhóm: kiến thức)\n- Không thêm field nào ngoài schema trên. Không thêm text trước/sau JSON.",
+      "userPrompt": "Ảnh 1 (bên trái) và ảnh 2 (bên phải) đính kèm là 2 chủ thể cần so sánh cho video.",
+      "responseSchema": {
+        "type": "object",
+        "required": [
+          "error",
+          "title",
+          "label_left",
+          "label_right",
+          "materials",
+          "topicTags",
+          "suggestedTags",
+          "points"
+        ],
+        "properties": {
+          "error": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 120
+          },
+          "label_left": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "label_right": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "materials": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          "topicTags": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "string",
+              "maxLength": 24,
+              "enum": [
+                "#daquy",
+                "#daquytunhien",
+                "#gemstone",
+                "#trangsucdaquy",
+                "#kienthucdaquy",
+                "#phanbietdaquy",
+                "#kimloaiquy",
+                "#trangsuckimloai",
+                "#kienthuckimloai",
+                "#chatlieutrangsuc",
+                "#trangsuc",
+                "#kimhoan",
+                "#jewelry",
+                "#trangsucdep",
+                "#quatangtrangsuc",
+                "#kienthuctrangsuc",
+                "#kinhnghiemmuatrangsuc",
+                "#phanbiettrangsuc",
+                "#meochontrangsuc"
+              ]
+            }
+          },
+          "suggestedTags": {
+            "type": "array",
+            "maxItems": 2,
+            "items": {
+              "type": "string",
+              "maxLength": 24
+            }
+          },
+          "points": {
+            "type": "array",
+            "maxItems": 8,
+            "items": {
+              "type": "object",
+              "required": [
+                "text",
+                "side",
+                "tag",
+                "sub",
+                "suggested_action",
+                "needs_context_image",
+                "image_concept"
+              ],
+              "properties": {
+                "text": {
+                  "type": "string",
+                  "maxLength": 160
+                },
+                "side": {
+                  "type": "string",
+                  "enum": [
+                    "left",
+                    "right",
+                    "both"
+                  ]
+                },
+                "tag": {
+                  "type": "string",
+                  "maxLength": 18
+                },
+                "sub": {
+                  "type": "string",
+                  "maxLength": 26
+                },
+                "suggested_action": {
+                  "type": "string",
+                  "enum": [
+                    "explain-a",
+                    "point-up-left",
+                    "inspect-gem",
+                    "present-ring"
+                  ]
+                },
+                "needs_context_image": {
+                  "type": "boolean"
+                },
+                "image_concept": {
+                  "type": "string",
+                  "maxLength": 200
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "normalized": [
+    "#thachanhtim",
+    "#daquy",
+    "#bac925",
+    "#kimcuongdo",
+    "#donghodeotay",
+    null,
+    null,
+    null,
+    null,
+    "#aaaaaaaaaaaaaaaaaaaaaaaa",
+    null,
+    null,
+    "#iamond"
+  ],
+  "plans": [
+    {
+      "plan": [
+        {
+          "tag": "#thachanhtim",
+          "tier": "specific"
+        },
+        {
+          "tag": "#peridot",
+          "tier": "specific"
+        },
+        {
+          "tag": "#daquy",
+          "tier": "topic"
+        },
+        {
+          "tag": "#trangsuc",
+          "tier": "topic"
+        }
+      ],
+      "unmapped": []
+    },
+    {
+      "plan": [
+        {
+          "tag": "#bac925",
+          "tier": "specific"
+        },
+        {
+          "tag": "#vangtrang",
+          "tier": "specific"
+        },
+        {
+          "tag": "#kienthuctrangsuc",
+          "tier": "topic"
+        }
+      ],
+      "unmapped": []
+    },
+    {
+      "plan": [
+        {
+          "tag": "#chophuquoc",
+          "tier": "specific"
+        },
+        {
+          "tag": "#choalaska",
+          "tier": "specific"
+        }
+      ],
+      "unmapped": []
+    },
+    {
+      "plan": [
+        {
+          "tag": "#moissanite",
+          "tier": "specific"
+        },
+        {
+          "tag": "#kimcuong",
+          "tier": "specific"
+        }
+      ],
+      "unmapped": []
+    }
+  ],
+  "specific": [
+    {
+      "tags": [
+        "#thachanhtim",
+        "#peridot"
+      ],
+      "unmapped": []
+    },
+    {
+      "tags": [
+        "#bac925",
+        "#vangtrang"
+      ],
+      "unmapped": []
+    },
+    {
+      "tags": [
+        "#chophuquoc",
+        "#choalaska"
+      ],
+      "unmapped": []
+    },
+    {
+      "tags": [
+        "#moissanite",
+        "#kimcuong"
+      ],
+      "unmapped": []
+    }
+  ],
+  "topics": [
+    [
+      "#daquy",
+      "#trangsuc"
+    ],
+    [
+      "#kienthuctrangsuc"
+    ],
+    [],
+    []
+  ],
+  "groups": [
+    [
+      "đá quý"
+    ],
+    [
+      "kim loại"
+    ],
+    [],
+    [
+      "đá quý"
+    ]
+  ],
+  "aligned": [
+    [
+      "#daquy"
+    ],
+    [
+      "#kimloaiquy"
+    ],
+    [
+      "#daquy"
+    ],
+    [
+      "#daquy"
+    ]
+  ],
+  "finalized": [
+    [
+      "#thachanhtim",
+      "#peridot",
+      "#daquy",
+      "#trangsucdep"
+    ],
+    [
+      "#bac925",
+      "#vangtrang",
+      "#kienthuctrangsuc"
+    ],
+    [
+      "#chophuquoc",
+      "#choalaska"
+    ],
+    [
+      "#moissanite",
+      "#kimcuong"
+    ]
+  ],
+  "finalizedMax2": [
+    [
+      "#thachanhtim",
+      "#peridot"
+    ],
+    [
+      "#bac925",
+      "#vangtrang"
+    ],
+    [
+      "#chophuquoc",
+      "#choalaska"
+    ],
+    [
+      "#moissanite",
+      "#kimcuong"
+    ]
+  ],
+  "sanitized": [
+    {
+      "tag": "#thachanh",
+      "tier": "specific"
+    },
+    {
+      "tag": "#taythem",
+      "tier": "specific",
+      "manual": true
+    },
+    {
+      "tag": "#daquy",
+      "tier": "topic"
+    }
+  ],
+  "cleaned": [
+    null,
+    null,
+    "#thachanh",
+    null
+  ],
+  "captions": [
+    "Thạch anh tím hay Peridot?\n\n#thachanhtim #peridot #daquy",
+    "Chỉ title",
+    "\n\n#a"
+  ],
+  "max": [
+    4,
+    7,
+    10,
+    4,
+    4
+  ],
+  "jewelry": [
+    true,
+    false,
+    true,
+    true,
+    true
+  ],
+  "gating": {
+    "corrections": [
+      {
+        "point": "p0",
+        "from": "inspect-gem",
+        "to": "thinking",
+        "reason": "topic không phải trang sức/đá quý"
+      },
+      {
+        "point": "p2",
+        "from": "present-ring",
+        "to": "explain-a",
+        "reason": "topic không phải trang sức/đá quý"
+      }
+    ],
+    "actions": [
+      "thinking",
+      "explain-a",
+      "explain-a",
+      "explain-a",
+      "explain-a",
+      "explain-a",
+      "explain-a",
+      "explain-a"
+    ]
+  },
+  "ctxLimits": {
+    "corrections": [
+      {
+        "point": "p1",
+        "reason": "liền kề point minh hoạ trước, cùng bên \"left\" — bỏ qua tránh xung đột swap ảnh"
+      },
+      {
+        "point": "p3",
+        "reason": "side=\"both\" không nhận ảnh minh hoạ ngữ cảnh (không rõ swap card bên nào)"
+      }
+    ],
+    "points": [
+      {
+        "text": "p0",
+        "side": "left",
+        "suggested_action": "inspect-gem",
+        "needs_context_image": true,
+        "image_concept": "x"
+      },
+      {
+        "text": "p1",
+        "side": "left",
+        "suggested_action": "explain-a",
+        "needs_context_image": false,
+        "image_concept": ""
+      },
+      {
+        "text": "p2",
+        "side": "right",
+        "suggested_action": "present-ring",
+        "needs_context_image": true,
+        "image_concept": "z"
+      },
+      {
+        "text": "p3",
+        "side": "both",
+        "suggested_action": "explain-a",
+        "needs_context_image": false,
+        "image_concept": ""
+      },
+      {
+        "text": "p4",
+        "side": "left",
+        "suggested_action": "explain-a",
+        "needs_context_image": true,
+        "image_concept": "v"
+      },
+      {
+        "text": "p5",
+        "side": "right",
+        "suggested_action": "explain-a",
+        "needs_context_image": true,
+        "image_concept": "u"
+      },
+      {
+        "text": "p6",
+        "side": "left",
+        "suggested_action": "explain-a",
+        "needs_context_image": true,
+        "image_concept": "t"
+      },
+      {
+        "text": "p7",
+        "side": "right",
+        "suggested_action": "explain-a",
+        "needs_context_image": false,
+        "image_concept": ""
+      }
+    ]
+  },
+  "parsed": {
+    "ok": {
+      "ok": {
+        "error": "",
+        "title": "Thạch anh tím hay Peridot?",
+        "label_left": "Thạch anh tím",
+        "label_right": "Peridot",
+        "materials": [
+          "Thạch anh tím",
+          "Peridot"
+        ],
+        "topicTags": [
+          "#daquy",
+          "#trangsuc"
+        ],
+        "suggestedTags": [
+          "#alexandrite",
+          "#hai"
+        ],
+        "points": [
+          {
+            "text": "Câu 1",
+            "side": "left",
+            "tag": "Rất cứng",
+            "sub": "10/10",
+            "suggested_action": "explain-a",
+            "needs_context_image": false,
+            "image_concept": ""
+          }
+        ]
+      }
+    },
+    "geminiError": {
+      "err": "NonRetryableError",
+      "retryable": false,
+      "message": "Gemini báo 2 ảnh không so sánh được: Hai ảnh giống nhau"
+    },
+    "missingField": {
+      "err": "RetryableError",
+      "retryable": true,
+      "message": "Response thiếu field bắt buộc: points. Raw: …"
+    },
+    "emptyTitle": {
+      "err": "RetryableError",
+      "retryable": true,
+      "message": "Field 'title' rỗng hoặc không phải string."
+    },
+    "badSide": {
+      "err": "RetryableError",
+      "retryable": true,
+      "message": "points[0].side = \"x\" phải là \"left\" | \"right\" | \"both\"."
+    },
+    "badAction": {
+      "err": "RetryableError",
+      "retryable": true,
+      "message": "points[0].suggested_action = \"nope\" không khớp id nào trong actions.json."
+    },
+    "badSub": {
+      "err": "RetryableError",
+      "retryable": true,
+      "message": "points[0].sub phải là string (dùng \"\" nếu không cần dòng phụ)."
+    },
+    "noMaterials": {
+      "ok": {
+        "error": "",
+        "title": "Thạch anh tím hay Peridot?",
+        "label_left": "Thạch anh tím",
+        "label_right": "Peridot",
+        "points": [
+          {
+            "text": "Câu 1",
+            "side": "left",
+            "tag": "Rất cứng",
+            "sub": "10/10",
+            "suggested_action": "explain-a",
+            "needs_context_image": false,
+            "image_concept": ""
+          }
+        ],
+        "materials": [],
+        "topicTags": [],
+        "suggestedTags": []
+      }
+    },
+    "notJson": {
+      "err": "RetryableError",
+      "retryable": true
+    }
+  },
+  "slugs": [
+    "thach-anh-tim",
+    "da-quy-kim-cuong",
+    "bac-925",
+    "nhan-cuoi-nam",
+    "den-led",
+    "",
+    "",
+    "",
+    "a-b",
+    "peridot-che-tac"
+  ]
+}
