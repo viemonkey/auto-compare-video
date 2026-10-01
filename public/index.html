@@ -226,11 +226,15 @@
         </div>
 
         <div id="render-lock-note" class="locale-render-note hidden"></div>
+        <div id="draft-note" class="draft-note hidden"></div>
 
         <!-- Step 2 Footer -->
         <div class="card-footer space-between">
           <button id="btn-back-step1" class="btn btn-secondary">
             ← Chọn lại ảnh
+          </button>
+          <button id="btn-save-draft" class="btn btn-secondary" title="Lưu kịch bản (kể cả khi thị trường chưa dựng được video) để mở lại sau">
+            💾 Lưu nháp
           </button>
           <button id="btn-approve-build" class="btn btn-primary btn-large glow-pink">
             <span class="btn-text">🚀 DUYỆT KỊCH BẢN & TẠO VIDEO</span>
@@ -338,6 +342,12 @@
               <button id="btn-apply-custom-range" class="btn btn-small btn-primary">Áp dụng</button>
             </div>
           </div>
+          <div class="cost-filter-group">
+            <label for="cost-locale-select">Thị trường</label>
+            <div class="select-wrap">
+              <select id="cost-locale-select" class="input-text cost-range-select"></select>
+            </div>
+          </div>
           <button id="btn-export-csv" class="btn btn-small btn-secondary" disabled>
             ⬇ Xuất CSV
           </button>
@@ -385,6 +395,7 @@
 
           <div class="cost-table-header-row">
             <h4 class="cost-section-title">Chi phí theo từng video</h4>
+          <div id="cost-by-locale" class="cost-by-locale"></div>
             <span class="cost-table-hint">Bấm tiêu đề cột để sắp xếp</span>
           </div>
           <div class="cost-table-wrap">
@@ -392,6 +403,7 @@
               <thead>
                 <tr>
                   <th data-sort="slug">Video / Slug<span class="sort-arrow"></span></th>
+                  <th data-sort="locale">Thị trường<span class="sort-arrow"></span></th>
                   <th data-sort="createdAt">Ngày tạo<span class="sort-arrow"></span></th>
                   <th data-sort="contentCost"><span class="cost-badge cost-badge-content">📝</span> Chi phí kịch bản<span class="sort-arrow"></span></th>
                   <th data-sort="imageCost"><span class="cost-badge cost-badge-image">🖼️</span> Chi phí ảnh<span class="sort-arrow"></span></th>
@@ -404,7 +416,7 @@
               </tbody>
               <tfoot>
                 <tr class="cost-total-row">
-                  <td colspan="2">TỔNG (theo bộ lọc hiện tại)</td>
+                  <td colspan="3">TỔNG (theo bộ lọc hiện tại)</td>
                   <td id="cost-foot-content">$0.0000</td>
                   <td id="cost-foot-image">$0.0000</td>
                   <td id="cost-foot-images-count">0</td>
@@ -424,6 +436,21 @@
     </div>
   </div>
 
+  <!-- Create a version of existing content for another market -->
+  <div id="market-version-modal" class="modal-backdrop hidden">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>TẠO PHIÊN BẢN CHO THỊ TRƯỜNG KHÁC</h3>
+        <button id="btn-close-market-version" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p id="market-version-source" class="modal-subtitle"></p>
+        <div id="market-version-buttons" class="locale-buttons"></div>
+        <div id="market-version-status" class="locale-render-note hidden"></div>
+      </div>
+    </div>
+  </div>
+
   <!-- Existing Videos Drawer/Modal -->
   <div id="videos-modal" class="modal-backdrop hidden">
     <div class="modal-dialog wide">
@@ -433,6 +460,10 @@
       </div>
       <div class="modal-body">
         <div id="social-alerts"></div>
+        <div class="videos-filter-row">
+          <label for="videos-locale-filter">🌏 Thị trường:</label>
+          <select id="videos-locale-filter" class="input-text"></select>
+        </div>
         <div id="videos-list-grid" class="videos-grid">
           <!-- Videos injected via JS -->
         </div>

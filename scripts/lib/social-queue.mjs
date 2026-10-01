@@ -141,7 +141,7 @@ const SKIP_SAVE = Symbol("skip-save");
  *   thiếu (job cũ/video cũ) thì đăng đúng `caption` như trước
  * @returns item mới, hoặc null nếu slug đã đăng / đang chờ đăng
  */
-export function enqueueVideo({ slug, videoPath, caption, hashtags }) {
+export function enqueueVideo({ slug, videoPath, caption, hashtags, locale }) {
   return updateQueue((data) => {
     // Slug đã đăng, hoặc đang chờ/đang verify -> không enqueue trùng. Render lại cùng slug ghi đè
     // output/<slug>.mp4 nên job pending sẵn có tự đăng bản mới.
@@ -153,6 +153,7 @@ export function enqueueVideo({ slug, videoPath, caption, hashtags }) {
       videoPath,
       caption: caption || slug,
       hashtags: Array.isArray(hashtags) && hashtags.length ? hashtags : null,
+      locale: locale || null, // thị trường của video; job cũ thiếu -> thị trường mặc định (xem jobLocale)
       addedAt: new Date().toISOString(),
       status: "pending",
       attempts: 0,
@@ -162,6 +163,61 @@ export function enqueueVideo({ slug, videoPath, caption, hashtags }) {
     data.queue.push(item);
     return item;
   }).result || null;
+}
+
+// ---------------------------------------------------------------------------------------------
+// Thị trường (locale) <-> page: video chỉ được đăng lên page CÙNG locale. Kiểm ở CẢ lúc enqueue lẫn lúc chọn page để đăng
+// (dữ liệu queue cũ không có locale = thị trường mặc định).
+// ---------------------------------------------------------------------------------------------
+/** Thị trường của 1 job (job cũ thiếu `locale` = mặc định). */
+export const jobLocale = (job, defaultCode) => job.locale || defaultCode;
+
+/** Các page thuộc đúng thị trường `localeCode` (page thiếu locale = mặc định). */
+export function pagesForLocale(pages, localeCode, defaultCode) {
+  return pages.filter((p) => (p.locale || defaultCode) === (localeCode || defaultCode));
+}
+
+/** Ném lỗi nếu page KHÔNG cùng thị trường với job — chốt chặn cuối trước khi đăng. */
+export function assertPageMatchesJob(page, job, defaultCode) {
+  const pl = page.locale || defaultCode;
+  const jl = jobLocale(job, defaultCode);
+  if (pl !== jl) throw new Error(`Chặn đăng nhầm: video "${job.slug}" thuộc thị trường ${jl} nhưng page "${page.name}" thuộc ${pl}.`);
+}
+
+/**
+ * Enqueue có kiểm tra thị trường: không có page nào cùng locale -> KHÔNG enqueue, trả lý do rõ ràng.
+ * @returns {{status:"enqueued", item:object}|{status:"duplicate"}|{status:"no-page-for-locale", reason:string}}
+ */
+export function tryEnqueueVideo(job, { pages, defaultCode }) {
+  const locale = job.locale || defaultCode;
+  if (!pagesForLocale(pages, locale, defaultCode).length) {
+    return { status: "no-page-for-locale", reason: `Không có page nào cấu hình thị trường ${locale} (FB_PAGE_n_LOCALE) — không thêm "${job.slug}" vào hàng đợi đăng.` };
+  }
+  const item = enqueueVideo({ ...job, locale });
+  return item ? { status: "enqueued", item } : { status: "duplicate" };
+}
+
+/**
+ * Chọn (job, page) để đăng ở tick này. Duyệt job pending theo thứ tự; mỗi job chỉ xét page CÙNG thị trường. Job mà thị trường của nó
+ * không có page nào được cấu hình -> trả trong `orphaned` (caller đánh dấu lỗi rõ ràng) và KHÔNG chặn job phía sau.
+ * @returns {{job:object|null, page:object|null, orphaned:object[]}}
+ */
+export function selectJobAndPage(queue, pages, pageHistory, minGap, maxGap, disabledPages, defaultCode, now = Date.now(), rand = Math.random) {
+  const orphaned = [];
+  for (const job of queue) {
+    if (job.status !== "pending" || (job.nextAttemptAt && Date.parse(job.nextAttemptAt) > now)) continue;
+    const candidates = pagesForLocale(pages, jobLocale(job, defaultCode), defaultCode);
+    if (!candidates.length) {
+      orphaned.push(job);
+      continue;
+    }
+    const page = pickEligiblePage(candidates, pageHistory, minGap, maxGap, disabledPages, now, rand);
+    if (page) {
+      assertPageMatchesJob(page, job, defaultCode);
+      return { job, page, orphaned };
+    }
+  }
+  return { job: null, page: null, orphaned };
 }
 
 function randomGapMs(minMinutes, maxMinutes) {

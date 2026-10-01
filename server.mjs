@@ -31,17 +31,17 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { CONTENT_ANGLES } from "./config/content-angles.mjs";
 import { COST_LEDGER_PATH, renameCostLedgerSlug, countsAsVideo } from "./scripts/lib/cost-ledger.mjs";
-import { getConfiguredPages } from "./scripts/lib/facebook-pages.mjs";
-import { graphVersion, inspectPages, isAutoPostEnabled, makeLogger, redactSecrets } from "./scripts/lib/fb-config.mjs";
+import { getConfiguredPages, inspectConfiguredPages } from "./scripts/lib/facebook-pages.mjs";
+import { graphVersion, isAutoPostEnabled, makeLogger, redactSecrets } from "./scripts/lib/fb-config.mjs";
 import { classifyError } from "./scripts/lib/fb-errors.mjs";
 import { npmCommand } from "./scripts/lib/npm-cmd.mjs";
 import { extractFailureMessage as geminiFailureMessage } from "./scripts/lib/gemini-retry.mjs";
 import { publishVideo, checkReelStatus } from "./scripts/lib/facebook-post.mjs";
 import {
   loadQueue,
-  enqueueVideo,
-  pickEligiblePage,
-  nextPendingJob,
+  tryEnqueueVideo,
+  selectJobAndPage,
+  jobLocale,
   recordPost,
   recordFailure,
   disablePage,
@@ -69,6 +69,9 @@ import {
 } from "./scripts/lib/hashtags.mjs";
 import { textOf } from "./public/shared/bilingual.mjs";
 import { rulesOf } from "./scripts/lib/compare-content.mjs";
+import { createMarketApi, buildRecord, resolveSocialPost as resolveSocialPostIn } from "./server-market.mjs";
+import { effectiveSlugSuffix, hasLocaleSuffix, stripLocaleSuffix, uniqueSlugForLocale } from "./scripts/lib/market-slug.mjs";
+import { copySourceImages, readRecord, writeRecord } from "./scripts/lib/content-store.mjs";
 import { rewriteField, translateField, FieldEditError } from "./scripts/lib/field-edit.mjs";
 import { AbortedError } from "./scripts/lib/gemini-client.mjs";
 import { checkFfmpeg, extractPoseTimeline, setReelThumbnail } from "./scripts/lib/reel-thumbnail.mjs";
@@ -252,7 +255,7 @@ function describeLocale(l, themeId) {
     displayName: l.displayName,
     flag: l.flag,
     flagIcon: l.flagIcon,
-    slugSuffix: l.slugSuffix,
+    slugSuffix: effectiveSlugSuffix(l), // "" cho thị trường mặc định; còn lại hậu tố slug thực tế
     styleSummary: l.styleSummary,
     renderable: r.renderable,
     blockers: r.blockers,
@@ -405,6 +408,55 @@ function localeFromCode(code) {
   return c ? getLocale(c) : getDefaultLocale();
 }
 
+// Sinh nội dung bằng Gemini (script generate-compare-content.mjs chạy như tiến trình con). Dùng chung cho /api/generate-content (Bước 1) và
+// /api/market-versions (tạo phiên bản cho thị trường khác từ ảnh đã lưu). Trả { ok:true, content, locale, pendingSlug, ... } hoặc { ok:false, status, error }.
+async function runGenerateContent({ leftPath, rightPath, hint = "", localeCode = "", contentAngleId = "", customAngleText = "" }) {
+  // slug thật của video chưa xác định ở Bước 1 (người dùng chỉ đặt/sửa slug ở Bước 2, sau khi
+  // thấy label_left/label_right Gemini vừa sinh ra) — dùng slug TẠM để dòng content-generation
+  // ghi vào cost-ledger.jsonl không bị "slug": null. Client giữ pendingSlug này và gửi lại ở
+  // /api/create-video, nơi nó được đổi thành slug thật (xem renameCostLedgerSlug bên dưới).
+  const pendingSlug = `_pending-${crypto.randomUUID()}`;
+  const outPath = path.join(TEMP_DIR, `content-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.json`);
+  const args = [path.join(SCRIPTS_DIR, "generate-compare-content.mjs"), leftPath, rightPath, "--out", outPath, "--slug", pendingSlug];
+  const cleanHint = String(hint || "").trim();
+  if (cleanHint) args.push("--topic-hint", cleanHint);
+
+  // Thị trường mục tiêu. Không gửi -> thị trường mặc định; mã không tồn tại/bị tắt -> lỗi 400.
+  const code = String(localeCode || "").trim();
+  if (code) {
+    if (!getLocale(code)) return { ok: false, status: 400, error: `Thị trường "${code}" không tồn tại hoặc đang bị tắt.` };
+    args.push("--locale", code);
+  }
+
+  const angleId = String(contentAngleId || "").trim();
+  if (angleId) args.push("--content-angle-id", angleId);
+  if (angleId === "custom") {
+    const customText = String(customAngleText || "").trim();
+    if (!customText) return { ok: false, status: 400, error: 'contentAngleId="custom" nhưng thiếu customAngleText.' };
+    args.push("--custom-angle-text", customText);
+  }
+
+  const { code: exitCode, out } = await runNode(args);
+  // Log NGAY cả khi thành công — đây là nơi duy nhất còn lại dòng chẩn đoán "Gemini đánh dấu
+  // needs_context_image=true cho X/N point" (xem generate-compare-content.mjs), một khi client
+  // rời trang thì output/logs/ là chỗ duy nhất còn xem lại được.
+  writeRunLog(`generate-content-${Date.now()}.log`, `ARGS: ${args.join(" ")}\n\n${out}`);
+  // Chi tiết kỹ thuật lỗi Gemini (model, mã lỗi, quotaId, retryDelay, body gốc) chỉ ra log server —
+  // UI chỉ nhận thông báo tiếng Việt ở dòng "THẤT BẠI:" (xem geminiFailureMessage()).
+  for (const l of out.split("\n")) if (l.startsWith("[gemini-error]")) console.warn(l);
+
+  if (exitCode !== 0 || !fs.existsSync(outPath)) return { ok: false, status: 500, error: geminiFailureMessage(out) };
+
+  try {
+    const content = JSON.parse(fs.readFileSync(outPath, "utf8"));
+    // client giữ nội dung trong state và POST lại ở /api/create-video, nên file tạm này không cần sống tiếp
+    fs.rmSync(outPath, { force: true });
+    return { ok: true, content, pendingSlug };
+  } catch (e) {
+    return { ok: false, status: 500, error: `Không đọc được kết quả Gemini: ${e.message}` };
+  }
+}
+
 app.post("/api/generate-content", async (req, res) => {
   let leftPath, rightPath;
   try {
@@ -414,75 +466,39 @@ app.post("/api/generate-content", async (req, res) => {
     return res.status(400).json({ error: e.message });
   }
 
-  // slug thật của video chưa xác định ở Bước 1 (người dùng chỉ đặt/sửa slug ở Bước 2, sau khi
-  // thấy label_left/label_right Gemini vừa sinh ra) — dùng slug TẠM để dòng content-generation
-  // ghi vào cost-ledger.jsonl không bị "slug": null. Client giữ pendingSlug này và gửi lại ở
-  // /api/create-video, nơi nó được đổi thành slug thật (xem renameCostLedgerSlug bên dưới).
-  const pendingSlug = `_pending-${crypto.randomUUID()}`;
-  const outPath = path.join(TEMP_DIR, `content-${Date.now()}.json`);
-  const args = [
-    path.join(SCRIPTS_DIR, "generate-compare-content.mjs"),
+  const gen = await runGenerateContent({
     leftPath,
     rightPath,
-    "--out",
-    outPath,
-    "--slug",
+    hint: req.body?.topicHint,
+    localeCode: req.body?.locale,
+    contentAngleId: req.body?.contentAngleId,
+    customAngleText: req.body?.customAngleText,
+  });
+  if (!gen.ok) return res.status(gen.status).json({ error: gen.error });
+
+  const { content, pendingSlug } = gen;
+  // Hashtag dự kiến cho Studio Bước 2 (chip có thể xoá/thêm) — cùng logic với lúc đăng, theo bộ từ vựng của thị trường
+  // (kèm nghĩa tiếng Việt cho tooltip). `warnings` = cảnh báo theo từng field (không chặn).
+  const locale = localeFromCode(content.locale) || getDefaultLocale();
+  const cfg = loadHashtagConfig(locale);
+  const { plan } = planHashtags(content, cfg);
+  res.json({
+    content,
     pendingSlug,
-  ];
-  const hint = String(req.body?.topicHint || "").trim();
-  if (hint) args.push("--topic-hint", hint);
+    locale: locale.code,
+    hashtags: withMeanings(plan, cfg),
+    hashtagMax: maxHashtags(),
+    warnings: content._meta?.warnings || [],
+  });
+});
 
-  // Thị trường mục tiêu (Bước 1). Không gửi -> thị trường mặc định; gửi mã không tồn tại/bị tắt -> 400.
-  const localeCode = String(req.body?.locale || "").trim();
-  if (localeCode) {
-    if (!getLocale(localeCode)) return res.status(400).json({ error: `Thị trường "${localeCode}" không tồn tại hoặc đang bị tắt.` });
-    args.push("--locale", localeCode);
-  }
-
-  const contentAngleId = String(req.body?.contentAngleId || "").trim();
-  if (contentAngleId) args.push("--content-angle-id", contentAngleId);
-  if (contentAngleId === "custom") {
-    const customAngleText = String(req.body?.customAngleText || "").trim();
-    if (!customAngleText) {
-      return res.status(400).json({ error: 'contentAngleId="custom" nhưng thiếu customAngleText.' });
-    }
-    args.push("--custom-angle-text", customAngleText);
-  }
-
-  const { code, out } = await runNode(args);
-  // Log NGAY cả khi thành công — đây là nơi duy nhất còn lại dòng chẩn đoán "Gemini đánh dấu
-  // needs_context_image=true cho X/N point" (xem generate-compare-content.mjs), một khi client
-  // rời trang thì output/logs/ là chỗ duy nhất còn xem lại được.
-  writeRunLog(`generate-content-${Date.now()}.log`, `ARGS: ${args.join(" ")}\n\n${out}`);
-  // Chi tiết kỹ thuật lỗi Gemini (model, mã lỗi, quotaId, retryDelay, body gốc) chỉ ra log server —
-  // UI chỉ nhận thông báo tiếng Việt ở dòng "THẤT BẠI:" (xem geminiFailureMessage()).
-  for (const l of out.split("\n")) if (l.startsWith("[gemini-error]")) console.warn(l);
-
-  if (code !== 0 || !fs.existsSync(outPath)) {
-    return res.status(500).json({ error: geminiFailureMessage(out) });
-  }
-
-  try {
-    const content = JSON.parse(fs.readFileSync(outPath, "utf8"));
-    // client giữ nội dung trong state và POST lại ở /api/create-video, nên
-    // file tạm này không cần sống tiếp
-    fs.rmSync(outPath, { force: true });
-    // Hashtag dự kiến cho Studio Bước 2 (chip có thể xoá/thêm) — cùng logic với lúc đăng, theo bộ từ vựng của thị trường
-    // (kèm nghĩa tiếng Việt cho tooltip). `warnings` = cảnh báo theo từng field (không chặn).
-    const locale = localeFromCode(content.locale) || getDefaultLocale();
-    const cfg = loadHashtagConfig(locale);
-    const { plan } = planHashtags(content, cfg);
-    res.json({
-      content,
-      pendingSlug,
-      locale: locale.code,
-      hashtags: withMeanings(plan, cfg),
-      hashtagMax: maxHashtags(),
-      warnings: content._meta?.warnings || [],
-    });
-  } catch (e) {
-    res.status(500).json({ error: `Không đọc được kết quả Gemini: ${e.message}` });
-  }
+// Lưu nháp / mở lại bản ghi / tạo phiên bản cho thị trường khác — xem server-market.mjs.
+const marketApi = createMarketApi({
+  app,
+  dirs: { UPLOAD_DIR, CONTENT_ARCHIVE_DIR, VIDEOS_DIR, OUTPUT_DIR },
+  assertInsideUploads,
+  runGenerateContent,
+  localeFromCode,
 });
 
 // Chuẩn hoá 1 hashtag người dùng gõ tay ở Studio (bỏ dấu, thường, <=25 ký tự, lọc blocked) — để UI
@@ -563,23 +579,6 @@ app.post("/api/create-video", async (req, res) => {
     if (!rawSlug || !SLUG_RE.test(rawSlug)) {
       return fail(`slug "${rawSlug}" không hợp lệ — chỉ a-z, 0-9 và dấu gạch ngang (không dấu tiếng Việt).`);
     }
-    // Nhiều góc độ nội dung khác nhau cho CÙNG 1 cặp ảnh dễ ra trùng slug gốc (vd cùng
-    // buildSlug() nhưng người dùng gõ tay giống nhau) — tự thêm hậu tố -2, -3... thay vì
-    // chặn đứng, để không phải quay lại sửa tay mỗi lần thử góc độ khác.
-    const slug = ensureUniqueSlug(rawSlug);
-    slugForLog = slug;
-    if (slug !== rawSlug) {
-      say(`ℹ slug "${rawSlug}" đã tồn tại — dùng "${slug}" thay thế.`);
-    }
-    // Chốt lại slug tạm dùng lúc gọi Gemini ở Bước 1 (/api/generate-content) thành slug thật
-    // vừa xác định — để dòng content-generation trong cost-ledger.jsonl không còn mồ côi
-    // "slug" tạm (xem renameCostLedgerSlug trong scripts/lib/cost-ledger.mjs).
-    if (pendingSlug) {
-      const renamed = renameCostLedgerSlug(pendingSlug, slug);
-      if (renamed > 0) {
-        say(`ℹ Đã gắn ${renamed} dòng chi phí Gemini (Bước 1) vào slug "${slug}".`);
-      }
-    }
     if (!content || !Array.isArray(content.points) || content.points.length === 0) {
       return fail("Thiếu nội dung kịch bản (content.points rỗng).");
     }
@@ -596,7 +595,31 @@ app.post("/api/create-video", async (req, res) => {
     if (!renderability.renderable) {
       return fail(`Thị trường ${locale.displayName} chưa dựng được video: ${renderability.blockers.map((b) => b.message).join(" ")}`);
     }
+    // Slug bản ngoại ngữ = slug gốc + hậu tố thị trường (thị trường mặc định giữ slug như cũ).
+    const slugSuffix = effectiveSlugSuffix(locale);
+    if (!hasLocaleSuffix(rawSlug, locale)) {
+      return fail(`Slug của thị trường ${locale.displayName} phải kết thúc bằng "-${slugSuffix}" (vd "ten-goc-${slugSuffix}").`);
+    }
 
+    // Nhiều góc độ nội dung khác nhau cho CÙNG 1 cặp ảnh dễ ra trùng slug gốc (vd cùng
+    // buildSlug() nhưng người dùng gõ tay giống nhau) — tự thêm hậu tố -2, -3... thay vì
+    // chặn đứng, để không phải quay lại sửa tay mỗi lần thử góc độ khác. Thị trường khác: số thứ tự chèn TRƯỚC hậu tố thị trường.
+    const slug = slugSuffix
+      ? uniqueSlugForLocale(stripLocaleSuffix(rawSlug, locale), locale, (s) => fs.existsSync(path.join(VIDEOS_DIR, s)))
+      : ensureUniqueSlug(rawSlug);
+    slugForLog = slug;
+    if (slug !== rawSlug) {
+      say(`ℹ slug "${rawSlug}" đã tồn tại — dùng "${slug}" thay thế.`);
+    }
+    // Chốt lại slug tạm dùng lúc gọi Gemini ở Bước 1 (/api/generate-content) thành slug thật
+    // vừa xác định — để dòng content-generation trong cost-ledger.jsonl không còn mồ côi
+    // "slug" tạm (xem renameCostLedgerSlug trong scripts/lib/cost-ledger.mjs).
+    if (pendingSlug) {
+      const renamed = renameCostLedgerSlug(pendingSlug, slug);
+      if (renamed > 0) {
+        say(`ℹ Đã gắn ${renamed} dòng chi phí Gemini (Bước 1) vào slug "${slug}".`);
+      }
+    }
     // Hashtag: plan Studio gửi lên (đã cho người dùng sửa) — luôn làm sạch lại phía server. Không có
     // (client cũ/API gọi trực tiếp) thì tự dựng từ content, video thiếu dữ liệu mới rơi về label.
     const hashtagCfg = loadHashtagConfig(locale);
@@ -612,10 +635,22 @@ app.post("/api/create-video", async (req, res) => {
     // Bản sao BỀN của content JSON gốc (needs_context_image/image_concept từng point) — TEMP_DIR
     // chỉ tồn tại trong request này (xoá ở finally), còn videos/<slug>/ có thể bị
     // archiveAndCleanup() xoá sạch sau khi render xong. Đây mới là bản duy nhất còn sống lâu dài.
-    fs.writeFileSync(
-      path.join(CONTENT_ARCHIVE_DIR, `${slug}.compare-content.json`),
-      JSON.stringify({ ...content, hashtagPlan }, null, 2),
-    );
+    // Bản ghi mang thị trường (locale), trạng thái "built" và bản sao ảnh nguồn + gợi ý + góc độ để sau này "tạo phiên bản cho thị trường khác".
+    {
+      const previous = readRecord(CONTENT_ARCHIVE_DIR, slug);
+      let source = previous?._meta?.source || null;
+      try {
+        source = {
+          ...copySourceImages(CONTENT_ARCHIVE_DIR, slug, leftPath, rightPath),
+          topicHint: String(topicHint || ""),
+          contentAngleId: String(req.body?.contentAngleId || "auto"),
+          customAngleText: String(req.body?.customAngleText || ""),
+        };
+      } catch (e) {
+        say(`⚠ Không lưu được bản sao ảnh nguồn (${e.message}) — sẽ không tạo được phiên bản thị trường khác từ video này.`);
+      }
+      writeRecord(CONTENT_ARCHIVE_DIR, slug, buildRecord({ content, locale, hashtagPlan, status: "built", source, derivedFrom: previous?._meta?.derivedFrom || null }));
+    }
 
     const args = [
       path.join(SCRIPTS_DIR, "scaffold-compare-video.mjs"),
@@ -734,9 +769,15 @@ app.post("/api/create-video", async (req, res) => {
           say(`⚠ Không thêm vào hàng đợi đăng Facebook: file không tồn tại: ${absoluteVideoPath}`);
         } else {
           const { title: caption, hashtags } = resolveSocialPost(slug, videoDisplayName, hashtagPlan, locale.code);
-          const item = enqueueVideo({ slug, videoPath: absoluteVideoPath, caption, hashtags });
-          if (item) {
-            say("ℹ Đã thêm vào hàng đợi đăng Facebook (đăng luân phiên các page, cách nhau 30-60 phút).");
+          const queued = tryEnqueueVideo(
+            { slug, videoPath: absoluteVideoPath, caption, hashtags, locale: locale.code },
+            { pages: getConfiguredPages(), defaultCode: getDefaultLocale().code },
+          );
+          if (queued.status === "enqueued") {
+            say(`ℹ Đã thêm vào hàng đợi đăng Facebook (chỉ đăng lên page thị trường ${locale.code}, luân phiên, cách nhau 30-60 phút).`);
+          } else if (queued.status === "no-page-for-locale") {
+            say(`⚠ ${queued.reason}`);
+            fbLog.warn(queued.reason);
           } else {
             say("ℹ Slug này đã đăng / đang chờ đăng — không thêm trùng vào hàng đợi.");
           }
@@ -847,23 +888,7 @@ function latestRender(slug) {
 // vừa chốt ở /api/create-video (ưu tiên hơn bản lưu). Video cũ dựng trước khi tính năng này tồn tại
 // (không có file content / không có materials, topicTags) rơi về tên hiển thị/slug + hashtag theo label.
 function resolveSocialPost(slug, fallbackName, livePlan = null, localeCode = null) {
-  let cfg = loadHashtagConfig(localeFromCode(localeCode) || getDefaultLocale());
-  let title = "";
-  let plan = livePlan;
-  try {
-    const p = path.join(CONTENT_ARCHIVE_DIR, `${slug}.compare-content.json`);
-    if (fs.existsSync(p)) {
-      const content = JSON.parse(fs.readFileSync(p, "utf8"));
-      // bản lưu ghi rõ thị trường -> dùng bộ từ vựng của thị trường đó (dữ liệu cũ không có locale = mặc định)
-      cfg = loadHashtagConfig(localeFromCode(content.locale) || getDefaultLocale());
-      const t = textOf(content.title).trim(); // title chuỗi phẳng (cũ/tiếng Việt) hoặc { text, vi }
-      if (t) title = t;
-      if (!plan) plan = sanitizePlan(content.hashtagPlan, cfg) ?? planHashtags(content, cfg).plan;
-    }
-  } catch {
-    // rơi về fallback bên dưới
-  }
-  return { title: title || fallbackName || slug, hashtags: plan && plan.length ? plan : null };
+  return resolveSocialPostIn({ dir: CONTENT_ARCHIVE_DIR, slug, fallbackName, livePlan, localeCode });
 }
 
 // Gộp trạng thái đăng Facebook (data/social-queue.json) theo slug, cho GET /api/videos.
@@ -934,6 +959,14 @@ app.get("/api/videos", (_req, res) => {
       });
     }
   }
+
+  // 2b. Thị trường + trạng thái của từng bản ghi (bản ghi cũ thiếu locale = thị trường mặc định) và các bản NHÁP chưa dựng.
+  for (const v of out) {
+    Object.assign(v, marketApi.recordInfo(v.slug));
+    v.canMakeVersion = marketApi.canMakeVersion(v.slug);
+  }
+  const listed = new Set(out.map((v) => v.slug));
+  for (const d of marketApi.listDrafts()) if (!listed.has(d.slug)) out.push(d);
 
   // 3. Trạng thái đăng Facebook (data/social-queue.json) — gắn thêm, không thay đổi field cũ.
   const social = socialStatusBySlug();
@@ -1017,9 +1050,18 @@ app.get("/api/cost-stats", (_req, res) => {
   // lọc khoảng ngày (7/30/tất cả) chọn trong UI mà không cần gọi lại API mỗi lần đổi bộ lọc.
   const byDayMap = new Map();
   const byTaskMap = new Map();
+  const byLocaleMap = new Map();
   const videoMap = new Map();
+  // Thị trường của 1 dòng sổ: cột `locale` (dòng mới) -> thị trường của bản ghi theo slug -> mặc định (dòng/dữ liệu cũ thiếu locale).
+  const slugLocaleCache = new Map();
+  const localeOfSlug = (slug) => {
+    if (!slug) return getDefaultLocale().code;
+    if (!slugLocaleCache.has(slug)) slugLocaleCache.set(slug, marketApi.recordInfo(slug).locale);
+    return slugLocaleCache.get(slug);
+  };
 
   for (const row of rows) {
+    const rowLocale = row.locale && getLocale(row.locale) ? row.locale : localeOfSlug(row.slug);
     const cost = typeof row.cost_usd === "number" ? row.cost_usd : 0;
     const task = row.task || "unknown";
     const timestamp = typeof row.timestamp === "string" ? row.timestamp : null;
@@ -1033,6 +1075,7 @@ app.get("/api/cost-stats", (_req, res) => {
       byDayMap.set(dateStr, (byDayMap.get(dateStr) || 0) + cost);
     }
     byTaskMap.set(task, (byTaskMap.get(task) || 0) + cost);
+    byLocaleMap.set(rowLocale, (byLocaleMap.get(rowLocale) || 0) + cost);
 
     // Dòng kiểm chứng (task "verification") vẫn nằm trong tổng/theo ngày/theo task ở trên nhưng KHÔNG phải video:
     // bỏ khỏi thống kê theo video để không hiện thành "video ma".
@@ -1040,6 +1083,7 @@ app.get("/api/cost-stats", (_req, res) => {
       if (!videoMap.has(row.slug)) {
         videoMap.set(row.slug, {
           slug: row.slug,
+          locale: rowLocale,
           createdAt: timestamp,
           totalCost: 0,
           byTask: {},
@@ -1070,11 +1114,17 @@ app.get("/api/cost-stats", (_req, res) => {
     .sort((a, b) => a.date.localeCompare(b.date));
 
   const byTask = Object.fromEntries(byTaskMap);
+  const byLocale = Object.fromEntries(byLocaleMap);
+  // badge cờ cho từng video (cờ + tên lấy từ file locale)
+  const localeBadge = (code) => {
+    const l = getLocale(code);
+    return l ? { flag: l.flag, flagIcon: l.flagIcon, displayName: l.displayName } : { flag: "", flagIcon: null, displayName: code };
+  };
 
   // mới nhất lên đầu — dựa theo lần gọi API gần nhất ghi nhận cho video đó.
   const videos = [...videoMap.values()]
     .sort((a, b) => String(b._lastTimestamp).localeCompare(String(a._lastTimestamp)))
-    .map(({ _lastTimestamp, ...v }) => v);
+    .map(({ _lastTimestamp, ...v }) => ({ ...v, ...localeBadge(v.locale) }));
 
   res.json({
     generatedAt: new Date(now).toISOString(),
@@ -1083,6 +1133,8 @@ app.get("/api/cost-stats", (_req, res) => {
     totalLast7Days,
     byDay,
     byTask,
+    byLocale,
+    locales: Object.keys(byLocale).map((code) => ({ code, ...localeBadge(code) })),
     videos,
   });
 });
@@ -1171,11 +1223,16 @@ async function checkVerifyingJobsTick(pages) {
 async function tryPostNextPendingJobTick(pages) {
   if (shuttingDown) return;
   const { queue, pageHistory, disabledPages } = loadQueue();
-  const job = nextPendingJob(queue);
-  if (!job) return;
-
-  const page = pickEligiblePage(pages, pageHistory, FB_POST_MIN_GAP_MINUTES, FB_POST_MAX_GAP_MINUTES, disabledPages);
-  if (!page) return;
+  const defaultCode = getDefaultLocale().code;
+  // Mỗi job chỉ ghép với page CÙNG thị trường (dữ liệu queue cũ thiếu locale = mặc định). Job mà thị trường không có page nào
+  // được cấu hình thì đánh dấu lỗi rõ ràng, không chặn job phía sau.
+  const { job, page, orphaned } = selectJobAndPage(queue, pages, pageHistory, FB_POST_MIN_GAP_MINUTES, FB_POST_MAX_GAP_MINUTES, disabledPages, defaultCode);
+  for (const o of orphaned) {
+    const reason = `Không có page nào cấu hình thị trường ${jobLocale(o, defaultCode)} (FB_PAGE_n_LOCALE) — không đăng để tránh đăng nhầm thị trường.`;
+    failJobTerminal(o.id, reason);
+    fbLog.error(`Job "${o.slug}" failed (không retry): ${reason}`);
+  }
+  if (!job || !page) return;
 
   if (!fs.existsSync(job.videoPath)) {
     failJobTerminal(job.id, `File không còn tồn tại: ${job.videoPath}`);
@@ -1190,7 +1247,7 @@ async function tryPostNextPendingJobTick(pages) {
     // Caption dựng MỖI LẦN đăng: tag chủ đề đổi ngẫu nhiên trong cùng nhóm để các page không trùng
     // caption. Job không có plan hashtag (job cũ) đăng đúng `caption` như trước.
     const caption = job.hashtags?.length
-      ? buildCaption(job.caption, finalizeHashtags(job.hashtags, loadHashtagConfig()))
+      ? buildCaption(job.caption, finalizeHashtags(job.hashtags, loadHashtagConfig(localeFromCode(job.locale) || getDefaultLocale())))
       : job.caption;
     const result = await publishVideo(page, job.videoPath, caption, {
       onSubmitted: (videoId) => recordVerifying(job.id, page, videoId, { postType: "reel", caption }),
@@ -1248,11 +1305,11 @@ async function processSocialQueueTick() {
 // ------------------------------------------------------------------
 let ffmpegStatus = { ok: null, detail: "chưa kiểm tra" };
 app.get("/api/social-status", (_req, res) => {
-  const { pages, problems } = inspectPages();
+  const { pages, problems } = inspectConfiguredPages();
   const { disabledPages } = loadQueue();
   res.json({
     autoPost: isAutoPostEnabled(),
-    configuredPages: pages.map((p) => ({ id: p.id, name: p.name })),
+    configuredPages: pages.map((p) => ({ id: p.id, name: p.name, locale: p.locale })),
     configProblems: problems,
     disabledPages: listDisabledPages(pages, disabledPages).map((d) => ({
       ...d,
@@ -1266,13 +1323,13 @@ app.get("/api/social-status", (_req, res) => {
 // Khởi động + tắt an toàn
 // ------------------------------------------------------------------
 function validateFbConfigAtStartup() {
-  const { pages, problems } = inspectPages();
+  const { pages, problems } = inspectConfiguredPages();
   for (const p of problems) fbLog.warn(p);
   const enabled = isAutoPostEnabled();
   if (enabled && !pages.length) {
     fbLog.warn("FB_AUTO_POST đang bật nhưng KHÔNG có page hợp lệ nào (cần FB_PAGE_n_ID + FB_PAGE_n_ACCESS_TOKEN) — sẽ không đăng gì.");
   } else if (enabled) {
-    fbLog.info(`Tự động đăng bật: ${pages.length} page (${pages.map((p) => p.name).join(", ")}), Graph API ${graphVersion()}.`);
+    fbLog.info(`Tự động đăng bật: ${pages.length} page (${pages.map((p) => `${p.name} [${p.locale}]`).join(", ")}), Graph API ${graphVersion()}.`);
   }
   if (enabled && pages.length) {
     const ff = checkFfmpeg();

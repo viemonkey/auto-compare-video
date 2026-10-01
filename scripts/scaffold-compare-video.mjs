@@ -33,6 +33,7 @@ import { renameCostLedgerSlug } from "./lib/cost-ledger.mjs";
 import { npmCommand } from "./lib/npm-cmd.mjs";
 import { stripDiacritics, slugify } from "./lib/slug.mjs";
 import { resolveLocale } from "./lib/locales.mjs";
+import { baseSlugFromContent, slugForLocale } from "./lib/market-slug.mjs";
 import { checkRenderability } from "./lib/capabilities.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -133,8 +134,12 @@ function ensureUniqueSlugDir(baseSlug) {
   return slug;
 }
 
-function genUniqueSlug(labelLeft, labelRight) {
-  return ensureUniqueSlugDir(`${slugify(labelLeft)}-vs-${slugify(labelRight)}`);
+// Slug tự sinh từ nội dung: gốc "<trái>-vs-<phải>" (từ nghĩa tiếng Việt nếu là nội dung song ngữ — chữ Nhật/Thái sẽ ra slug rỗng) +
+// hậu tố thị trường (thị trường mặc định không có hậu tố). Không sinh được -> dừng, bắt truyền --slug.
+function genUniqueSlug(content) {
+  const base = baseSlugFromContent(content);
+  if (!base) fail("Không sinh được slug từ nhãn (toàn ký tự không phải a-z0-9) — truyền --slug <tên-kebab-case>.");
+  return ensureUniqueSlugDir(slugForLocale(base, resolveLocale(content.locale)));
 }
 
 function escapeHtml(str) {
@@ -776,7 +781,7 @@ async function main() {
   backfillPointFields(content, catalog.allIds);
   validateContent(content, catalog);
 
-  const requestedSlug = opts.slug || genUniqueSlug(content.label_left, content.label_right);
+  const requestedSlug = opts.slug || genUniqueSlug(content);
   const slug = opts.slug ? ensureUniqueSlugDir(requestedSlug) : requestedSlug;
   if (slug !== requestedSlug) {
     console.log(`ℹ videos/${requestedSlug}/ đã tồn tại — dùng "${slug}" thay thế.`);

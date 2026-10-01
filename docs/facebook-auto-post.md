@@ -85,3 +85,11 @@ chừng không gây đăng trùng. Job upload dở (chưa `finish`) vẫn `pendi
 ## 8. Chạy test
 
 `npm test` (dùng `node:test`, mock `fetch`, không gọi Facebook thật).
+
+## 9. Thị trường (locale) của page — chặn đăng nhầm
+
+- Mỗi page có `FB_PAGE_n_LOCALE` (mã file trong `config/locales/`, vd `ja-JP`). **Không đặt = `DEFAULT_LOCALE`.** Mã không hợp lệ/đang bị tắt → page bị bỏ qua và báo ở log khởi động (đăng nhầm thị trường tệ hơn không đăng).
+- Video chỉ được ghép với page **cùng locale**. Kiểm ở hai chỗ:
+  1. **Lúc enqueue** (`tryEnqueueVideo`): không có page nào cùng locale → không vào hàng đợi, log/ghi chú rõ lý do.
+  2. **Lúc chọn page để đăng** (`selectJobAndPage` + `assertPageMatchesJob`): chỉ xét page cùng locale; job cũ (queue không có `locale`) coi là `DEFAULT_LOCALE`. Job mà thị trường của nó không còn page nào bị đánh dấu lỗi (không chặn job phía sau).
+- Caption = `title` (chữ ngôn ngữ đích) + hashtag của **đúng thị trường của video** (bản ghi `output/content/<slug>.compare-content.json` ghi `locale`).

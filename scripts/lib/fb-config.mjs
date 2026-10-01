@@ -49,8 +49,13 @@ export function makeLogger(prefix) {
 // ---- Validate cấu hình page ---------------------------------------------------------------
 const MAX_SLOTS = 16;
 
-/** Trả các page hợp lệ + danh sách cảnh báo cho slot cấu hình dở dang. */
-export function inspectPages(env = process.env) {
+/**
+ * Trả các page hợp lệ + danh sách cảnh báo cho slot cấu hình dở dang.
+ * Mỗi page có `locale` (thị trường của page) từ FB_PAGE_n_LOCALE; không đặt -> thị trường mặc định. Page đặt locale KHÔNG hợp lệ bị bỏ
+ * qua (đăng nhầm thị trường tệ hơn không đăng). `localeResolver` ({ defaultCode, isValid(code) }) do facebook-pages.mjs truyền vào
+ * (fb-config.mjs không import locales.mjs vì locales.mjs đã import file này); không truyền thì locale = giá trị thô hoặc null.
+ */
+export function inspectPages(env = process.env, { localeResolver } = {}) {
   const pages = [];
   const problems = [];
   for (let i = 1; i <= MAX_SLOTS; i++) {
@@ -60,7 +65,15 @@ export function inspectPages(env = process.env) {
     if (!id && !accessToken) continue; // slot trống — bình thường
     if (!id) problems.push(`FB_PAGE_${i}: có token nhưng thiếu FB_PAGE_${i}_ID — bỏ qua page này.`);
     else if (!accessToken) problems.push(`FB_PAGE_${i} (${id}): thiếu FB_PAGE_${i}_ACCESS_TOKEN — bỏ qua page này.`);
-    else pages.push({ id, name: name || `Page ${i}`, accessToken });
+    else {
+      const rawLocale = (env[`FB_PAGE_${i}_LOCALE`] || "").trim();
+      if (rawLocale && localeResolver && !localeResolver.isValid(rawLocale)) {
+        problems.push(`FB_PAGE_${i} (${id}): FB_PAGE_${i}_LOCALE="${rawLocale}" không phải thị trường hợp lệ/đang bật (config/locales/) — bỏ qua page này để không đăng nhầm.`);
+        continue;
+      }
+      const locale = rawLocale || (localeResolver ? localeResolver.defaultCode : null);
+      pages.push({ id, name: name || `Page ${i}`, accessToken, locale });
+    }
   }
   return { pages, problems };
 }

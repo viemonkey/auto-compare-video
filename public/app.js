@@ -117,10 +117,15 @@ document.addEventListener("DOMContentLoaded", () => {
     return id;
   }
 
+  // Slug gợi ý: <trái>-vs-<phải>[-<góc độ>][-<hậu tố thị trường>]. Bản ngoại ngữ sinh từ NGHĨA TIẾNG VIỆT của label (chữ Nhật/Thái
+  // ra slug rỗng); không có nghĩa thì trả rỗng để người dùng nhập tay. Thị trường mặc định không có hậu tố.
   function buildSlugWithAngle(left, right) {
-    const base = buildSlug(left, right);
-    const suffix = contentAngleSlugSuffix();
-    return suffix ? `${base}-${suffix}` : base;
+    const gloss = typeof isGloss === "function" && isGloss();
+    const base = buildSlug(gloss ? biState.label_left.vi || left : left, gloss ? biState.label_right.vi || right : right);
+    if (!base || !base.includes("-vs-")) return "";
+    const info = typeof currentLocaleInfo === "function" ? currentLocaleInfo() : null;
+    const parts = [base, contentAngleSlugSuffix(), info && info.slugSuffix ? info.slugSuffix : ""].filter(Boolean);
+    return parts.join("-");
   }
 
   const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
@@ -447,6 +452,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const locked = !!info && !info.renderable;
     const busyNow = busyCount > 0;
     btnApproveBuild.disabled = locked || busyNow;
+    if (btnSaveDraft) btnSaveDraft.disabled = busyNow; // nội dung đang được AI sửa -> chưa lưu bản nửa vời
     btnApproveBuild.title = locked ? "Thị trường này chưa dựng được video" : busyNow ? "Đang chờ AI sửa dòng…" : "";
     if (locked) {
       renderLockNote.textContent = `🔒 Chưa dựng được video cho ${info.displayName}: ${info.blockers.map((b) => b.message).join(" ")} Bạn vẫn xem và sửa kịch bản bình thường.`;
@@ -585,6 +591,240 @@ document.addEventListener("DOMContentLoaded", () => {
       points: pointsData.map(({ _bi, ...p }) => ({ ...p, text: field(p.text, _bi.text), tag: field(p.tag, _bi.tag), sub: field(p.sub, _bi.sub) })),
     };
   }
+
+  // -------------------------------------------------------------
+  // Drafts, reopening saved content, and market versions (M4)
+  // -------------------------------------------------------------
+  const btnSaveDraft = document.getElementById("btn-save-draft");
+  const draftNote = document.getElementById("draft-note");
+  const videosLocaleFilter = document.getElementById("videos-locale-filter");
+  const marketVersionModal = document.getElementById("market-version-modal");
+  const marketVersionSource = document.getElementById("market-version-source");
+  const marketVersionButtons = document.getElementById("market-version-buttons");
+  const marketVersionStatus = document.getElementById("market-version-status");
+  const btnCloseMarketVersion = document.getElementById("btn-close-market-version");
+  let videosData = [];
+  let marketVersionRequestId = 0;
+
+  // Flag badge: bundled SVG (flagIcon from the locale file) with the emoji only as fallback.
+  function flagBadgeHtml(item) {
+    const icon = item.flagIcon
+      ? `<img class="locale-flag" src="${escapeAttr(item.flagIcon)}" alt="" width="24" height="16" />`
+      : `<span>${escapeHtml(item.flag || "")}</span>`;
+    return `<span class="locale-badge" title="${escapeAttr(item.displayName || item.locale || "")}">${icon}<span>${escapeHtml(item.displayName || item.locale || "")}</span></span>`;
+  }
+
+  // Fill Step 2 from a content object (generated or reopened). Slug is suggested unless given.
+  function populateStep2({ content: raw, hashtags, hashtagMax: max, warnings, slug }) {
+    generatedContent = raw;
+    generatedWarnings = warnings || [];
+    const content = flattenContent(raw);
+    scriptTitle.value = content.title || "";
+    scriptLabelLeft.value = content.label_left || "";
+    scriptLabelRight.value = content.label_right || "";
+    initBilingualState(generatedContent); // biState first: the slug of a foreign-language version comes from the vi labels
+    scriptSlug.value = slug || buildSlugWithAngle(content.label_left, content.label_right);
+    refreshBiEditors();
+    geminiHashtagMeta = {
+      materials: content.materials || [],
+      topicTags: content.topicTags || [],
+      suggestedTags: content.suggestedTags || [],
+    };
+    hashtagPlan = hashtags || [];
+    hashtagMax = max || 4;
+    renderHashtagChips();
+    draftNote.classList.add("hidden");
+  }
+
+  // Reopen a saved record (draft or built video) in Step 2, switching the market to the record's market.
+  async function loadRecordIntoStep2(slug) {
+    const res = await fetch(`/api/content-record?slug=${encodeURIComponent(slug)}`);
+    const rec = await res.json();
+    if (!res.ok) throw new Error(rec.error || "Không mở được nội dung đã lưu.");
+    if (hasStep2Content() && !confirm("Bước 2 đang có nội dung chưa lưu — mở bản này sẽ thay thế nó. Tiếp tục?")) return false;
+    resetStep2Content();
+    if (rec.locale !== currentLocale) {
+      currentLocale = rec.locale;
+      storeLocale(rec.locale);
+      renderLocaleButtons();
+    }
+    await refreshMarketDependents(); // luật + giọng đọc của thị trường này phải có TRƯỚC khi dựng trình soạn
+    uploadedLeftPath = rec.leftPath;
+    uploadedRightPath = rec.rightPath;
+    pendingContentSlug = null;
+    if (rec.source && rec.source.available) {
+      topicHintInput.value = rec.source.topicHint || "";
+      if (contentAngleSelect && Array.from(contentAngleSelect.options).some((o) => o.value === rec.source.contentAngleId)) {
+        contentAngleSelect.value = rec.source.contentAngleId;
+        contentAngleCustomContainer.classList.toggle("hidden", contentAngleSelect.value !== "custom");
+        if (contentAngleCustomText) contentAngleCustomText.value = rec.source.customAngleText || "";
+      }
+    }
+    populateStep2({ content: rec.content, hashtags: rec.hashtags, hashtagMax: rec.hashtagMax, warnings: rec.warnings, slug: rec.slug });
+    gotoStep(2);
+    return true;
+  }
+
+  function slugIsValidForMarket(slug) {
+    const info = currentLocaleInfo();
+    const suffix = info && info.slugSuffix ? info.slugSuffix : "";
+    if (!SLUG_RE.test(slug)) return false;
+    return !suffix || (slug.endsWith(`-${suffix}`) && slug.length > suffix.length + 1);
+  }
+
+  btnSaveDraft.addEventListener("click", async () => {
+    if (!pointsData.length) {
+      alert("Cần có ít nhất 1 điểm so sánh để lưu nháp!");
+      return;
+    }
+    let slug = scriptSlug.value.trim();
+    if (!slugIsValidForMarket(slug)) {
+      const suggested = buildSlugWithAngle(scriptLabelLeft.value, scriptLabelRight.value);
+      const info = currentLocaleInfo();
+      const need = info && info.slugSuffix ? ` và kết thúc bằng "-${info.slugSuffix}" cho thị trường ${info.displayName}` : "";
+      if (suggested && slugIsValidForMarket(suggested) && confirm(`Slug "${slug}" chưa hợp lệ (chữ thường a-z, số, gạch ngang${need}).\n\nDùng "${suggested}" thay thế?`)) {
+        slug = suggested;
+        scriptSlug.value = suggested;
+      } else {
+        alert(`Sửa lại slug (chữ thường a-z, số, gạch ngang${need}) rồi lưu lại nhé.`);
+        return;
+      }
+    }
+    btnSaveDraft.disabled = true;
+    draftNote.classList.add("hidden");
+    try {
+      const res = await fetch("/api/save-draft", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          slug,
+          locale: currentLocale,
+          content: buildContentPayload(),
+          hashtags: hashtagPlan,
+          topicHint: topicHintInput.value.trim(),
+          contentAngleId: contentAngleSelect ? contentAngleSelect.value : "auto",
+          customAngleText: contentAngleCustomText ? contentAngleCustomText.value.trim() : "",
+          leftPath: uploadedLeftPath,
+          rightPath: uploadedRightPath,
+          pendingSlug: pendingContentSlug,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Lưu nháp thất bại.");
+      pendingContentSlug = null; // chi phí Gemini đã gắn vào slug thật
+      draftNote.textContent = `✅ Đã lưu nháp "${data.slug}" lúc ${new Date(data.savedAt).toLocaleTimeString("vi-VN")}.`;
+      draftNote.classList.remove("hidden");
+    } catch (err) {
+      draftNote.textContent = `❌ ${err.message}`;
+      draftNote.classList.remove("hidden");
+    } finally {
+      updateApproveState();
+    }
+  });
+
+  // --- "Tạo phiên bản cho thị trường khác" ---
+  function openMarketVersionModal(video) {
+    marketVersionStatus.classList.add("hidden");
+    marketVersionSource.textContent = `Dùng lại 2 ảnh, gợi ý ngữ cảnh và góc độ đã chọn của "${video.slug}" để Gemini viết nội dung MỚI cho thị trường khác. Kết quả lưu thành bản nháp riêng (slug riêng), không ghi đè bản gốc.`;
+    marketVersionButtons.innerHTML = "";
+    localesData
+      .filter((l) => l.code !== video.locale)
+      .forEach((l) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "locale-btn";
+        btn.innerHTML = flagBadgeHtml({ flag: l.flag, flagIcon: l.flagIcon, displayName: l.displayName });
+        btn.addEventListener("click", () => createMarketVersion(video, l, btn));
+        marketVersionButtons.appendChild(btn);
+      });
+    marketVersionModal.classList.remove("hidden");
+  }
+
+  async function createMarketVersion(video, target, btn) {
+    const requestId = ++marketVersionRequestId;
+    const buttons = marketVersionButtons.querySelectorAll("button");
+    buttons.forEach((b) => (b.disabled = true));
+    marketVersionStatus.textContent = `⏳ Gemini đang viết nội dung bản ${target.displayName}… (khoảng 30 giây)`;
+    marketVersionStatus.classList.remove("hidden");
+    try {
+      const res = await fetch("/api/market-versions", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ sourceSlug: video.slug, locale: target.code }),
+      });
+      const data = await res.json();
+      if (requestId !== marketVersionRequestId) return; // người dùng đã đóng/gửi yêu cầu khác
+      if (!res.ok) throw new Error(data.error || "Tạo phiên bản thất bại.");
+      const opened = await loadRecordIntoStep2(data.slug);
+      marketVersionModal.classList.add("hidden");
+      if (opened) videosModal.classList.add("hidden");
+      else alert(`Đã lưu bản nháp "${data.slug}" — mở lại từ danh sách video khi cần.`);
+    } catch (err) {
+      if (requestId !== marketVersionRequestId) return;
+      marketVersionStatus.textContent = `❌ ${err.message}`;
+      marketVersionStatus.classList.remove("hidden");
+    } finally {
+      if (requestId === marketVersionRequestId) buttons.forEach((b) => (b.disabled = false));
+    }
+  }
+
+  btnCloseMarketVersion.addEventListener("click", () => {
+    marketVersionRequestId++; // bỏ kết quả của yêu cầu đang chờ (nếu có)
+    marketVersionModal.classList.add("hidden");
+  });
+
+  // --- Danh sách video: badge thị trường + bộ lọc + hành động ---
+  function renderVideosList() {
+    const filter = videosLocaleFilter.value || "all";
+    const list = filter === "all" ? videosData : videosData.filter((v) => v.locale === filter);
+    videosListGrid.innerHTML = "";
+    if (!list.length) {
+      videosListGrid.innerHTML = `<p style="color: var(--fg-dim);">${videosData.length ? "Không có video nào thuộc thị trường này." : "Chưa có video nào được tạo."}</p>`;
+      return;
+    }
+    list.forEach((v) => {
+      const draft = v.status === "draft";
+      const card = document.createElement("div");
+      card.className = "video-card";
+      const actions = draft
+        ? `<button type="button" class="btn btn-small btn-primary btn-open-draft" data-slug="${escapeAttr(v.slug)}">✏ Mở để sửa</button>`
+        : `<a href="${v.previewUrl}" target="_blank" class="btn btn-small btn-primary">${v.hasIndex ? "🎬 Xem Trước" : "▶ Xem MP4"}</a>
+            ${v.renderFile && v.renderFile !== v.previewUrl ? `<a href="${v.renderFile}" target="_blank" class="btn btn-small btn-secondary">⬇ Tải MP4</a>` : ""}`;
+      const versionBtn = v.canMakeVersion
+        ? `<button type="button" class="btn btn-small btn-secondary btn-make-version" data-slug="${escapeAttr(v.slug)}" title="Dùng lại 2 ảnh + gợi ý + góc độ để viết nội dung cho thị trường khác">🌏 Tạo phiên bản cho thị trường khác</button>`
+        : "";
+      card.innerHTML = `
+        <div>
+          <h4>${flagBadgeHtml(v)} ${escapeHtml(v.name)}${draft ? ' <span class="draft-badge">Bản nháp</span>' : ""}</h4>
+          <span style="font-size: 11px; color: var(--accent-cyan); font-family: monospace;">${escapeHtml(v.location || `videos/${v.slug}/`)}</span>
+          ${v.derivedFrom ? `<div style="font-size: 11px; color: var(--fg-dim); margin-top: 2px;">Phiên bản của ${escapeHtml(v.derivedFrom)}</div>` : ""}
+          ${socialStatusHtml(v.social)}
+        </div>
+        <div class="video-card-actions">${actions}${versionBtn}</div>
+      `;
+      videosListGrid.appendChild(card);
+    });
+  }
+
+  // Event delegation (no inline handlers in an ES module)
+  videosListGrid.addEventListener("click", async (e) => {
+    const open = e.target.closest(".btn-open-draft");
+    const make = e.target.closest(".btn-make-version");
+    if (open) {
+      open.disabled = true;
+      try {
+        if (await loadRecordIntoStep2(open.dataset.slug)) videosModal.classList.add("hidden");
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        open.disabled = false;
+      }
+    } else if (make) {
+      const video = videosData.find((v) => v.slug === make.dataset.slug);
+      if (video) openMarketVersionModal(video);
+    }
+  });
+  videosLocaleFilter.addEventListener("change", renderVideosList);
 
   async function fetchContentAngles() {
     if (!contentAngleSelect) return;
@@ -767,30 +1007,8 @@ document.addEventListener("DOMContentLoaded", () => {
 
       pendingContentSlug = genData.pendingSlug || null;
 
-      // Populate Step 2 Studio with Gemini output.
-      // Thị trường khác tiếng Việt trả field song ngữ { text, vi }: bản gốc giữ ở generatedContent (+ cảnh báo theo field)
-      // cho trình soạn song ngữ ở bước sau; ô nhập hiện tại chỉ hiện chữ ngôn ngữ đích.
-      generatedContent = genData.content;
-      generatedWarnings = genData.warnings || [];
-      const content = flattenContent(genData.content);
-      scriptTitle.value = content.title || "";
-      scriptLabelLeft.value = content.label_left || "";
-      scriptLabelRight.value = content.label_right || "";
-
-      // Auto-generate suggested slug — hậu tố theo góc độ nội dung đã chọn ở Bước 1
-      scriptSlug.value = buildSlugWithAngle(content.label_left, content.label_right);
-
-      initBilingualState(generatedContent);
-      refreshBiEditors();
-
-      geminiHashtagMeta = {
-        materials: content.materials || [],
-        topicTags: content.topicTags || [],
-        suggestedTags: content.suggestedTags || [],
-      };
-      hashtagPlan = genData.hashtags || [];
-      hashtagMax = genData.hashtagMax || 4;
-      renderHashtagChips();
+      // Populate Step 2 Studio with Gemini output (field song ngữ { text, vi } với thị trường ngoài tiếng Việt).
+      populateStep2({ content: genData.content, hashtags: genData.hashtags, hashtagMax: genData.hashtagMax, warnings: genData.warnings });
 
       gotoStep(2);
     } catch (err) {
@@ -1109,6 +1327,8 @@ document.addEventListener("DOMContentLoaded", () => {
           slug: scriptSlug.value.trim(),
           pendingSlug: pendingContentSlug,
           topicHint: topicHintInput.value.trim(),
+          contentAngleId: contentAngleSelect ? contentAngleSelect.value : "auto",
+          customAngleText: contentAngleCustomText ? contentAngleCustomText.value.trim() : "",
           ttsProvider,
           ttsVoice,
           vieneuVoice,
@@ -1166,32 +1386,22 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       const res = await fetch("/api/videos");
-      const videos = await res.json();
-
-      videosListGrid.innerHTML = "";
-      if (!videos.length) {
-        videosListGrid.innerHTML = `<p style="color: var(--fg-dim);">Chưa có video nào được tạo.</p>`;
-        return;
-      }
-
-      videos.forEach((v) => {
-        const card = document.createElement("div");
-        card.className = "video-card";
-        card.innerHTML = `
-          <div>
-            <h4>${escapeHtml(v.name)}</h4>
-            <span style="font-size: 11px; color: var(--accent-cyan); font-family: monospace;">${escapeHtml(v.location || `videos/${v.slug}/`)}</span>
-            ${socialStatusHtml(v.social)}
-          </div>
-          <div class="video-card-actions">
-            <a href="${v.previewUrl}" target="_blank" class="btn btn-small btn-primary">${v.hasIndex ? "🎬 Xem Trước" : "▶ Xem MP4"}</a>
-            ${v.renderFile && v.renderFile !== v.previewUrl ? `<a href="${v.renderFile}" target="_blank" class="btn btn-small btn-secondary">⬇ Tải MP4</a>` : ""}
-          </div>
-        `;
-        videosListGrid.appendChild(card);
+      videosData = await res.json();
+      // bộ lọc thị trường: chỉ liệt kê thị trường đang có trong danh sách (giữ lựa chọn hiện tại nếu còn)
+      const previous = videosLocaleFilter.value || "all";
+      const seen = new Map();
+      videosData.forEach((v) => seen.set(v.locale, v.displayName));
+      videosLocaleFilter.innerHTML = "";
+      [["all", "Tất cả"], ...seen.entries()].forEach(([code, name]) => {
+        const opt = document.createElement("option");
+        opt.value = code;
+        opt.textContent = name;
+        videosLocaleFilter.appendChild(opt);
       });
+      videosLocaleFilter.value = seen.has(previous) ? previous : "all";
+      renderVideosList();
     } catch (err) {
-      videosListGrid.innerHTML = `<p style="color: var(--danger);">Lỗi nạp danh sách: ${err.message}</p>`;
+      videosListGrid.innerHTML = `<p style="color: var(--danger);">Lỗi nạp danh sách: ${escapeHtml(err.message)}</p>`;
     }
   });
 
@@ -1241,6 +1451,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let costSortKey = "createdAt";
   let costSortDir = "desc";
   let costPage = 1;
+  let costLocaleFilter = "all";
 
   function formatUsd(n) {
     const v = typeof n === "number" ? n : 0;
@@ -1278,6 +1489,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       costRawData = data;
       costPage = 1;
+      populateCostLocaleSelect(data);
       costStateLoading.classList.add("hidden");
 
       // Ledger rỗng hoàn toàn (chưa từng có lần gọi Gemini nào) — khác với "có dữ liệu nhưng
@@ -1467,12 +1679,39 @@ document.addEventListener("DOMContentLoaded", () => {
     return { pageItems: list.slice(start, start + COST_PAGE_SIZE), totalPages };
   }
 
+  // Bộ lọc thị trường của bảng chi phí + dòng tổng theo thị trường (badge cờ). Dữ liệu cũ thiếu locale = thị trường mặc định (server đã gộp).
+  function populateCostLocaleSelect(data) {
+    const select = document.getElementById("cost-locale-select");
+    const box = document.getElementById("cost-by-locale");
+    select.innerHTML = "";
+    const all = document.createElement("option");
+    all.value = "all";
+    all.textContent = "Tất cả";
+    select.appendChild(all);
+    (data.locales || []).forEach((l) => {
+      const opt = document.createElement("option");
+      opt.value = l.code;
+      opt.textContent = l.displayName;
+      select.appendChild(opt);
+    });
+    if (!(data.locales || []).some((l) => l.code === costLocaleFilter)) costLocaleFilter = "all";
+    select.value = costLocaleFilter;
+    box.innerHTML = (data.locales || [])
+      .map((l) => `<span class="cost-locale-chip">${flagBadgeHtml({ flag: l.flag, flagIcon: l.flagIcon, displayName: l.displayName })} <b>${formatUsd((data.byLocale || {})[l.code] || 0)}</b></span>`)
+      .join("");
+  }
+  document.getElementById("cost-locale-select").addEventListener("change", (e) => {
+    costLocaleFilter = e.target.value;
+    costPage = 1;
+    renderCostStats();
+  });
+
   function renderCostTableRows(pageItems) {
     costVideosTbody.innerHTML = "";
     if (!pageItems.length) {
       const tr = document.createElement("tr");
       const td = document.createElement("td");
-      td.colSpan = 6;
+      td.colSpan = 7;
       td.className = "cost-table-empty-row";
       td.textContent = "Không có video nào trong khoảng thời gian đang lọc.";
       tr.appendChild(td);
@@ -1484,6 +1723,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const createdAt = v.createdAt ? new Date(v.createdAt).toLocaleString("vi-VN") : "—";
       tr.innerHTML = `
         <td class="cost-td-slug">${escapeHtml(v.slug)}</td>
+        <td>${flagBadgeHtml(v)}</td>
         <td>${escapeHtml(createdAt)}</td>
         <td class="cost-td-content">${formatUsd(v.contentCost)}</td>
         <td class="cost-td-image">${formatUsd(v.imageCost)}</td>
@@ -1563,6 +1803,8 @@ document.addEventListener("DOMContentLoaded", () => {
         return d >= cutoffFrom && d <= cutoffTo;
       });
     }
+
+    if (costLocaleFilter !== "all") videos = videos.filter((v) => v.locale === costLocaleFilter);
 
     const enriched = videos.map((v) => ({
       ...v,
@@ -1646,7 +1888,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   function exportCostCsv() {
     if (!costFilteredSorted.length) return;
-    const header = ["slug", "created_at", "content_cost_usd", "image_cost_usd", "images_generated", "total_cost_usd"];
+    const header = ["slug", "locale", "created_at", "content_cost_usd", "image_cost_usd", "images_generated", "total_cost_usd"];
     const lines = [header.join(",")];
     const totals = { content: 0, image: 0, images: 0, total: 0 };
 
@@ -1658,6 +1900,7 @@ document.addEventListener("DOMContentLoaded", () => {
       lines.push(
         [
           csvEscape(v.slug),
+          csvEscape(v.locale || ""),
           csvEscape(v.createdAt || ""),
           (v.contentCost || 0).toFixed(6),
           (v.imageCost || 0).toFixed(6),
@@ -1667,7 +1910,7 @@ document.addEventListener("DOMContentLoaded", () => {
       );
     });
     lines.push(
-      ["TONG", "", totals.content.toFixed(6), totals.image.toFixed(6), totals.images, totals.total.toFixed(6)].join(","),
+      ["TONG", "", "", totals.content.toFixed(6), totals.image.toFixed(6), totals.images, totals.total.toFixed(6)].join(","),
     );
 
     const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8;" });
