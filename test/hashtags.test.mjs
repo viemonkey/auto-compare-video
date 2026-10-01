@@ -17,7 +17,6 @@ import {
   loadHashtagConfig,
   resolveMaterialGroups,
   alignTopicTags,
-  MIXED_GROUP,
 } from "../scripts/lib/hashtags.mjs";
 
 const RAW = {
@@ -318,7 +317,7 @@ test("cập nhật tag: không xác định được nhóm -> giữ nguyên topi
 });
 
 test("cập nhật tag: 2 vật liệu KHÁC nhóm và cần thay -> chọn ngẫu nhiên từ nhóm 'kiến thức', không theo bên trái", () => {
-  assert.equal(MIXED_GROUP, "kiến thức");
+  assert.equal(GCFG.mixedGroup, "kiến thức"); // MIXED_GROUP đã chuyển vào locale.mixedGroup (config/locales/vi-VN.json)
   const groups = resolveMaterialGroups({ label_left: "Peridot", label_right: "Bạc 925" }, GCFG);
   assert.deepEqual(groups, ["đá quý", "kim loại"]);
   // tag hiện tại thuộc nhóm "trang sức" (không khớp cả 2 vật liệu, cũng không phải kiến thức) -> thay

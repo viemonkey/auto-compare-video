@@ -31,6 +31,7 @@ import { runCompareContent, loadActionCatalog, enforceContextImageLimits } from 
 import { generateContextImage } from "./generate-context-image.mjs";
 import { renameCostLedgerSlug } from "./lib/cost-ledger.mjs";
 import { npmCommand } from "./lib/npm-cmd.mjs";
+import { stripDiacritics, slugify } from "./lib/slug.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -116,20 +117,6 @@ function parseArgs(argv) {
 // ============================================================
 // Helpers dùng chung
 // ============================================================
-function stripDiacritics(str) {
-  return str
-    .normalize("NFD")
-    .replace(/[̀-ͯ]/g, "")
-    .replace(/đ/gi, (m) => (m === "đ" ? "d" : "D"))
-    .toLowerCase();
-}
-
-function slugify(str) {
-  return stripDiacritics(str)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
-
 // videos/<slug>/ trùng tên -> thêm hậu tố số thứ tự thay vì báo lỗi dừng lại. Dùng cho cả
 // slug tự sinh từ label (genUniqueSlug) LẪN slug người dùng/caller truyền qua --slug (xem
 // chỗ gọi ở main()) — một lần dựng lại tình cờ trùng tên không đáng phải huỷ cả run.

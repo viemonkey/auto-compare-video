@@ -12,8 +12,14 @@ import {
   loadHashtagConfig, normalizeTag, planHashtags, finalizeHashtags, buildCaption, resolveTopicTags,
   resolveSpecificTags, alignTopicTags, resolveMaterialGroups, sanitizePlan, cleanTag, maxHashtags,
 } from "../scripts/lib/hashtags.mjs";
-import { RetryableError, NonRetryableError } from "../scripts/lib/gemini-retry.mjs";
-import { loadExtracted } from "./helpers/extract-fn.mjs";
+import { RetryableError } from "../scripts/lib/gemini-retry.mjs";
+import { isJewelryTopic, enforceJewelryGating, enforceContextImageLimits, parseAndValidate } from "../scripts/lib/compare-content.mjs";
+import { slugify } from "../scripts/lib/slug.mjs";
+import { resolveLocale } from "../scripts/lib/locales.mjs";
+
+// Golden = hành vi của thị trường tiếng Việt; cố định để không phụ thuộc DEFAULT_LOCALE trong .env của máy chạy test.
+process.env.DEFAULT_LOCALE = "vi-VN";
+const vi = resolveLocale("vi-VN");
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const FIX = path.join(ROOT, "test", "fixtures", "golden-vi");
@@ -41,8 +47,8 @@ function seq(...vals) {
 
 function compute() {
   const prompts = {
-    full: buildComparePrompt({ catalog, hashtagCfg: cfg, topicHint: "Đồ trang sức kim hoàn", angleInstruction: "Phân tích rõ ưu điểm và nhược điểm của từng bên." }),
-    noHints: buildComparePrompt({ catalog, hashtagCfg: cfg }),
+    full: buildComparePrompt({ catalog, hashtagCfg: cfg, locale: vi, topicHint: "Đồ trang sức kim hoàn", angleInstruction: "Phân tích rõ ưu điểm và nhược điểm của từng bên." }),
+    noHints: buildComparePrompt({ catalog, hashtagCfg: cfg, locale: vi }),
   };
 
   const tagInputs = ["#Thạch Anh Tím", "Đá  Quý!!", "bạc-925", "Kim cương Đỏ", "Đồng hồ Đeo Tay", "925", "###", "", null, "a".repeat(60), "#宝石", "#อัญมณี", "Ｄiamond"];
@@ -73,13 +79,8 @@ function compute() {
   ];
   const max = [{}, { FB_MAX_HASHTAGS: "7" }, { FB_MAX_HASHTAGS: "99" }, { FB_MAX_HASHTAGS: "0" }, { FB_MAX_HASHTAGS: "x" }].map((e) => maxHashtags(e));
 
-  // --- hàm nằm trong file không import được: trích nguyên văn nguồn ---
-  const gen = loadExtracted(
-    path.join(ROOT, "scripts", "generate-compare-content.mjs"),
-    ["JEWELRY_KEYWORDS", "stripDiacritics", "isJewelryTopic", "JEWELRY_FALLBACK", "enforceJewelryGating", "MAX_CONTEXT_IMAGES", "enforceContextImageLimits", "normalizeHashtagFields", "parseAndValidate"],
-    { RetryableError, NonRetryableError, loadHashtagConfig: () => cfg, resolveTopicTags, cleanTag },
-  );
-  const scaf = loadExtracted(path.join(ROOT, "scripts", "scaffold-compare-video.mjs"), ["stripDiacritics", "slugify"]);
+  const gen = { isJewelryTopic: (c, h) => isJewelryTopic(c, h, vi), enforceJewelryGating: (c, cat, h) => enforceJewelryGating(c, cat, h, vi), enforceContextImageLimits, parseAndValidate: (raw, cat) => parseAndValidate(raw, cat, { hashtagCfg: cfg }) };
+  const scaf = { slugify };
 
   const jewelry = [
     [{ title: "Kim cương hay moissanite?", label_left: "Kim cương", label_right: "Moissanite" }, null],

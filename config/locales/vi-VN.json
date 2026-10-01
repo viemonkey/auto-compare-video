@@ -1,0 +1,45 @@
+{
+  "code": "vi-VN",
+  "language": "vi",
+  "script": "Latn",
+  "displayName": "Tiếng Việt",
+  "flag": "🇻🇳",
+  "enabled": true,
+  "slugSuffix": "",
+  "styleGuide": "",
+  "glossary": {},
+  "limits": {
+    "unit": "grapheme",
+    "title": 120,
+    "label": 40,
+    "point": 160,
+    "tag": 18,
+    "sub": 26,
+    "topicTag": 24,
+    "suggestedTag": 24,
+    "material": 40,
+    "hashtagTotal": 25,
+    "readingRate": 15
+  },
+  "forbiddenPhrases": [],
+  "hashtags": "config/hashtags/vi-VN.json",
+  "mixedGroup": "kiến thức",
+  "jewelryKeywords": [
+    "kim cuong", "kim hoan", "trang suc", "da quy", "ngoc", "nhan", "vang", "bac",
+    "diamond", "gem", "gemstone", "jewelry", "jewellery", "ring"
+  ],
+  "prompt": {
+    "language": "tiếng Việt",
+    "languageDetailed": "tiếng Việt có dấu",
+    "titleWords": 15,
+    "pointWords": 20,
+    "example": {
+      "text": "Kim cương cứng nhất hành tinh, đạt 10/10 trên thang Mohs.",
+      "tag": "Rất cứng",
+      "sub": "10/10 thang Mohs"
+    },
+    "materialExamples": "\"Thạch anh tím\", \"Bạc 925\", \"Vàng trắng\", \"Kim cương tự nhiên\"",
+    "topicGroupsHint": "đá quý / kim loại / trang sức / kiến thức",
+    "suggestedTagStyle": "viết thường không dấu"
+  }
+}

@@ -1,4 +1,4 @@
-// Hashtag caption Reel dựa trên BỘ TỪ VỰNG KIỂM SOÁT (config/hashtags.json) — Gemini không sinh tự do:
+// Hashtag caption Reel dựa trên BỘ TỪ VỰNG KIỂM SOÁT (config/hashtags/<locale>.json) — Gemini không sinh tự do:
 //   - tầng "specific": tag vật liệu tra từ bảng `materials` (fallback: label trái/phải chuẩn hoá)
 //   - tầng "topic"   : tag chủ đề CHỌN TỪ whitelist `topic`, mỗi lần đăng đổi ngẫu nhiên sang tag khác
 //                      CÙNG NHÓM để nhiều page không trùng caption
@@ -7,18 +7,16 @@
 // KHÔNG throw khi thiếu/hỏng config — hashtag là phần phụ, không được làm hỏng luồng dựng/đăng video.
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
 import { makeLogger } from "./fb-config.mjs";
+import { getDefaultLocale, REPO_ROOT } from "./locales.mjs";
 
 const log = makeLogger("hashtags");
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const REPO_ROOT = path.resolve(__dirname, "..", "..");
-export const HASHTAGS_CONFIG_PATH = process.env.HASHTAGS_CONFIG_PATH || path.join(REPO_ROOT, "config", "hashtags.json");
 export const HASHTAG_SUGGESTIONS_PATH =
   process.env.HASHTAG_SUGGESTIONS_PATH || path.join(REPO_ROOT, "data", "hashtag-suggestions.json");
+// Tương thích ngược: trước đây bộ từ vựng nằm ở config/hashtags.json (1 thị trường duy nhất).
+const LEGACY_HASHTAGS_PATH = path.join(REPO_ROOT, "config", "hashtags.json");
 
-export const MAX_TAG_LENGTH = 25; // gồm cả dấu '#'
 export const MAX_SPECIFIC = 2;
 export const MAX_TOPIC = 2;
 
@@ -40,11 +38,12 @@ export function foldVietnamese(str) {
 }
 
 /**
- * Chuẩn hoá 1 tag: thường, bỏ dấu, chỉ giữ a-z0-9, tối đa 25 ký tự (gồm '#'), thêm '#'.
+ * Chuẩn hoá 1 tag: thường, bỏ dấu, chỉ giữ a-z0-9, tối đa limits.hashtagTotal ký tự (gồm '#'), thêm '#'.
  * Trả null nếu rỗng hoặc chỉ toàn số (Facebook không nhận hashtag thuần số).
+ * `locale` mặc định = thị trường mặc định.
  */
-export function normalizeTag(raw) {
-  const body = foldVietnamese(raw).replace(/[^a-z0-9]/g, "").slice(0, MAX_TAG_LENGTH - 1);
+export function normalizeTag(raw, locale = getDefaultLocale()) {
+  const body = foldVietnamese(raw).replace(/[^a-z0-9]/g, "").slice(0, locale.limits.hashtagTotal - 1);
   if (!body || /^\d+$/.test(body)) return null;
   return `#${body}`;
 }
@@ -57,19 +56,19 @@ function materialKey(name) {
 /**
  * Dựng config nội bộ từ JSON thô (thuần, dễ test): chuẩn hoá mọi tag, loại tag blocked/trùng.
  * materials: mỗi mục là `{tags:[...], group}` (group tuỳ chọn) hoặc mảng tag thuần (không có group).
- * @returns {{topic: Array<{tag:string,group:string}>, materials: Map<string,string[]>, materialGroups: Map<string,string>, blocked: Set<string>, groupOf: Map<string,string>}}
+ * @returns {{locale: object, mixedGroup: string, topic: Array<{tag:string,group:string}>, materials: Map<string,string[]>, materialGroups: Map<string,string>, blocked: Set<string>, groupOf: Map<string,string>}}
  */
-export function buildConfig(raw) {
+export function buildConfig(raw, locale = getDefaultLocale()) {
   const blocked = new Set();
   for (const t of Array.isArray(raw?.blocked) ? raw.blocked : []) {
-    const n = normalizeTag(t);
+    const n = normalizeTag(t, locale);
     if (n) blocked.add(n);
   }
 
   const topic = [];
   const groupOf = new Map();
   for (const entry of Array.isArray(raw?.topic) ? raw.topic : []) {
-    const tag = normalizeTag(entry?.tag);
+    const tag = normalizeTag(entry?.tag, locale);
     const group = String(entry?.group ?? "").trim();
     if (!tag || !group || blocked.has(tag) || groupOf.has(tag)) continue;
     topic.push({ tag, group });
@@ -86,7 +85,7 @@ export function buildConfig(raw) {
     const list = [];
     const rawTags = Array.isArray(tags) ? tags : tags?.tags;
     for (const t of Array.isArray(rawTags) ? rawTags : []) {
-      const n = normalizeTag(t);
+      const n = normalizeTag(t, locale);
       if (n && !blocked.has(n) && !list.includes(n)) list.push(n);
     }
     if (!list.length) continue;
@@ -95,27 +94,49 @@ export function buildConfig(raw) {
     if (group) materialGroups.set(key, group);
   }
 
-  return { topic, materials, materialGroups, blocked, groupOf };
+  return { locale, mixedGroup: locale.mixedGroup, topic, materials, materialGroups, blocked, groupOf };
 }
 
-let cached = null;
-/** Đọc config/hashtags.json (cache theo mtime). Lỗi -> config rỗng + log, không throw. */
-export function loadHashtagConfig(file = HASHTAGS_CONFIG_PATH) {
+/** File bộ từ vựng của 1 locale: HASHTAGS_CONFIG_PATH (chỉ locale mặc định) > file của locale > config/hashtags.json cũ. */
+function hashtagFileFor(locale) {
+  const isDefault = locale.code === getDefaultLocale().code;
+  if (isDefault && process.env.HASHTAGS_CONFIG_PATH) return process.env.HASHTAGS_CONFIG_PATH;
+  if (!fs.existsSync(locale.hashtagsPath) && isDefault && fs.existsSync(LEGACY_HASHTAGS_PATH)) {
+    if (!hashtagFileFor.warned) {
+      hashtagFileFor.warned = true;
+      log.warn(`Chưa có ${locale.hashtags} — tạm dùng config/hashtags.json (cũ). Hãy chuyển sang ${locale.hashtags}.`);
+    }
+    return LEGACY_HASHTAGS_PATH;
+  }
+  return locale.hashtagsPath;
+}
+
+const cache = new Map();
+/**
+ * Đọc bộ từ vựng hashtag (cache theo file + mtime). Lỗi -> config rỗng + log, không throw.
+ * @param {object|string} [source] locale (mặc định: locale mặc định), hoặc đường dẫn file (dùng cho test/tương thích cũ,
+ *   áp quy tắc của locale mặc định).
+ */
+export function loadHashtagConfig(source) {
+  const locale = typeof source === "string" || !source ? getDefaultLocale() : source;
+  const file = typeof source === "string" ? source : hashtagFileFor(locale);
   try {
     const mtime = fs.statSync(file).mtimeMs;
-    if (cached && cached.file === file && cached.mtime === mtime) return cached.cfg;
-    const cfg = buildConfig(JSON.parse(fs.readFileSync(file, "utf8")));
-    cached = { file, mtime, cfg };
+    const key = `${locale.code}|${file}`;
+    const hit = cache.get(key);
+    if (hit && hit.mtime === mtime) return hit.cfg;
+    const cfg = buildConfig(JSON.parse(fs.readFileSync(file, "utf8")), locale);
+    cache.set(key, { mtime, cfg });
     return cfg;
   } catch (e) {
     log.error(`Không đọc được ${file}: ${e.message} — dùng config hashtag rỗng (chỉ còn fallback theo label).`);
-    return buildConfig({});
+    return buildConfig({}, locale);
   }
 }
 
 /** Tag hợp lệ để đăng: đã chuẩn hoá và không nằm trong blocked. Trả null nếu không. */
 export function cleanTag(raw, cfg) {
-  const n = normalizeTag(raw);
+  const n = normalizeTag(raw, cfg.locale);
   return n && !cfg.blocked.has(n) ? n : null;
 }
 
@@ -149,15 +170,14 @@ export function resolveMaterialGroups({ materials, label_left, label_right } = {
   return groups;
 }
 
-// Nhóm "kiến thức" áp dụng cho MỌI video: tag thuộc nhóm này luôn hợp lệ để giữ, và là nhóm để chọn
-// thay thế khi 2 vật liệu KHÁC nhóm (vd kim cương vs vàng).
-export const MIXED_GROUP = "kiến thức";
+// Nhóm "kiến thức chung" (cfg.mixedGroup = locale.mixedGroup) áp dụng cho MỌI video: tag thuộc nhóm này luôn
+// hợp lệ để giữ, và là nhóm để chọn thay thế khi 2 vật liệu KHÁC nhóm (vd kim cương vs vàng).
 
 /**
  * Căn topicTags theo nhóm của vật liệu (dùng khi tính lại tag sau khi sửa label): giữ tag đã cùng
- * nhóm HOẶC thuộc nhóm MIXED_GROUP ("kiến thức" — luôn hợp lệ, mọi trường hợp); chỉ bỏ tag thuộc nhóm
+ * nhóm HOẶC thuộc nhóm cfg.mixedGroup (vd "kiến thức" — luôn hợp lệ, mọi trường hợp); chỉ bỏ tag thuộc nhóm
  * vật liệu không khớp. Nếu có tag nhưng không còn tag nào hợp lệ thì thay bằng 1 tag ngẫu nhiên: 2 vật
- * liệu cùng nhóm -> trong nhóm đó; KHÁC nhóm -> trong nhóm MIXED_GROUP. Không xác định được nhóm ->
+ * liệu cùng nhóm -> trong nhóm đó; KHÁC nhóm -> trong nhóm cfg.mixedGroup. Không xác định được nhóm ->
  * giữ nguyên. topicTags RỖNG (Gemini xác định nội dung ngoài ngành) -> giữ rỗng, KHÔNG tự thêm tag.
  * @param {() => number} [rand] - chỉ để test
  */
@@ -165,10 +185,10 @@ export function alignTopicTags(topicTags, groups, cfg, rand = Math.random) {
   const current = resolveTopicTags(topicTags, cfg);
   if (!current.length || !groups.length) return current;
   const mixed = groups.length > 1;
-  const allowed = [...groups, MIXED_GROUP];
+  const allowed = [...groups, cfg.mixedGroup];
   const kept = current.filter((t) => allowed.includes(cfg.groupOf.get(t)));
   if (kept.length) return kept;
-  let pool = cfg.topic.filter((t) => t.group === (mixed ? MIXED_GROUP : groups[0]));
+  let pool = cfg.topic.filter((t) => t.group === (mixed ? cfg.mixedGroup : groups[0]));
   if (!pool.length && mixed) pool = cfg.topic.filter((t) => t.group === groups[0]);
   if (!pool.length) return current;
   return [pool[Math.min(pool.length - 1, Math.floor(rand() * pool.length))].tag];
@@ -216,7 +236,7 @@ export function resolveSpecificTags({ materials, label_left, label_right } = {},
 export function resolveTopicTags(topicTags, cfg) {
   const out = [];
   for (const raw of Array.isArray(topicTags) ? topicTags : []) {
-    const n = normalizeTag(raw);
+    const n = normalizeTag(raw, cfg.locale);
     if (n && cfg.groupOf.has(n) && !cfg.blocked.has(n) && !out.includes(n)) out.push(n);
     if (out.length >= MAX_TOPIC) break;
   }
