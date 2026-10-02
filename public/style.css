@@ -1369,3 +1369,18 @@ body {
 .point-labels-body { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
 .info-tip { display: inline-block; margin-left: 4px; width: 14px; height: 14px; line-height: 14px; text-align: center; border-radius: 50%; font-size: 10px; font-style: normal; color: var(--fg-dim); border: 1px solid var(--panel-edge); cursor: help; }
 .bi-view-vi .bi-vi-line { opacity: 1; }
+
+/* Dòng nghĩa tiếng Việt: người vận hành PHẢI đọc để kiểm soát nội dung -> rõ, không mờ.
+   Chữ #cfc9ee trên nền ô #0d0a1a/#17122c ≈ 11:1 (WCAG AA cần ≥ 4.5:1); cỡ 13px (câu chính 14px); vạch dọc nhấn bên trái cho biết đây là bản dịch của dòng trên. */
+:root { --gloss-fg: #cfc9ee; --gloss-accent: var(--accent-cyan); }
+.bi-vi-line { opacity: 1; font-size: 13px; color: var(--gloss-fg); }
+.bi-vi-text {
+  color: var(--gloss-fg); font-size: 13px; line-height: 1.45;
+  padding: 2px 8px; border-left: 3px solid var(--gloss-accent); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  background: rgba(55, 230, 196, 0.06);
+}
+.bi-vi-text:empty { display: none; }
+.bi-vi-text.is-stale { opacity: 0.75; border-left-color: var(--accent-yellow); }
+/* thời gian đọc + ✎/↻ giữ cỡ nhỏ */
+.bi-vi-actions { font-size: 11px; color: var(--fg-dim); }
+.bi-view-vi .bi-vi-text { font-size: 14px; color: var(--fg); }
