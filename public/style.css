@@ -1336,3 +1336,11 @@ body {
 .fact-note { margin: 4px 0 10px; padding: 8px 12px; border-radius: 8px; font-size: 13px; color: #ff8a7a; background: rgba(255, 90, 70, 0.08); border: 1px solid rgba(255, 90, 70, 0.45); }
 
 .field-help { display: block; margin-top: 4px; font-size: 12px; color: #9aa3b2; }
+
+/* Phản hồi sau Viết lại / Dịch lại nghĩa: so sánh ý nhập ↔ nghĩa câu mới */
+.bi-notice { position: relative; flex-basis: 100%; padding: 6px 28px 6px 10px; border-radius: 8px; font-size: 12.5px; background: rgba(0, 200, 255, 0.07); border: 1px solid rgba(0, 200, 255, 0.35); }
+.bi-notice-text { font-weight: 700; color: var(--accent-cyan); }
+.bi-cmp-row { display: flex; gap: 8px; margin-top: 2px; }
+.bi-cmp-label { flex: 0 0 96px; color: var(--fg-dim); }
+.bi-cmp-value { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.bi-notice-close { position: absolute; top: 4px; right: 6px; background: none; border: 0; color: var(--fg-dim); cursor: pointer; font-size: 12px; }

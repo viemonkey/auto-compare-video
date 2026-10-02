@@ -267,3 +267,29 @@ test("gọi Gemini: 503 -> retry rồi thành công; client huỷ (AbortSignal) 
     },
   );
 });
+
+// ---------------------------------------------------------------------------------------------
+// phản hồi sau Viết lại / Dịch lại (hàm thuần dùng ở trình duyệt)
+// ---------------------------------------------------------------------------------------------
+test("rewriteFeedback: câu đích không đổi -> thông báo 'Giữ nguyên' kèm tên ngôn ngữ; vẫn trả ý nhập ↔ nghĩa câu mới", async () => {
+  const { rewriteFeedback } = await import("../public/shared/edit-feedback.mjs");
+  const same = rewriteFeedback({ idea: " đá Aquamarine ", beforeText: "アクアマリン", afterField: { text: "アクアマリン ", vi: "Aquamarine" }, languageName: "tiếng Nhật" });
+  assert.equal(same.unchanged, true);
+  assert.equal(same.notice, "Giữ nguyên — câu hiện tại đã thể hiện đúng ý theo văn phong tiếng Nhật.");
+  assert.equal(same.idea, "đá Aquamarine");
+  assert.equal(same.meaning, "Aquamarine");
+
+  const changed = rewriteFeedback({ idea: "x", beforeText: "a", afterField: { text: "b", vi: "bê" }, languageName: "tiếng Nhật" });
+  assert.equal(changed.unchanged, false);
+  assert.equal(changed.notice, "");
+});
+
+test("translateFeedback + friendlyError: không im lặng; lỗi kỹ thuật tiếng Anh -> thông báo tiếng Việt, lỗi server tiếng Việt giữ nguyên", async () => {
+  const { translateFeedback, friendlyError } = await import("../public/shared/edit-feedback.mjs");
+  assert.equal(translateFeedback({ beforeVi: "A", afterVi: " A" }).changed, false);
+  assert.match(translateFeedback({ beforeVi: "A", afterVi: "B" }).message, /Đã cập nhật/);
+  assert.match(friendlyError(new TypeError("Failed to fetch")), /Không kết nối được/);
+  assert.equal(friendlyError(new Error("Gemini đang quá tải, vui lòng thử lại sau vài phút.")), "Gemini đang quá tải, vui lòng thử lại sau vài phút.");
+  assert.match(friendlyError(new Error("Internal Server Error")), /Không thực hiện được/);
+  assert.match(friendlyError(new Error("")), /Không thực hiện được/);
+});

@@ -3,6 +3,9 @@
 // Gemini cho ĐÚNG dòng này. Chống race bằng createLatestRunner (requestId + AbortController); nút bị khoá trong lúc chờ.
 import { warningsForField, readingSeconds } from "/shared/field-warnings.mjs";
 import { createLatestRunner, STALE } from "/shared/latest-request.mjs";
+import { rewriteFeedback, translateFeedback, friendlyError } from "/shared/edit-feedback.mjs";
+
+const NOTICE_MS = 10_000; // so sánh ý / thông báo tự ẩn sau chừng này (hoặc người dùng đóng)
 
 const ICON_CLASS = { "too-long": "warn", "forbidden-phrase": "danger", "glossary-term": "warn", "missing-vi": "info", "fact-mismatch": "danger" };
 
@@ -66,7 +69,14 @@ export function createFieldEditor(o) {
   const reading = el("span", "bi-reading hidden");
   const warnList = el("ul", "bi-warnings");
   const errBox = el("div", "bi-error hidden");
-  meta.append(reading, warnList, errBox);
+  const notice = el("div", "bi-notice hidden");
+  const noticeText = el("div", "bi-notice-text");
+  const noticeCmp = el("div", "bi-notice-cmp");
+  const btnNoticeClose = el("button", "bi-notice-close", "✕");
+  btnNoticeClose.type = "button";
+  btnNoticeClose.title = "Đóng";
+  notice.append(noticeText, noticeCmp, btnNoticeClose);
+  meta.append(reading, warnList, errBox, notice);
 
   wrap.append(viLine, editBox, meta);
   o.host.appendChild(wrap);
@@ -88,6 +98,30 @@ export function createFieldEditor(o) {
   function showError(msg) {
     errBox.textContent = msg || "";
     errBox.classList.toggle("hidden", !msg);
+  }
+
+  let noticeTimer = null;
+  function hideNotice() {
+    clearTimeout(noticeTimer);
+    notice.classList.add("hidden");
+  }
+  btnNoticeClose.addEventListener("click", hideNotice);
+  /** @param {{message?:string, idea?:string, meaning?:string}} n */
+  function showNotice({ message = "", idea = "", meaning = "" }) {
+    clearTimeout(noticeTimer);
+    noticeText.textContent = message;
+    noticeText.classList.toggle("hidden", !message);
+    noticeCmp.innerHTML = "";
+    if (idea || meaning) {
+      const row = (label, value) => {
+        const r = el("div", "bi-cmp-row");
+        r.append(el("span", "bi-cmp-label", label), el("span", "bi-cmp-value", value || "—"));
+        return r;
+      };
+      noticeCmp.append(row("Ý bạn nhập", idea), row("Nghĩa câu mới", meaning));
+    }
+    notice.classList.remove("hidden");
+    noticeTimer = setTimeout(hideNotice, NOTICE_MS);
   }
 
   function refresh() {
@@ -154,6 +188,7 @@ export function createFieldEditor(o) {
       return;
     }
     showError("");
+    hideNotice();
     setBusy(true);
     try {
       const data = await runner.run((signal, requestId) =>
@@ -172,10 +207,12 @@ export function createFieldEditor(o) {
         ),
       );
       if (data === STALE || destroyed) return;
+      const fb = rewriteFeedback({ idea, beforeText: o.inputEl.value, afterField: data.field, languageName: (o.getRules() || {}).languageName });
       applyField(data.field.text, data.field.vi); // vi = nghĩa của câu MỚI do AI viết, không phải câu người dùng nhập
       editBox.classList.add("hidden");
+      showNotice({ message: fb.notice, idea: fb.idea, meaning: fb.meaning }); // luôn cho thấy ý bạn nhập ↔ nghĩa câu mới, kể cả khi chữ đích không đổi
     } catch (err) {
-      showError(err.message);
+      showError(friendlyError(err));
     } finally {
       if (!destroyed) setBusy(false);
       else if (busy) {
@@ -189,17 +226,20 @@ export function createFieldEditor(o) {
   btnRe.addEventListener("click", async () => {
     const text = o.inputEl.value;
     showError("");
+    hideNotice();
     setBusy(true);
     try {
       const data = await runner.run((signal, requestId) =>
         postJson("/api/translate-field", { locale: o.getLocaleCode(), kind: o.kind, text, pendingSlug: o.getPendingSlug(), requestId }, signal),
       );
       if (data === STALE || destroyed) return;
+      const tf = translateFeedback({ beforeVi: o.state.vi, afterVi: data.vi });
       o.state.vi = data.vi;
       o.state.baseText = text; // nghĩa này là của `text` lúc gửi; nếu người dùng đã gõ tiếp thì vẫn hiện "chưa cập nhật"
       if (o.onChange) o.onChange();
+      showNotice({ message: tf.message });
     } catch (err) {
-      showError(err.message);
+      showError(friendlyError(err));
     } finally {
       if (!destroyed) setBusy(false);
       else if (busy) {
@@ -218,6 +258,7 @@ export function createFieldEditor(o) {
     destroy() {
       if (destroyed) return;
       destroyed = true;
+      clearTimeout(noticeTimer);
       runner.cancel();
       o.inputEl.removeEventListener("input", onInput);
       if (busy) {
