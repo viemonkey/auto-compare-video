@@ -72,6 +72,7 @@ import { textOf } from "./public/shared/bilingual.mjs";
 import { rulesOf } from "./scripts/lib/compare-content.mjs";
 import { createMarketApi, buildRecord, generatedByOf, resolveSocialPost as resolveSocialPostIn } from "./server-market.mjs";
 import { validateGeminiModels } from "./scripts/lib/gemini-models.mjs";
+import { createCleanupQueue, existingVideoWebPath } from "./scripts/lib/pending-cleanup.mjs";
 import { effectiveSlugSuffix, hasLocaleSuffix, stripLocaleSuffix, uniqueSlugForLocale } from "./scripts/lib/market-slug.mjs";
 import { copySourceImages, readRecord, writeRecord } from "./scripts/lib/content-store.mjs";
 import { rewriteField, translateField, FieldEditError } from "./scripts/lib/field-edit.mjs";
@@ -131,6 +132,14 @@ const CONTENT_ARCHIVE_DIR = path.join(OUTPUT_DIR, "content");
 const DATA_DIR = path.join(__dirname, "data");
 
 for (const d of [UPLOAD_DIR, TEMP_DIR, OUTPUT_DIR, LOG_DIR, CONTENT_ARCHIVE_DIR, DATA_DIR]) fs.mkdirSync(d, { recursive: true });
+
+// videos/<slug>/ chưa dọn được sau render (EPERM...) -> data/pending-cleanup.json, thử lại mỗi tick + lúc khởi động (xem scripts/lib/pending-cleanup.mjs).
+const cleanupQueue = createCleanupQueue({
+  file: path.join(DATA_DIR, "pending-cleanup.json"),
+  videosDir: VIDEOS_DIR,
+  outputDir: OUTPUT_DIR,
+  log: makeLogger("cleanup"),
+});
 
 function writeRunLog(name, text) {
   try {
@@ -766,7 +775,7 @@ app.post("/api/create-video", async (req, res) => {
         if (keepProject) {
           say(`  (KEEP_PROJECT — giữ nguyên videos/${slug}/)`);
         } else {
-          renderUrl = archiveAndCleanup(slug, file, say);
+          renderUrl = await archiveAndCleanup(slug, file, say);
         }
       }
     }
@@ -839,41 +848,36 @@ app.post("/api/create-video", async (req, res) => {
 // chối dựng khi videos/<slug>/ đã tồn tại — giữ lại thư mục rỗng là khoá luôn
 // slug đó vĩnh viễn.
 // ------------------------------------------------------------------
-function archiveAndCleanup(slug, renderWebPath, say) {
+async function archiveAndCleanup(slug, renderWebPath, say) {
   const src = path.join(__dirname, renderWebPath.replace(/^\//, ""));
   const dest = path.join(OUTPUT_DIR, `${slug}${path.extname(src)}`);
 
-  let moved = false;
+
   try {
     const size = fs.statSync(src).size;
     if (size < 100 * 1024) throw new Error(`MP4 chỉ ${size} byte — nghi ngờ render lỗi`);
 
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
     fs.renameSync(src, dest); // cùng volume nên rename là đủ, không cần copy
-    moved = true;
+
     if (!fs.existsSync(dest) || fs.statSync(dest).size !== size) {
       throw new Error("MP4 không đến nơi nguyên vẹn");
     }
 
-    // chỉ xoá SAU khi đã xác nhận MP4 nằm an toàn ở output/
-    // maxRetries/retryDelay: ngay sau khi child render (Chrome headless) vừa
-    // thoát, Windows/AV đôi khi còn giữ handle trên vài file trong node_modules
-    // hoặc renders/ trong vài trăm ms -> rmSync bắn EPERM dù thư mục hợp lệ để
-    // xoá. Node tự lùi tuyến tính và thử lại thay vì bỏ cuộc ngay lần đầu.
-    fs.rmSync(path.join(VIDEOS_DIR, slug), {
-      recursive: true,
-      force: true,
-      maxRetries: 5,
-      retryDelay: 300,
-    });
     say(`✔ Đã lưu: /output/${path.basename(dest)}  (${(size / 1048576).toFixed(1)} MB)`);
-    say(`  Đã xoá videos/${slug}/ — chỉ giữ MP4. Muốn giữ source: KEEP_PROJECT=1`);
-    return `/output/${path.basename(dest)}`;
+    // chỉ xoá SAU khi đã xác nhận MP4 nằm an toàn ở output/. Ngay sau khi child render (Chrome headless) thoát, Windows/AV đôi khi còn giữ
+    // handle trong node_modules/renders/ -> EPERM: thử lại 1s/3s/5s, vẫn lỗi thì vào danh sách chờ dọn (thử lại ở tick sau + lúc khởi động).
+    if (await cleanupQueue.cleanNowOrDefer(slug)) {
+      say(`  Đã xoá videos/${slug}/ — chỉ giữ MP4. Muốn giữ source: KEEP_PROJECT=1`);
+    } else {
+      say(`⚠ Chưa dọn được videos/${slug}/ (đang bị tiến trình khác giữ) — MP4 đã an toàn ở output/; thư mục được đưa vào danh sách chờ dọn, sẽ tự thử lại.`);
+    }
   } catch (e) {
     say(`⚠ Không dọn được (${e.message}) — giữ nguyên videos/${slug}/ cho an toàn.`);
-    // MP4 đã rename sang output/ thì đường dẫn renders/ cũ không còn tồn tại
-    return moved && fs.existsSync(dest) ? `/output/${path.basename(dest)}` : renderWebPath;
   }
+  // luôn trỏ tới file ĐANG TỒN TẠI: output/ nếu đã chuyển, không thì bản ở renders/ (tuỳ chọn rename lỗi giữa chừng)
+  const exists = (web) => fs.existsSync(path.join(__dirname, web.replace(/^\//, "")));
+  return existingVideoWebPath({ outputWeb: `/output/${path.basename(dest)}`, rendersWeb: renderWebPath, exists });
 }
 
 function readMetaName(slug) {
@@ -1362,7 +1366,16 @@ function validateFbConfigAtStartup() {
   }
 }
 
+function runPendingCleanup() {
+  try {
+    cleanupQueue.processPending();
+  } catch (e) {
+    makeLogger("cleanup").error(`Lỗi khi thử dọn lại: ${e.message}`);
+  }
+}
+
 const tickTimer = setInterval(() => {
+  runPendingCleanup();
   currentTick = processSocialQueueTick()
     .catch((e) => fbLog.error(`Lỗi không mong đợi ở tick: ${e.message}`))
     .finally(() => {
@@ -1394,6 +1407,7 @@ const httpServer = app.listen(PORT, () => {
   console.log(`Auto Compare Video UI  ->  http://localhost:${PORT}`);
   validateLocalesAtStartup();
   validateFbConfigAtStartup();
+  runPendingCleanup(); // thư mục còn sót từ lần chạy trước
   void validateGeminiModels(); // không chặn khởi động; chỉ log cảnh báo nếu tên model sai / chưa có model dự phòng
 });
 
