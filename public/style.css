@@ -1282,15 +1282,6 @@ body {
 .bi-view-mode { display: flex; flex-wrap: wrap; gap: 8px; }
 .bi-view-btn { font-size: 12px; padding: 6px 12px; }
 
-.bi-field { display: flex; flex-direction: column; gap: 4px; margin-top: 4px; }
-.bi-vi-line { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; font-size: 12.5px; color: var(--fg-dim); }
-.bi-vi-tag {
-  font-size: 10px; font-weight: 800; letter-spacing: 0.5px; padding: 1px 6px; border-radius: var(--radius-sm);
-  background: var(--panel-edge); color: var(--fg-dim);
-}
-.bi-vi-text { flex: 1 1 200px; min-width: 0; overflow-wrap: anywhere; }
-.bi-vi-text.is-stale { opacity: 0.55; text-decoration: line-through; text-decoration-color: rgba(255, 209, 102, 0.5); }
-.bi-stale { color: var(--accent-yellow); font-weight: 700; font-size: 11.5px; }
 .bi-btn {
   border: 1px solid var(--panel-edge); background: var(--panel); color: var(--fg); border-radius: var(--radius-sm);
   min-width: 28px; height: 26px; cursor: pointer; font: inherit; line-height: 1;
@@ -1301,13 +1292,11 @@ body {
 .bi-edit-text { flex: 1 1 260px; min-height: 52px; resize: vertical; font-size: 13px; }
 .bi-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; }
 .bi-reading { color: var(--fg-dim); }
-.bi-warnings { list-style: none; display: flex; flex-wrap: wrap; gap: 4px 12px; padding: 0; margin: 0; }
 .bi-warn-warn, .bi-warn-info { color: var(--accent-yellow); }
 .bi-warn-danger { color: var(--danger); font-weight: 700; }
 .bi-error { color: var(--danger); font-weight: 700; flex-basis: 100%; }
 
 /* view modes: both | target (hide the Vietnamese line) | vi (hide the target-language inputs) */
-.bi-view-target .bi-vi-line, .bi-view-target .bi-edit { display: none !important; }
 .bi-view-vi .bi-main {
   height: 0; min-height: 0; padding: 0; border-width: 0; margin: 0; overflow: hidden; opacity: 0; pointer-events: none;
 }
@@ -1345,19 +1334,11 @@ body {
 .bi-cmp-value { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
 .bi-notice-close { position: absolute; top: 4px; right: 6px; background: none; border: 0; color: var(--fg-dim); cursor: pointer; font-size: 12px; }
 
-/* Bước 2 gọn: nghĩa tiếng Việt chữ nhỏ nhạt sát dưới ô nhập; cảnh báo chỉ hiện khi có; tag/sub gập lại */
-.bi-field { gap: 2px; margin-top: 2px; }
-.bi-vi-line { gap: 6px; font-size: 11.5px; color: var(--fg-dim); opacity: 0.8; align-items: center; }
-.bi-vi-text { flex: 1 1 160px; }
-.bi-vi-actions { display: inline-flex; align-items: center; gap: 6px; margin-left: auto; font-size: 11px; white-space: nowrap; }
-.bi-vi-actions .bi-btn { min-width: 22px; height: 20px; font-size: 11px; opacity: 0.85; }
 .bi-meta:empty { display: none; }
 .bi-meta { gap: 2px 12px; }
 .bi-warn-line { font-size: 11.5px; }
 .bi-warn-line.bi-warn-warn, .bi-warn-line.bi-warn-info { color: var(--accent-yellow); }
 .bi-warn-line.bi-warn-danger { color: var(--danger); font-weight: 700; }
-.bi-input-warn { border-color: var(--accent-yellow) !important; }
-.bi-input-danger { border-color: var(--danger) !important; }
 .point-labels { margin: 0; }
 .point-labels > summary { cursor: pointer; font-size: 11.5px; font-weight: 700; color: var(--fg-dim); list-style: none; display: flex; align-items: center; gap: 6px; padding: 2px 0; }
 .point-labels > summary::-webkit-details-marker { display: none; }
@@ -1368,19 +1349,48 @@ body {
 .point-labels.has-warn .point-labels-dot { display: inline-block; }
 .point-labels-body { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
 .info-tip { display: inline-block; margin-left: 4px; width: 14px; height: 14px; line-height: 14px; text-align: center; border-radius: 50%; font-size: 10px; font-style: normal; color: var(--fg-dim); border: 1px solid var(--panel-edge); cursor: help; }
-.bi-view-vi .bi-vi-line { opacity: 1; }
 
-/* Dòng nghĩa tiếng Việt: người vận hành PHẢI đọc để kiểm soát nội dung -> rõ, không mờ.
-   Chữ #cfc9ee trên nền ô #0d0a1a/#17122c ≈ 11:1 (WCAG AA cần ≥ 4.5:1); cỡ 13px (câu chính 14px); vạch dọc nhấn bên trái cho biết đây là bản dịch của dòng trên. */
-:root { --gloss-fg: #cfc9ee; --gloss-accent: var(--accent-cyan); }
-.bi-vi-line { opacity: 1; font-size: 13px; color: var(--gloss-fg); }
-.bi-vi-text {
-  color: var(--gloss-fg); font-size: 13px; line-height: 1.45;
-  padding: 2px 8px; border-left: 3px solid var(--gloss-accent); border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
-  background: rgba(55, 230, 196, 0.06);
+/* ---- Khối song ngữ (card) ở Bước 2 --------------------------------------------------------------------------
+   1 card liền mạch: câu chính (ô nhập) / đường kẻ 1px / dòng nghĩa tiếng Việt. Thời gian đọc + ✎/↻ ở góc phải dưới (✎/↻ chỉ rõ khi
+   hover/focus card, luôn rõ trên màn cảm ứng). Cảnh báo = viền card vàng/đỏ + 1 dòng chữ nhỏ DƯỚI card; nghĩa cũ = viền trái vàng. */
+:root { --gloss-fg: #cfc9ee; } /* ≈ 12:1 trên nền ô (WCAG AA cần ≥ 4.5:1) */
+.bi-field { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; }
+.bi-card {
+  position: relative; background: var(--bg); border: 1px solid var(--panel-edge); border-radius: var(--radius-md);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.bi-vi-text:empty { display: none; }
-.bi-vi-text.is-stale { opacity: 0.75; border-left-color: var(--accent-yellow); }
-/* thời gian đọc + ✎/↻ giữ cỡ nhỏ */
-.bi-vi-actions { font-size: 11px; color: var(--fg-dim); }
-.bi-view-vi .bi-vi-text { font-size: 14px; color: var(--fg); }
+.bi-card:focus-within { border-color: var(--accent-pink); box-shadow: 0 0 10px rgba(255, 79, 163, 0.2); }
+.bi-card:has(.input-highlight) { border-color: var(--accent-cyan); }
+.bi-card.has-warn { border-color: var(--accent-yellow); }
+.bi-card.has-danger { border-color: var(--danger); }
+.bi-card.is-stale { box-shadow: inset 3px 0 0 var(--accent-yellow); }
+.bi-card .bi-main, .bi-card .bi-main:focus { border: 0; background: transparent; box-shadow: none; border-radius: var(--radius-md) var(--radius-md) 0 0; }
+.bi-card.no-gloss .bi-main { border-radius: var(--radius-md); }
+.bi-gloss {
+  display: flex; align-items: baseline; gap: 8px; padding: 7px 14px; padding-right: 100px;
+  border-top: 1px solid var(--panel-edge); font-size: 13px; line-height: 1.45; color: var(--gloss-fg);
+}
+.bi-card.is-stale .bi-gloss { padding-right: 240px; }
+.bi-gloss-label { flex: none; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--fg-dim); }
+.bi-vi-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.bi-vi-text.is-stale { opacity: 0.75; }
+.bi-vi-actions { position: absolute; right: 8px; bottom: 6px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--fg-dim); white-space: nowrap; }
+.bi-card.no-gloss .bi-vi-actions { position: static; justify-content: flex-end; padding: 0 10px 6px; }
+.bi-stale { color: var(--accent-yellow); font-weight: 700; font-size: 11px; }
+.bi-vi-actions .bi-btn { min-width: 22px; height: 20px; font-size: 11px; opacity: 0; transition: opacity 0.15s ease; }
+.bi-card:hover .bi-vi-actions .bi-btn, .bi-card:focus-within .bi-vi-actions .bi-btn, .bi-vi-actions .bi-btn:focus-visible { opacity: 1; }
+.bi-vi-actions .bi-btn:disabled { opacity: 0.5; }
+@media (hover: none) { .bi-vi-actions .bi-btn { opacity: 1; } }
+.bi-below { display: flex; flex-direction: column; gap: 4px; }
+.point-row .bi-card { background: transparent; }
+
+/* chế độ xem: target = ẩn dòng nghĩa; vi = ẩn ô chữ đích, chỉ còn nghĩa (to hơn, màu chính) */
+.bi-view-target .bi-gloss, .bi-view-target .bi-vi-actions, .bi-view-target .bi-edit { display: none !important; }
+.bi-view-vi .bi-gloss { border-top: 0; font-size: 14px; color: var(--fg); }
+.bi-view-vi .bi-gloss-label { display: none; }
+
+/* tinh chỉnh: thị trường không có dòng nghĩa -> thời gian đọc nằm góc phải của card; chế độ "chỉ tiếng Việt" -> ẩn hẳn ô chữ đích */
+.bi-card.no-gloss .bi-vi-actions { position: absolute; top: 50%; right: 12px; bottom: auto; transform: translateY(-50%); padding: 0; }
+.bi-card.no-gloss .bi-main { padding-right: 76px; }
+.bi-view-vi .bi-card .bi-main { display: none; }
+.bi-view-vi .bi-gloss { padding: 12px 14px; padding-right: 100px; }

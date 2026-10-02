@@ -437,7 +437,7 @@ document.addEventListener("DOMContentLoaded", () => {
   } catch {
     // storage bị chặn — chế độ xem chỉ không được nhớ
   }
-  let staticEditors = []; // [{ editor, host }] cho title + 2 label
+  let staticEditors = []; // editor của title + 2 label
   let pointEditors = []; // widget của từng dòng point (dựng lại mỗi lần renderPointsList)
   let busyCount = 0; // số dòng đang chờ AI
 
@@ -476,12 +476,11 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  function mountEditor(kind, inputEl, host, state, point, onWarnings) {
+  function mountEditor(kind, inputEl, state, point, onWarnings) {
     inputEl.classList.add("bi-main");
     return createFieldEditor({
       kind,
       inputEl,
-      host,
       state,
       getRules: () => localeRules,
       getLocaleCode: () => currentLocale,
@@ -493,19 +492,14 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function mountStaticEditors() {
-    staticEditors.forEach(({ editor, host }) => {
-      editor.destroy();
-      host.remove();
-    });
+    staticEditors.forEach((editor) => editor.destroy());
     staticEditors = [];
     [
       ["title", scriptTitle],
       ["label_left", scriptLabelLeft],
       ["label_right", scriptLabelRight],
     ].forEach(([kind, input]) => {
-      const host = document.createElement("div");
-      input.insertAdjacentElement("afterend", host);
-      staticEditors.push({ editor: mountEditor(kind, input, host, biState[kind], null), host });
+      staticEditors.push(mountEditor(kind, input, biState[kind], null));
     });
   }
 
@@ -1200,9 +1194,7 @@ document.addEventListener("DOMContentLoaded", () => {
       // Dưới mỗi dòng: nghĩa tiếng Việt + cảnh báo của lời thoại; thị trường có dòng nghĩa còn sửa được nhãn (tag) và dòng phụ (sub).
       const extra = document.createElement("div");
       extra.className = "point-extra";
-      const textHost = document.createElement("div");
-      extra.appendChild(textHost);
-      pointEditors.push(mountEditor("text", input, textHost, p._bi ? p._bi.text : emptyPair(), p));
+      pointEditors.push(mountEditor("text", input, p._bi ? p._bi.text : emptyPair(), p));
       if (isGloss() && p._bi) {
         // tag + sub gập trong 1 khối (mặc định đóng); có cảnh báo thì tự mở + chấm màu ở tiêu đề.
         const details = document.createElement("details");
@@ -1245,10 +1237,9 @@ document.addEventListener("DOMContentLoaded", () => {
           field.addEventListener("input", (e) => {
             pointsData[idx][kind] = e.target.value;
           });
-          const host = document.createElement("div");
-          group.append(lab, field, host);
+          group.append(lab, field);
           body.appendChild(group);
-          pointEditors.push(mountEditor(kind, field, host, p._bi[kind], p, onLevel(kind)));
+          pointEditors.push(mountEditor(kind, field, p._bi[kind], p, onLevel(kind)));
         });
       }
       item.appendChild(extra);

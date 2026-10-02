@@ -27,7 +27,6 @@ function el(tag, className, text) {
  * @param {object} o
  * @param {"title"|"label_left"|"label_right"|"text"|"tag"|"sub"} o.kind
  * @param {HTMLInputElement} o.inputEl         ô nhập chữ ngôn ngữ đích (đã có trong DOM)
- * @param {HTMLElement} o.host                 nơi gắn dòng nghĩa + cảnh báo
  * @param {{vi:string, baseText:string}} o.state  nghĩa tiếng Việt hiện có + chữ đích tại thời điểm nghĩa đó đúng (stale = text != baseText)
  * @param {() => object|null} o.getRules       luật của thị trường (GET /api/locale-rules) — null: chưa tải
  * @param {() => string} o.getLocaleCode
@@ -41,12 +40,16 @@ export function createFieldEditor(o) {
   let destroyed = false;
   let busy = false;
 
+  // 1 khối (card) liền mạch: câu chính (ô nhập) ở trên, đường kẻ 1px, dòng nghĩa tiếng Việt ngay dưới; thời gian đọc + ✎ ↻ ở góc phải dưới.
+  // Cảnh báo / lỗi / so sánh ý nằm DƯỚI card. `wrap` thay chỗ ô nhập trong DOM (app.js không phải tạo host).
   const wrap = el("div", "bi-field");
   wrap.dataset.kind = o.kind;
-  // Dòng nghĩa tiếng Việt: chữ nhỏ, nhạt, sát ngay dưới ô nhập. Thời gian đọc + ✎ ↻ cùng hàng, căn phải, cỡ nhỏ.
-  const viLine = el("div", "bi-vi-line");
+  const card = el("div", "bi-card");
+  const viLine = el("div", "bi-gloss");
+  const viLabel = el("span", "bi-gloss-label", "VI");
+  viLabel.title = "Nghĩa tiếng Việt";
   const viText = el("span", "bi-vi-text");
-  const stale = el("span", "bi-stale hidden", "⚠ chưa cập nhật nghĩa");
+  const stale = el("span", "bi-stale hidden", "Nghĩa chưa cập nhật");
   const viActions = el("span", "bi-vi-actions");
   const reading = el("span", "bi-reading hidden");
   const btnEdit = el("button", "bi-btn", "✎");
@@ -55,8 +58,8 @@ export function createFieldEditor(o) {
   const btnRe = el("button", "bi-btn", "↻");
   btnRe.type = "button";
   btnRe.title = "Dịch lại nghĩa tiếng Việt cho dòng này";
-  viActions.append(reading, btnEdit, btnRe);
-  viLine.append(viText, stale, viActions);
+  viActions.append(stale, reading, btnEdit, btnRe);
+  viLine.append(viLabel, viText);
 
   const editBox = el("div", "bi-edit hidden");
   const editText = el("textarea", "input-text bi-edit-text");
@@ -80,8 +83,11 @@ export function createFieldEditor(o) {
   notice.append(noticeText, noticeCmp, btnNoticeClose);
   meta.append(warnLine, errBox, notice);
 
-  wrap.append(viLine, editBox, meta);
-  o.host.appendChild(wrap);
+  const below = el("div", "bi-below");
+  below.append(editBox, meta);
+  o.inputEl.before(wrap);
+  card.append(o.inputEl, viLine, viActions);
+  wrap.append(card, below);
 
   const hasGloss = () => !!(o.getRules() && o.getRules().needsGloss);
   const isStale = () => o.inputEl.value.trim() !== (o.state.baseText || "").trim();
@@ -131,14 +137,15 @@ export function createFieldEditor(o) {
     const rules = o.getRules();
     const gloss = !!(rules && rules.needsGloss);
     // Thị trường không có dòng nghĩa (tiếng Việt): chỉ giữ thời gian đọc của câu thoại, ẩn nghĩa + nút ✎.
-    viLine.classList.toggle("hidden", !gloss && o.kind !== "text");
-    viText.classList.toggle("hidden", !gloss);
+    viLine.classList.toggle("hidden", !gloss);
     btnEdit.classList.toggle("hidden", !gloss);
+    card.classList.toggle("no-gloss", !gloss);
     if (!rules) return;
     const text = o.inputEl.value;
     const staleNow = gloss && text.trim() !== "" && isStale();
     viText.textContent = o.state.vi ? o.state.vi : text.trim() ? "(chưa có nghĩa)" : "";
     viText.classList.toggle("is-stale", staleNow);
+    card.classList.toggle("is-stale", staleNow);
     stale.classList.toggle("hidden", !staleNow);
     btnRe.classList.toggle("hidden", !(staleNow || (gloss && text.trim() !== "" && !o.state.vi)));
     btnRewrite.textContent = busy ? "⏳ Đang viết…" : `Viết lại bằng ${rules.languageName || "ngôn ngữ đích"}`;
@@ -151,8 +158,8 @@ export function createFieldEditor(o) {
     const level = warnings.some((w) => ICON_CLASS[w.code] === "danger") ? "danger" : warnings.some((w) => ICON_CLASS[w.code] !== "info") ? "warn" : warnings.length ? "info" : "";
     warnLine.textContent = warnings.map((w) => w.message).join(" · ");
     warnLine.className = `bi-warn-line${level ? ` bi-warn-${level}` : " hidden"}`;
-    o.inputEl.classList.toggle("bi-input-warn", level === "warn" || level === "info");
-    o.inputEl.classList.toggle("bi-input-danger", level === "danger");
+    card.classList.toggle("has-warn", level === "warn" || level === "info");
+    card.classList.toggle("has-danger", level === "danger");
     if (o.onWarnings) o.onWarnings(level);
     if (o.kind === "text" && text.trim()) {
       reading.textContent = `⏱ ${readingSeconds(text, rules).toFixed(1)}s`;
@@ -161,6 +168,8 @@ export function createFieldEditor(o) {
     } else {
       reading.classList.add("hidden");
     }
+    // thị trường không có dòng nghĩa: chỉ còn thời gian đọc của câu thoại, ẩn hẳn khối thao tác nếu không có gì để hiện
+    viActions.classList.toggle("hidden", !gloss && reading.classList.contains("hidden"));
   }
 
   function applyField(text, vi) {
@@ -268,12 +277,13 @@ export function createFieldEditor(o) {
       clearTimeout(noticeTimer);
       runner.cancel();
       o.inputEl.removeEventListener("input", onInput);
-      o.inputEl.classList.remove("bi-input-warn", "bi-input-danger");
+
       if (busy) {
         busy = false;
         o.onBusy(-1);
       }
       o.inputEl.disabled = false;
+      wrap.before(o.inputEl); // trả ô nhập về chỗ cũ rồi gỡ card
       wrap.remove();
     },
     hasGloss,
