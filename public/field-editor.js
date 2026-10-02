@@ -43,17 +43,20 @@ export function createFieldEditor(o) {
 
   const wrap = el("div", "bi-field");
   wrap.dataset.kind = o.kind;
+  // Dòng nghĩa tiếng Việt: chữ nhỏ, nhạt, sát ngay dưới ô nhập. Thời gian đọc + ✎ ↻ cùng hàng, căn phải, cỡ nhỏ.
   const viLine = el("div", "bi-vi-line");
-  const viTag = el("span", "bi-vi-tag", "VI");
   const viText = el("span", "bi-vi-text");
   const stale = el("span", "bi-stale hidden", "⚠ chưa cập nhật nghĩa");
+  const viActions = el("span", "bi-vi-actions");
+  const reading = el("span", "bi-reading hidden");
   const btnEdit = el("button", "bi-btn", "✎");
   btnEdit.type = "button";
   btnEdit.title = "Sửa ý bằng tiếng Việt rồi nhờ AI viết lại";
   const btnRe = el("button", "bi-btn", "↻");
   btnRe.type = "button";
   btnRe.title = "Dịch lại nghĩa tiếng Việt cho dòng này";
-  viLine.append(viTag, viText, stale, btnEdit, btnRe);
+  viActions.append(reading, btnEdit, btnRe);
+  viLine.append(viText, stale, viActions);
 
   const editBox = el("div", "bi-edit hidden");
   const editText = el("textarea", "input-text bi-edit-text");
@@ -66,8 +69,7 @@ export function createFieldEditor(o) {
   editBox.append(editText, btnRewrite, btnCancel);
 
   const meta = el("div", "bi-meta");
-  const reading = el("span", "bi-reading hidden");
-  const warnList = el("ul", "bi-warnings");
+  const warnLine = el("div", "bi-warn-line hidden"); // cảnh báo chỉ hiện khi có: viền màu ở ô + 1 dòng chữ nhỏ
   const errBox = el("div", "bi-error hidden");
   const notice = el("div", "bi-notice hidden");
   const noticeText = el("div", "bi-notice-text");
@@ -76,7 +78,7 @@ export function createFieldEditor(o) {
   btnNoticeClose.type = "button";
   btnNoticeClose.title = "Đóng";
   notice.append(noticeText, noticeCmp, btnNoticeClose);
-  meta.append(reading, warnList, errBox, notice);
+  meta.append(warnLine, errBox, notice);
 
   wrap.append(viLine, editBox, meta);
   o.host.appendChild(wrap);
@@ -128,7 +130,10 @@ export function createFieldEditor(o) {
     if (destroyed) return;
     const rules = o.getRules();
     const gloss = !!(rules && rules.needsGloss);
-    viLine.classList.toggle("hidden", !gloss);
+    // Thị trường không có dòng nghĩa (tiếng Việt): chỉ giữ thời gian đọc của câu thoại, ẩn nghĩa + nút ✎.
+    viLine.classList.toggle("hidden", !gloss && o.kind !== "text");
+    viText.classList.toggle("hidden", !gloss);
+    btnEdit.classList.toggle("hidden", !gloss);
     if (!rules) return;
     const text = o.inputEl.value;
     const staleNow = gloss && text.trim() !== "" && isStale();
@@ -143,13 +148,15 @@ export function createFieldEditor(o) {
     if (staleNow) warnings = warnings.filter((w) => w.code !== "glossary-term" && w.code !== "missing-vi");
     // Lệch dữ kiện đã duyệt của bản gốc (phiên bản thị trường): còn hiệu lực chừng nào người dùng chưa sửa chữ dòng này.
     if (o.state.fact && text === o.state.fact.forText) warnings.push({ code: "fact-mismatch", message: o.state.fact.message });
-    warnList.innerHTML = "";
-    for (const w of warnings) {
-      const li = el("li", `bi-warn bi-warn-${ICON_CLASS[w.code] || "warn"}`, `⚠ ${w.message}`);
-      warnList.appendChild(li);
-    }
+    const level = warnings.some((w) => ICON_CLASS[w.code] === "danger") ? "danger" : warnings.some((w) => ICON_CLASS[w.code] !== "info") ? "warn" : warnings.length ? "info" : "";
+    warnLine.textContent = warnings.map((w) => w.message).join(" · ");
+    warnLine.className = `bi-warn-line${level ? ` bi-warn-${level}` : " hidden"}`;
+    o.inputEl.classList.toggle("bi-input-warn", level === "warn" || level === "info");
+    o.inputEl.classList.toggle("bi-input-danger", level === "danger");
+    if (o.onWarnings) o.onWarnings(level);
     if (o.kind === "text" && text.trim()) {
-      reading.textContent = `⏱ ≈ ${readingSeconds(text, rules).toFixed(1)}s khi đọc`;
+      reading.textContent = `⏱ ${readingSeconds(text, rules).toFixed(1)}s`;
+      reading.title = "Thời gian đọc ước tính";
       reading.classList.remove("hidden");
     } else {
       reading.classList.add("hidden");
@@ -261,6 +268,7 @@ export function createFieldEditor(o) {
       clearTimeout(noticeTimer);
       runner.cancel();
       o.inputEl.removeEventListener("input", onInput);
+      o.inputEl.classList.remove("bi-input-warn", "bi-input-danger");
       if (busy) {
         busy = false;
         o.onBusy(-1);

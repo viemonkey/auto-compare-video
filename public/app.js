@@ -476,7 +476,7 @@ document.addEventListener("DOMContentLoaded", () => {
     };
   }
 
-  function mountEditor(kind, inputEl, host, state, point) {
+  function mountEditor(kind, inputEl, host, state, point, onWarnings) {
     inputEl.classList.add("bi-main");
     return createFieldEditor({
       kind,
@@ -488,6 +488,7 @@ document.addEventListener("DOMContentLoaded", () => {
       getContext: () => biContext(point),
       getPendingSlug: () => pendingContentSlug,
       onBusy: setBusy,
+      onWarnings,
     });
   }
 
@@ -1203,14 +1204,40 @@ document.addEventListener("DOMContentLoaded", () => {
       extra.appendChild(textHost);
       pointEditors.push(mountEditor("text", input, textHost, p._bi ? p._bi.text : emptyPair(), p));
       if (isGloss() && p._bi) {
+        // tag + sub gập trong 1 khối (mặc định đóng); có cảnh báo thì tự mở + chấm màu ở tiêu đề.
+        const details = document.createElement("details");
+        details.className = "point-labels";
+        const summary = document.createElement("summary");
+        const dot = document.createElement("span");
+        dot.className = "point-labels-dot";
+        summary.append("Nhãn & dòng phụ ", dot);
+        const body = document.createElement("div");
+        body.className = "point-labels-body";
+        details.append(summary, body);
+        extra.appendChild(details);
+        const levels = { tag: "", sub: "" };
+        const onLevel = (kind) => (level) => {
+          levels[kind] = level;
+          const worst = levels.tag === "danger" || levels.sub === "danger" ? "danger" : levels.tag || levels.sub;
+          const had = details.classList.contains("has-warn");
+          details.classList.toggle("has-warn", !!worst);
+          dot.classList.toggle("is-danger", worst === "danger");
+          if (worst && !had) details.open = true;
+        };
         [
-          ["tag", "Nhãn trên màn hình (tag)"],
-          ["sub", "Dòng phụ (sub)"],
-        ].forEach(([kind, label]) => {
+          ["tag", "Nhãn trên màn hình", "Chữ ngắn hiện phía trên ảnh trái/phải trong video khi câu này đang được đọc."],
+          ["sub", "Dòng phụ", "Dòng chữ nhỏ hiện ngay dưới nhãn trên màn hình (có thể để trống)."],
+        ].forEach(([kind, label, tip]) => {
           const group = document.createElement("div");
           group.className = "point-subfield";
           const lab = document.createElement("label");
           lab.textContent = label;
+          const info = document.createElement("i");
+          info.className = "info-tip";
+          info.textContent = "i";
+          info.title = tip;
+          info.setAttribute("aria-label", tip);
+          lab.append(info);
           const field = document.createElement("input");
           field.type = "text";
           field.className = "input-text";
@@ -1220,8 +1247,8 @@ document.addEventListener("DOMContentLoaded", () => {
           });
           const host = document.createElement("div");
           group.append(lab, field, host);
-          extra.appendChild(group);
-          pointEditors.push(mountEditor(kind, field, host, p._bi[kind], p));
+          body.appendChild(group);
+          pointEditors.push(mountEditor(kind, field, host, p._bi[kind], p, onLevel(kind)));
         });
       }
       item.appendChild(extra);
