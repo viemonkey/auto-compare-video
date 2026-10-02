@@ -12,8 +12,17 @@ import { textOf, viOf } from "./public/shared/bilingual.mjs";
 
 /** Dựng bản ghi bền vững (xem scripts/lib/content-store.mjs). */
 export function buildRecord({ content, locale, hashtagPlan, status, source = null, derivedFrom = null, savedAt = new Date().toISOString() }) {
-  const { _meta: _ignored, hashtagPlan: _plan, locale: _loc, ...rest } = content;
-  return { ...rest, locale: locale.code, hashtagPlan, _meta: { status, savedAt, source, derivedFrom } };
+  const { _meta: genMeta, hashtagPlan: _plan, locale: _loc, ...rest } = content;
+  const generatedBy = generatedByOf(genMeta);
+  return { ...rest, locale: locale.code, hashtagPlan, _meta: { status, savedAt, source, derivedFrom, ...(generatedBy ? { generatedBy } : {}) } };
+}
+
+/** Model đã sinh nội dung (từ _meta của generate-compare-content hoặc đã lưu) -> { model, primary, isFallback } | null. */
+export function generatedByOf(meta) {
+  if (meta?.generatedBy?.model) return meta.generatedBy;
+  if (!meta?.model) return null;
+  const primary = meta.primary_model || meta.model;
+  return { model: meta.model, primary, isFallback: meta.used_fallback === true || meta.model !== primary };
 }
 
 /**
@@ -194,6 +203,7 @@ export function createMarketApi(ctx) {
       status: _meta?.status || "built",
       locale: locale.code,
       derivedFrom: _meta?.derivedFrom || null,
+      generatedBy: _meta?.generatedBy || null,
       content,
       hashtags: withMeanings(plan, cfg),
       hashtagMax: maxHashtags(),

@@ -30,6 +30,7 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 import { CONTENT_ANGLES } from "../config/content-angles.mjs";
 import { calcContentCost } from "../config/pricing.mjs";
 import { appendCostEntry } from "./lib/cost-ledger.mjs";
+import { resolveGeminiModels } from "./lib/gemini-models.mjs";
 import { loadHashtagConfig } from "./lib/hashtags.mjs";
 import { buildComparePrompt } from "./lib/compare-prompt.mjs";
 import { parseAndValidate, enforceJewelryGating, enforceContextImageLimits, collectContentWarnings } from "./lib/compare-content.mjs";
@@ -74,9 +75,10 @@ function loadEnv() {
 const ENV = loadEnv();
 // Đọc lười (mỗi lần dùng): import module này (vd trong test, hoặc từ scaffold) không bị process.exit khi thiếu key.
 const apiKey = () => process.env.GEMINI_API_KEY || ENV.GEMINI_API_KEY;
-const GEMINI_MODEL = ENV.GEMINI_MODEL || "gemini-3.5-flash";
-// Model dự phòng khi model chính HẾT QUOTA THEO NGÀY (429 PerDay). Trống = không chuyển, báo lỗi ngay.
-const GEMINI_FALLBACK_MODEL = (ENV.GEMINI_FALLBACK_MODEL || process.env.GEMINI_FALLBACK_MODEL || "").trim();
+// process.env ưu tiên hơn file .env (server đã nạp .env vào process.env; chạy CLI trần thì đọc từ file).
+// Model dự phòng (GEMINI_FALLBACK_MODEL) dùng khi model chính hết quota ngày HOẶC quá tải (503/5xx/timeout) sau khi hết retry.
+const geminiModels = () => resolveGeminiModels({ ...ENV, ...process.env });
+const GEMINI_MODEL = geminiModels().primary;
 
 function requireApiKey() {
   if (apiKey()) return;
@@ -270,6 +272,7 @@ async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalo
       userMessage: isTimeout
         ? "Gemini không phản hồi kịp (timeout), vui lòng thử lại sau."
         : "Không kết nối được tới Gemini, vui lòng kiểm tra mạng rồi thử lại.",
+      transient: true,
     });
   } finally {
     clearTimeout(timeout);
@@ -342,11 +345,14 @@ async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalo
 // retry: chuyển sang GEMINI_FALLBACK_MODEL nếu có, không có thì báo lỗi ngay. Trả { content, model }
 // với model = model THỰC SỰ sinh ra nội dung.
 async function generateWithRetry(args) {
+  const { primary, fallback } = geminiModels();
   return runWithModelFallback({
-    primaryModel: GEMINI_MODEL,
-    fallbackModel: GEMINI_FALLBACK_MODEL,
+    primaryModel: primary,
+    fallbackModel: fallback,
     run: async (model) => ({
       model,
+      primaryModel: primary,
+      usedFallback: model !== primary,
       content: await withRetry(
         async (attempt) => parseAndValidate(await callGeminiOnce({ ...args, attempt, model }), args.catalog, { locale: args.locale, hashtagCfg: loadHashtagConfig(args.locale) }),
         {
@@ -379,7 +385,7 @@ async function runCompareContent({ left, right, topicHint, contentAngleId, custo
   const rightImg = loadImage(right, "phải");
   const angleInstruction = resolveAngleInstruction(contentAngleId, customAngleText);
 
-  const { content, model: usedModel } = await generateWithRetry({ left: leftImg, right: rightImg, topicHint, angleInstruction, catalog, locale, slug });
+  const { content, model: usedModel, primaryModel, usedFallback } = await generateWithRetry({ left: leftImg, right: rightImg, topicHint, angleInstruction, catalog, locale, slug });
 
   // Log chẩn đoán: Gemini tự đánh dấu bao nhiêu point cần ảnh minh hoạ NGAY SAU khi nhận
   // response, TRƯỚC mọi hậu kiểm (jewelry gate / cap MAX_CONTEXT_IMAGES ảnh / liền-kề-cùng-bên) — để phân biệt
@@ -421,6 +427,8 @@ async function runCompareContent({ left, right, topicHint, contentAngleId, custo
     contextImageCorrections,
     warnings,
     model: usedModel,
+    primaryModel,
+    usedFallback,
     source_images: {
       left: left.startsWith("data:") ? "<inline base64>" : path.resolve(left),
       right: right.startsWith("data:") ? "<inline base64>" : path.resolve(right),
@@ -439,7 +447,7 @@ async function main() {
   console.log(`Right image: ${opts.right}`);
 
   requireApiKey();
-  const { content, corrections, contextImageCorrections, warnings, model, source_images } = await runCompareContent({
+  const { content, corrections, contextImageCorrections, warnings, model, primaryModel, usedFallback, source_images } = await runCompareContent({
     left: opts.left,
     right: opts.right,
     topicHint: opts.topicHint,
@@ -467,6 +475,8 @@ async function main() {
     _meta: {
       generated_at: new Date().toISOString(),
       model,
+      primary_model: primaryModel,
+      used_fallback: usedFallback,
       source_images,
       corrections,
       contextImageCorrections,

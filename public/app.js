@@ -615,7 +615,21 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Fill Step 2 from a content object (generated or reopened). Slug is suggested unless given.
-  function populateStep2({ content: raw, hashtags, hashtagMax: max, warnings, slug }) {
+  // Badge nhỏ: model đã sinh nội dung; "(dự phòng)" nếu là model dự phòng -> nên đọc kỹ hơn.
+  function renderModelBadge(generatedBy) {
+    const el = document.getElementById("gen-model-badge");
+    if (!el) return;
+    el.classList.toggle("hidden", !generatedBy);
+    el.classList.toggle("is-fallback", !!(generatedBy && generatedBy.isFallback));
+    if (!generatedBy) return;
+    el.textContent = `Sinh bởi ${generatedBy.model}${generatedBy.isFallback ? " (dự phòng)" : ""}`;
+    el.title = generatedBy.isFallback
+      ? `Model chính ${generatedBy.primary} đang quá tải nên nội dung do model dự phòng viết — hãy đọc kỹ hơn.`
+      : "Model Gemini đã sinh nội dung này.";
+  }
+
+  function populateStep2({ content: raw, hashtags, hashtagMax: max, warnings, slug, generatedBy }) {
+    renderModelBadge(generatedBy);
     generatedContent = raw;
     generatedWarnings = warnings || [];
     const content = flattenContent(raw);
@@ -660,7 +674,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (contentAngleCustomText) contentAngleCustomText.value = rec.source.customAngleText || "";
       }
     }
-    populateStep2({ content: rec.content, hashtags: rec.hashtags, hashtagMax: rec.hashtagMax, warnings: rec.warnings, slug: rec.slug });
+    populateStep2({ content: rec.content, hashtags: rec.hashtags, hashtagMax: rec.hashtagMax, warnings: rec.warnings, slug: rec.slug, generatedBy: rec.generatedBy });
     gotoStep(2);
     return true;
   }
@@ -1008,7 +1022,7 @@ document.addEventListener("DOMContentLoaded", () => {
       pendingContentSlug = genData.pendingSlug || null;
 
       // Populate Step 2 Studio with Gemini output (field song ngữ { text, vi } với thị trường ngoài tiếng Việt).
-      populateStep2({ content: genData.content, hashtags: genData.hashtags, hashtagMax: genData.hashtagMax, warnings: genData.warnings });
+      populateStep2({ content: genData.content, hashtags: genData.hashtags, hashtagMax: genData.hashtagMax, warnings: genData.warnings, generatedBy: genData.generatedBy });
 
       gotoStep(2);
     } catch (err) {

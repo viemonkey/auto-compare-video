@@ -1,6 +1,8 @@
 // Phân loại lỗi + vòng retry cho lần gọi Gemini sinh kịch bản.
 //   - RetryableError    : lỗi TỪ Gemini/mạng (429 theo phút, 5xx, timeout, fetch failed, response rỗng/không
 //                         phải JSON/sai schema) — đáng thử lại. Có thể mang `retryAfterMs` (từ RetryInfo).
+//                         `transient: true` = lỗi TẠM THỜI phía model/mạng (429/503/5xx/timeout/network): hết lượt retry
+//                         thì nơi gọi chuyển sang model dự phòng. Lỗi hình dạng response (JSON hỏng/rỗng) KHÔNG transient.
 //   - DailyQuotaError   : 429 hết quota THEO NGÀY — retry vô ích; nơi gọi chuyển model dự phòng hoặc báo lỗi.
 //   - NonRetryableError : lỗi Gemini nhưng retry vô ích (401/403/400, safety block, 2 ảnh không so sánh được).
 //   - Mọi lỗi khác (ReferenceError, TypeError, SyntaxError...) = lỗi LẬP TRÌNH -> throw ngay, không retry.
@@ -8,11 +10,12 @@
 // Mọi lỗi Gemini có `userMessage` (tiếng Việt, KHÔNG chứa JSON gốc) để hiện cho người dùng; chi tiết
 // gốc chỉ được ghi vào log server (xem describeGeminiErrorForLog()).
 export class RetryableError extends Error {
-  constructor(message, { userMessage, retryAfterMs, info } = {}) {
+  constructor(message, { userMessage, retryAfterMs, info, transient = false } = {}) {
     super(message);
     this.userMessage = userMessage || message;
     this.retryAfterMs = retryAfterMs ?? null;
     this.info = info || null;
+    this.transient = transient;
   }
 }
 export class NonRetryableError extends Error {
@@ -122,12 +125,14 @@ export function classifyGeminiHttpError({ httpStatus, bodyText, model }) {
       userMessage: `Gemini đang giới hạn tốc độ, vui lòng thử lại sau ${waitS} giây.`,
       retryAfterMs: info.retryDelayMs,
       info,
+      transient: true,
     });
   }
   if (httpStatus === 503) {
     return new RetryableError(`${raw}: quá tải`, {
       userMessage: "Gemini đang quá tải, vui lòng thử lại sau vài phút.",
       info,
+      transient: true,
     });
   }
   if (httpStatus === 401 || httpStatus === 403) {
@@ -146,6 +151,7 @@ export function classifyGeminiHttpError({ httpStatus, bodyText, model }) {
   return new RetryableError(raw, {
     userMessage: `Gemini đang gặp lỗi tạm thời (HTTP ${httpStatus}), vui lòng thử lại sau vài phút.`,
     info,
+    transient: true,
   });
 }
 
@@ -168,17 +174,26 @@ export function describeGeminiErrorForLog(err, { bodyText, apiKey } = {}) {
 }
 
 /**
- * Chạy `run(model)` với model chính; nếu model chính HẾT QUOTA NGÀY (DailyQuotaError) và có model dự
- * phòng khác thì chạy lại 1 lần với model dự phòng, không có thì ném lỗi ngay (userMessage tiếng Việt).
- * Mọi lỗi khác (kể cả lỗi lập trình) đi thẳng ra ngoài.
+ * Chạy `run(model)` với model chính; nếu model chính thất bại vì lý do ĐỔI MODEL CÓ THỂ GIÚP và có model dự phòng khác thì
+ * chạy lại ĐÚNG 1 lần với model dự phòng (lần đó có vòng retry riêng; hỏng nữa thì ném lỗi — không lặp):
+ *   - DailyQuotaError: hết quota theo ngày của model chính.
+ *   - RetryableError `transient` (503/5xx/429 theo phút/timeout/network) đã hết lượt retry: model chính quá tải.
+ * Không có model dự phòng (hoặc trùng model chính) thì ném lỗi ngay (userMessage tiếng Việt). Mọi lỗi khác
+ * (NonRetryable, response sai hình dạng, lỗi lập trình, huỷ) đi thẳng ra ngoài.
  * @param {{primaryModel:string, fallbackModel?:string, run:(model:string)=>Promise<T>, log?:(msg:string)=>void}} p
  */
 export async function runWithModelFallback({ primaryModel, fallbackModel, run, log = () => {} }) {
   try {
     return await run(primaryModel);
   } catch (err) {
-    if (!(err instanceof DailyQuotaError) || !fallbackModel || fallbackModel === primaryModel) throw err;
-    log(`model ${primaryModel} hết quota theo ngày — chuyển sang model dự phòng ${fallbackModel}.`);
+    const quota = err instanceof DailyQuotaError;
+    const overloaded = err instanceof RetryableError && err.transient;
+    if (!(quota || overloaded) || !fallbackModel || fallbackModel === primaryModel) throw err;
+    log(
+      quota
+        ? `model chính ${primaryModel} hết quota theo ngày → chuyển sang ${fallbackModel}`
+        : `model chính ${primaryModel} quá tải → chuyển sang ${fallbackModel}`,
+    );
     return run(fallbackModel);
   }
 }
@@ -224,5 +239,6 @@ export async function withRetry(fn, { maxAttempts, baseDelayMs, label = "call", 
   throw new RetryableError(`${label} thất bại sau ${maxAttempts} lần thử. Lỗi cuối cùng: ${lastErr.message}`, {
     userMessage: lastErr.userMessage,
     info: lastErr.info,
+    transient: lastErr.transient,
   });
 }

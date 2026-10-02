@@ -69,7 +69,8 @@ import {
 } from "./scripts/lib/hashtags.mjs";
 import { textOf } from "./public/shared/bilingual.mjs";
 import { rulesOf } from "./scripts/lib/compare-content.mjs";
-import { createMarketApi, buildRecord, resolveSocialPost as resolveSocialPostIn } from "./server-market.mjs";
+import { createMarketApi, buildRecord, generatedByOf, resolveSocialPost as resolveSocialPostIn } from "./server-market.mjs";
+import { validateGeminiModels } from "./scripts/lib/gemini-models.mjs";
 import { effectiveSlugSuffix, hasLocaleSuffix, stripLocaleSuffix, uniqueSlugForLocale } from "./scripts/lib/market-slug.mjs";
 import { copySourceImages, readRecord, writeRecord } from "./scripts/lib/content-store.mjs";
 import { rewriteField, translateField, FieldEditError } from "./scripts/lib/field-edit.mjs";
@@ -489,6 +490,7 @@ app.post("/api/generate-content", async (req, res) => {
     hashtags: withMeanings(plan, cfg),
     hashtagMax: maxHashtags(),
     warnings: content._meta?.warnings || [],
+    generatedBy: generatedByOf(content._meta), // { model, primary, isFallback } — UI Bước 2 hiện badge model (+ "(dự phòng)")
   });
 });
 
@@ -1370,6 +1372,7 @@ const httpServer = app.listen(PORT, () => {
   console.log(`Auto Compare Video UI  ->  http://localhost:${PORT}`);
   validateLocalesAtStartup();
   validateFbConfigAtStartup();
+  void validateGeminiModels(); // không chặn khởi động; chỉ log cảnh báo nếu tên model sai / chưa có model dự phòng
 });
 
 async function shutdown(signal) {

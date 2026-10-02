@@ -251,10 +251,64 @@ test("quota ngày: fallback cũng hết quota ngày -> lỗi của model dự ph
   assert.deepEqual(used, ["gemini-a", "gemini-b"]);
 });
 
-test("lỗi khác quota ngày (429 phút, 503, lỗi lập trình) KHÔNG kích hoạt model dự phòng", async () => {
+test("503 / 500 / 429 phút (transient) hết retry -> chuyển model dự phòng, log đúng mẫu", async () => {
+  for (const [httpStatus, bodyText] of [[503, body503], [500, "{}"], [429, body429Minute]]) {
+    const used = [];
+    const logs = [];
+    const out = await runWithModelFallback({
+      primaryModel: "gemini-a",
+      fallbackModel: "gemini-b",
+      run: async (model) => {
+        used.push(model);
+        if (model === "gemini-a") throw classifyGeminiHttpError({ httpStatus, bodyText, model });
+        return { model };
+      },
+      log: (m) => logs.push(m),
+    });
+    assert.deepEqual(used, ["gemini-a", "gemini-b"], `HTTP ${httpStatus}`);
+    assert.equal(out.model, "gemini-b");
+    assert.equal(logs[0], "model chính gemini-a quá tải → chuyển sang gemini-b");
+  }
+});
+
+test("503 cả 2 model -> ném lỗi của model dự phòng, chỉ 2 lần chạy (không lặp vô hạn)", async () => {
+  const used = [];
+  await assert.rejects(
+    runWithModelFallback({
+      primaryModel: "gemini-a",
+      fallbackModel: "gemini-b",
+      run: async (model) => {
+        used.push(model);
+        throw classifyGeminiHttpError({ httpStatus: 503, bodyText: body503, model });
+      },
+    }),
+    (e) => e instanceof RetryableError,
+  );
+  assert.deepEqual(used, ["gemini-a", "gemini-b"]);
+});
+
+test("503 không có fallback / fallback trùng model chính -> báo lỗi ngay", async () => {
+  for (const fallbackModel of ["", undefined, "gemini-a"]) {
+    const used = [];
+    await assert.rejects(
+      runWithModelFallback({
+        primaryModel: "gemini-a",
+        fallbackModel,
+        run: async (model) => {
+          used.push(model);
+          throw classifyGeminiHttpError({ httpStatus: 503, bodyText: body503, model });
+        },
+      }),
+    );
+    assert.deepEqual(used, ["gemini-a"]);
+  }
+});
+
+test("lỗi KHÔNG tạm thời (response hỏng hình dạng, 400/401, lỗi lập trình) KHÔNG kích hoạt model dự phòng", async () => {
   const errors = [
-    classifyGeminiHttpError({ httpStatus: 429, bodyText: body429Minute, model: "gemini-a" }),
-    classifyGeminiHttpError({ httpStatus: 503, bodyText: body503, model: "gemini-a" }),
+    new RetryableError("Gemini trả về không phải JSON hợp lệ"),
+    classifyGeminiHttpError({ httpStatus: 400, bodyText: "{}", model: "gemini-a" }),
+    classifyGeminiHttpError({ httpStatus: 401, bodyText: "{}", model: "gemini-a" }),
     new ReferenceError("x is not defined"),
   ];
   for (const e of errors) {

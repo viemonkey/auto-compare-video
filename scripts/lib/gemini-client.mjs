@@ -5,6 +5,7 @@
 // Model/key: GEMINI_API_KEY, GEMINI_MODEL, GEMINI_FALLBACK_MODEL từ process.env (server nạp .env lúc khởi động).
 import { calcContentCost } from "../../config/pricing.mjs";
 import { appendCostEntry } from "./cost-ledger.mjs";
+import { resolveGeminiModels } from "./gemini-models.mjs";
 import {
   RetryableError,
   NonRetryableError,
@@ -20,8 +21,6 @@ const RETRY_BASE_DELAY_MS = 1500;
 const REQUEST_TIMEOUT_MS = 45_000;
 
 const apiKey = () => (process.env.GEMINI_API_KEY || "").trim();
-const primaryModel = () => (process.env.GEMINI_MODEL || "gemini-3.5-flash").trim();
-const fallbackModel = () => (process.env.GEMINI_FALLBACK_MODEL || "").trim();
 
 /** Lỗi do người dùng huỷ (signal.abort) — KHÔNG retry, KHÔNG ghi nhận như lỗi Gemini. */
 export class AbortedError extends Error {
@@ -52,6 +51,7 @@ async function callOnce({ systemPrompt, userText, schema, model, signal, attempt
     appendCostEntry({ ...ledger, model, status: "error", errorMessage: reason, attempt });
     throw new RetryableError(reason, {
       userMessage: isTimeout ? "Gemini không phản hồi kịp (timeout), vui lòng thử lại." : "Không kết nối được tới Gemini, vui lòng kiểm tra mạng rồi thử lại.",
+      transient: true,
     });
   }
 
@@ -89,12 +89,15 @@ async function callOnce({ systemPrompt, userText, schema, model, signal, attempt
  */
 export async function generateJson({ systemPrompt, userText, schema, validate = (o) => o, signal, ledger }) {
   if (!apiKey()) throw new NonRetryableError("Thiếu GEMINI_API_KEY trong .env (repo root).", { userMessage: "Server chưa cấu hình GEMINI_API_KEY." });
+  const { primary, fallback } = resolveGeminiModels();
   return runWithModelFallback({
-    primaryModel: primaryModel(),
-    fallbackModel: fallbackModel(),
+    primaryModel: primary,
+    fallbackModel: fallback,
     log: (msg) => console.warn(`[gemini] ${msg}`),
     run: async (model) => ({
       model,
+      primaryModel: primary,
+      usedFallback: model !== primary,
       result: await withRetry(
         async (attempt) => {
           const text = await callOnce({ systemPrompt, userText, schema, model, signal, attempt, ledger });
