@@ -72,7 +72,7 @@ import { textOf } from "./public/shared/bilingual.mjs";
 import { rulesOf } from "./scripts/lib/compare-content.mjs";
 import { createMarketApi, buildRecord, generatedByOf, resolveSocialPost as resolveSocialPostIn } from "./server-market.mjs";
 import { validateGeminiModels } from "./scripts/lib/gemini-models.mjs";
-import { createCleanupQueue, existingVideoWebPath } from "./scripts/lib/pending-cleanup.mjs";
+import { createCleanupQueue, existingVideoWebPath, MIN_MP4_BYTES } from "./scripts/lib/pending-cleanup.mjs";
 import { effectiveSlugSuffix, hasLocaleSuffix, stripLocaleSuffix, uniqueSlugForLocale } from "./scripts/lib/market-slug.mjs";
 import { copySourceImages, readRecord, writeRecord } from "./scripts/lib/content-store.mjs";
 import { rewriteField, translateField, FieldEditError } from "./scripts/lib/field-edit.mjs";
@@ -855,7 +855,7 @@ async function archiveAndCleanup(slug, renderWebPath, say) {
 
   try {
     const size = fs.statSync(src).size;
-    if (size < 100 * 1024) throw new Error(`MP4 chỉ ${size} byte — nghi ngờ render lỗi`);
+    if (size < MIN_MP4_BYTES) throw new Error(`MP4 chỉ ${size} byte — nghi ngờ render lỗi`);
 
     fs.mkdirSync(OUTPUT_DIR, { recursive: true });
     fs.renameSync(src, dest); // cùng volume nên rename là đủ, không cần copy

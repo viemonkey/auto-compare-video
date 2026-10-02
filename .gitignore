@@ -136,3 +136,5 @@ videos/pose-test-new2/
 videos/test-marble-bg/
 videos/*/pose-calibration/
 videos/*/_caption_preview/
+
+!docs/ui-step2/*

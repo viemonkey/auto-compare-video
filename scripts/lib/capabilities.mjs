@@ -131,7 +131,6 @@ const byOrder = (a, b) => (a.order ?? 100) - (b.order ?? 100) || a.id.localeComp
 export const listEngines = () => [...cached(TTS_ENGINES_DIR, () => loadEngines()).engines.values()].filter((e) => e.enabled).sort(byOrder);
 export const listThemes = () => [...cached(THEMES_DIR, () => loadThemes()).themes.values()].filter((t) => t.enabled).sort(byOrder);
 export const getEngine = (id) => listEngines().find((e) => e.id === id);
-export const getTheme = (id) => listThemes().find((t) => t.id === id);
 export const capabilityErrors = () => [...cached(TTS_ENGINES_DIR, () => loadEngines()).errors, ...cached(THEMES_DIR, () => loadThemes()).errors];
 
 /** Theme mặc định của UI: theme có `default: true`, không có thì theme đầu tiên. */

@@ -6,7 +6,7 @@ import fs from "node:fs";
 import path from "node:path";
 
 export const CLEANUP_DELAYS_MS = [1000, 3000, 5000];
-const MIN_MP4_BYTES = 100 * 1024; // cùng ngưỡng với archiveAndCleanup(): nhỏ hơn = nghi render lỗi
+export const MIN_MP4_BYTES = 100 * 1024; // MP4 nhỏ hơn ngưỡng này = nghi render lỗi (dùng chung với archiveAndCleanup trong server.mjs)
 
 const defaultRm = (dir) => fs.rmSync(dir, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 });
 const defaultSleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));

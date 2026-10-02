@@ -16,6 +16,7 @@
 - [Cấu trúc repo](#-cấu-trúc-repo)
 - [Yêu cầu hệ thống](#️-yêu-cầu-hệ-thống)
 - [Bắt đầu](#-bắt-đầu)
+- [Đa thị trường (ja / en / th)](#-đa-thị-trường)
 - [Đóng góp](#-đóng-góp)
 - [Xem thêm](#-xem-thêm)
 - [License](#-license)
@@ -256,7 +257,9 @@ Web UI (`npm run ui`) có tab **"💰 Thống kê chi phí"** cạnh "Danh sách
 Cách hoạt động:
 
 - **`config/pricing.mjs`** — bảng giá tập trung (USD/1M token cho sinh kịch bản, USD/ảnh cho
-  sinh ảnh minh hoạ), kèm ngày cập nhật giá gần nhất. Đổi model (`GEMINI_MODEL`/`IMAGE_GEN_MODEL`
+  sinh ảnh minh hoạ) theo trang giá chính thức của Google (ghi nguồn URL + ngày cập nhật). Model chưa có giá
+  được đánh dấu "chưa có giá" trong thống kê (không hiện 0 như thật); tính lại sổ bằng
+  `node scripts/reprice-cost-ledger.mjs`. Đổi model (`GEMINI_MODEL`/`IMAGE_GEN_MODEL`
   trong `.env`) hoặc khi Google đổi giá thì sửa trực tiếp file này.
 - **`output/cost-ledger.jsonl`** — sổ chi phí, mỗi dòng là 1 lần gọi Gemini thật (append-only,
   ghi bởi `scripts/lib/cost-ledger.mjs` từ `generate-compare-content.mjs` và
@@ -280,6 +283,13 @@ node scripts/seed-fake-cost-data.mjs --clear
 
 Lệnh `--clear` chỉ xoá đúng các dòng do script này sinh ra (đánh dấu `"seed": true`), không đụng
 tới dòng chi phí thật nào khác đã có trong file.
+
+## 🌏 Đa thị trường
+
+Web UI hỗ trợ nhiều **thị trường** (vi-VN mặc định, ja-JP, en-US, th-TH): Gemini viết nội dung bằng ngôn ngữ đích theo văn phong/thuật ngữ của thị trường kèm **dòng nghĩa tiếng Việt** để bạn kiểm soát được nội dung dù không đọc được ngôn ngữ đó; Bước 2 có trình soạn song ngữ, lưu nháp, và tạo phiên bản thị trường khác từ cùng 2 ảnh
+(giữ nguyên đối tượng/ý của bản gốc). Hiện chỉ vi-VN **dựng được video** — các thị trường khác sinh/sửa/lưu nháp được (xem giới hạn và lộ trình ở tài liệu).
+
+Hướng dẫn đầy đủ — **cách thêm thị trường mới**, cấu trúc `config/locales | hashtags | tts-engines | themes`, quy tắc văn phong, cách dùng Bước 2 song ngữ, model fallback (`GEMINI_FALLBACK_MODEL`), bảng giá, dọn thư mục sau render, kế hoạch Giai đoạn 2/3: [docs/phase1-markets.md](docs/phase1-markets.md).
 
 ## 📣 Đăng Reels lên Facebook tự động
 
