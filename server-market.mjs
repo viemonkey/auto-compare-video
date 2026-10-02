@@ -9,6 +9,7 @@ import { loadHashtagConfig, planHashtags, sanitizePlan, maxHashtags, withMeaning
 import { collectContentWarnings } from "./scripts/lib/compare-content.mjs";
 import { renameCostLedgerSlug } from "./scripts/lib/cost-ledger.mjs";
 import { textOf, viOf } from "./public/shared/bilingual.mjs";
+import { buildApprovedFacts, checkAgainstApprovedFacts } from "./scripts/lib/approved-facts.mjs";
 
 /** Dựng bản ghi bền vững (xem scripts/lib/content-store.mjs). */
 export function buildRecord({ content, locale, hashtagPlan, status, source = null, derivedFrom = null, savedAt = new Date().toISOString() }) {
@@ -90,6 +91,14 @@ export function createMarketApi(ctx) {
 
   function sourceOf({ slug, record }) {
     return resolveSource({ dir: STORE, videosDir: VIDEOS_DIR, slug, record });
+  }
+
+  // Phiên bản phái sinh: đối chiếu LẠI với bản gốc mỗi lần mở (nên luôn đúng với nội dung hiện tại, không lưu cảnh báo cũ).
+  function factWarningsFor(derivedFrom, content) {
+    if (!derivedFrom) return [];
+    const base = readRecord(STORE, derivedFrom);
+    const facts = base ? buildApprovedFacts(base) : null;
+    return facts ? checkAgainstApprovedFacts(structuredClone(content), facts).warnings : [];
   }
 
   function draftName(record) {
@@ -204,6 +213,7 @@ export function createMarketApi(ctx) {
       locale: locale.code,
       derivedFrom: _meta?.derivedFrom || null,
       generatedBy: _meta?.generatedBy || null,
+      factWarnings: factWarningsFor(_meta?.derivedFrom, content),
       content,
       hashtags: withMeanings(plan, cfg),
       hashtagMax: maxHashtags(),
@@ -240,6 +250,8 @@ export function createMarketApi(ctx) {
       localeCode: target.code,
       contentAngleId: src.contentAngleId,
       customAngleText: src.customAngleText,
+      // Bản gốc đã duyệt là sự thật cố định: Gemini chỉ viết lại bằng ngôn ngữ đích, KHÔNG nhận dạng lại ảnh. Bản gốc thiếu dữ kiện (null) thì sinh như cũ.
+      approvedFacts: buildApprovedFacts(sourceRecord),
     });
     if (!gen.ok) return res.status(gen.status).json({ error: gen.error });
 

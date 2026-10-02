@@ -31,6 +31,7 @@ import { CONTENT_ANGLES } from "../config/content-angles.mjs";
 import { calcContentCost } from "../config/pricing.mjs";
 import { appendCostEntry } from "./lib/cost-ledger.mjs";
 import { resolveGeminiModels } from "./lib/gemini-models.mjs";
+import { checkAgainstApprovedFacts } from "./lib/approved-facts.mjs";
 import { loadHashtagConfig } from "./lib/hashtags.mjs";
 import { buildComparePrompt } from "./lib/compare-prompt.mjs";
 import { parseAndValidate, enforceJewelryGating, enforceContextImageLimits, collectContentWarnings } from "./lib/compare-content.mjs";
@@ -94,7 +95,7 @@ function requireApiKey() {
 // ============================================================
 function parseArgs(argv) {
   const positional = [];
-  const opts = { out: null, topicHint: null, contentAngleId: null, customAngleText: null, slug: null, locale: null };
+  const opts = { out: null, topicHint: null, contentAngleId: null, customAngleText: null, slug: null, locale: null, approvedFacts: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--out") {
@@ -105,6 +106,8 @@ function parseArgs(argv) {
       opts.slug = argv[++i];
     } else if (a === "--locale") {
       opts.locale = argv[++i];
+    } else if (a === "--approved-facts") {
+      opts.approvedFacts = JSON.parse(fs.readFileSync(argv[++i], "utf8")); // dữ kiện đã duyệt của bản gốc (xem lib/approved-facts.mjs)
     } else if (a === "--content-angle-id") {
       opts.contentAngleId = argv[++i];
     } else if (a === "--custom-angle-text") {
@@ -221,10 +224,10 @@ function loadActionCatalog() {
   return { actions, allIds, jewelryIds, generalIds, excludedIds: all.map((a) => a.id).filter((id) => !allIds.includes(id)) };
 }
 
-async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalog, locale, slug, attempt, model = GEMINI_MODEL }) {
+async function callGeminiOnce({ left, right, topicHint, angleInstruction, approvedFacts, catalog, locale, slug, attempt, model = GEMINI_MODEL }) {
   const hashtagCfg = loadHashtagConfig(locale);
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey()}`;
-  const { systemPrompt, userPrompt, responseSchema } = buildComparePrompt({ catalog, hashtagCfg, topicHint, angleInstruction, locale });
+  const { systemPrompt, userPrompt, responseSchema } = buildComparePrompt({ catalog, hashtagCfg, topicHint, angleInstruction, approvedFacts, locale });
   const body = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
     contents: [
@@ -377,7 +380,7 @@ async function generateWithRetry(args) {
 // real error objects instead of parsed stdout). The CLI `main()` below is a thin wrapper
 // around this same function — no behavior duplication between the two entry points.
 // ============================================================
-async function runCompareContent({ left, right, topicHint, contentAngleId, customAngleText, slug = null, locale: localeCode } = {}) {
+async function runCompareContent({ left, right, topicHint, contentAngleId, customAngleText, slug = null, locale: localeCode, approvedFacts = null } = {}) {
   requireApiKey();
   const locale = resolveLocale(localeCode); // rỗng/thiếu -> thị trường mặc định (DEFAULT_LOCALE)
   const catalog = loadActionCatalog();
@@ -385,7 +388,7 @@ async function runCompareContent({ left, right, topicHint, contentAngleId, custo
   const rightImg = loadImage(right, "phải");
   const angleInstruction = resolveAngleInstruction(contentAngleId, customAngleText);
 
-  const { content, model: usedModel, primaryModel, usedFallback } = await generateWithRetry({ left: leftImg, right: rightImg, topicHint, angleInstruction, catalog, locale, slug });
+  const { content, model: usedModel, primaryModel, usedFallback } = await generateWithRetry({ left: leftImg, right: rightImg, topicHint, angleInstruction, approvedFacts, catalog, locale, slug });
 
   // Log chẩn đoán: Gemini tự đánh dấu bao nhiêu point cần ảnh minh hoạ NGAY SAU khi nhận
   // response, TRƯỚC mọi hậu kiểm (jewelry gate / cap MAX_CONTEXT_IMAGES ảnh / liền-kề-cùng-bên) — để phân biệt
@@ -415,6 +418,9 @@ async function runCompareContent({ left, right, topicHint, contentAngleId, custo
 
   // Cảnh báo theo từng field (độ dài theo limits, cụm cấm, thiếu nghĩa tiếng Việt, lệch glossary) — KHÔNG chặn.
   const warnings = collectContentWarnings(content, locale);
+  // Phiên bản thị trường: đối chiếu với dữ kiện đã duyệt của bản gốc (số point, bên, nghĩa nhãn) — lệch thì cảnh báo, side bị ép về đúng bản gốc.
+  const factCheck = approvedFacts ? checkAgainstApprovedFacts(content, approvedFacts) : { warnings: [], corrections: [] };
+  warnings.push(...factCheck.warnings);
   if (warnings.length) {
     console.warn(`[generate-compare-content] ${warnings.length} cảnh báo nội dung (${locale.code}):`);
     for (const w of warnings) console.warn(`  - ${w.path}: ${w.message}`);
@@ -426,6 +432,7 @@ async function runCompareContent({ left, right, topicHint, contentAngleId, custo
     corrections,
     contextImageCorrections,
     warnings,
+    factWarnings: factCheck.warnings,
     model: usedModel,
     primaryModel,
     usedFallback,
@@ -447,7 +454,7 @@ async function main() {
   console.log(`Right image: ${opts.right}`);
 
   requireApiKey();
-  const { content, corrections, contextImageCorrections, warnings, model, primaryModel, usedFallback, source_images } = await runCompareContent({
+  const { content, corrections, contextImageCorrections, warnings, factWarnings, model, primaryModel, usedFallback, source_images } = await runCompareContent({
     left: opts.left,
     right: opts.right,
     topicHint: opts.topicHint,
@@ -455,6 +462,7 @@ async function main() {
     customAngleText: opts.customAngleText,
     slug: opts.slug,
     locale: opts.locale,
+    approvedFacts: opts.approvedFacts,
   });
 
   if (corrections.length) {
@@ -481,6 +489,7 @@ async function main() {
       corrections,
       contextImageCorrections,
       warnings,
+      fact_warnings: factWarnings,
       content_angle_id: opts.contentAngleId || "auto",
       custom_angle_text: opts.contentAngleId === "custom" ? opts.customAngleText || "" : "",
     },

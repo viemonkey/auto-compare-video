@@ -137,7 +137,24 @@ JSON trả về LUÔN LUÔN có đủ 8 field sau — không được bỏ bớt
 
 Gợi ý ngữ cảnh thêm từ người dùng: {{contextHint}}{{/contextHint}}{{#angle}}
 
-Góc độ nội dung yêu cầu cho video này: {{angle}}{{/angle}}
+Góc độ nội dung yêu cầu cho video này: {{angle}}{{/angle}}{{#approvedFacts}}
+
+{{approvedFacts}}{{/approvedFacts}}
+
+@@@ fragment.approvedFacts
+DỮ KIỆN ĐÃ DUYỆT của bản gốc — đây là SỰ THẬT CỐ ĐỊNH (ưu tiên hơn mọi thứ bạn nhận ra từ ảnh):
+- Ảnh TRÁI là: {{left}}. "label_left" PHẢI là tên {{language}} của đúng đối tượng này.
+- Ảnh PHẢI là: {{right}}. "label_right" PHẢI là tên {{language}} của đúng đối tượng này.
+{{#materials}}
+- "materials" = [tên chuẩn {{language}} của đối tượng TRÁI, của đối tượng PHẢI]; tên ở bản gốc: {{materials}}.
+{{/materials}}
+- "points" PHẢI có ĐÚNG {{count}} phần tử (quy tắc "4 đến 8 points" ở trên KHÔNG áp dụng), giữ NGUYÊN thứ tự; mỗi phần tử diễn đạt đúng ý tương ứng dưới đây và có đúng "side" ghi kèm:
+{{points}}
+QUY TẮC: tên đối tượng LẤY THEO dữ kiện đã duyệt ở trên, KHÔNG theo nhận dạng từ ảnh — ảnh chỉ để tham khảo hình dáng/màu sắc. KHÔNG đổi đối tượng, KHÔNG thêm/bớt/gộp/tách/đổi thứ tự ý.
+Việc của bạn chỉ là VIẾT LẠI từng ý bằng {{language}} theo văn phong và thuật ngữ của thị trường. "title" là câu hỏi mở đầu về ĐÚNG 2 đối tượng này. Bạn vẫn tự chọn "tag", "sub", "suggested_action", "needs_context_image", "image_concept".
+
+@@@ fragment.approvedFacts.point
+  {{n}}. [{{side}}] {{meaning}}
 
 @@@ fragment.unit.grapheme
 {{n}} ký tự

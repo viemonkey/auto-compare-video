@@ -55,9 +55,23 @@ export function buildSystemPrompt(catalog, hashtagCfg, locale = getDefaultLocale
   });
 }
 
-export function buildUserPrompt(topicHint, angleInstruction, templateFile = PROMPT_TEMPLATE_PATH) {
+// approvedFacts (tuỳ chọn, xem scripts/lib/approved-facts.mjs): dữ kiện đã duyệt của bản gốc khi tạo phiên bản cho thị trường khác —
+// Gemini chỉ được viết lại bằng ngôn ngữ đích, không nhận dạng lại ảnh / đổi đối tượng / thêm bớt ý.
+export function buildUserPrompt(topicHint, angleInstruction, templateFile = PROMPT_TEMPLATE_PATH, { approvedFacts = null, locale = getDefaultLocale() } = {}) {
   const sections = loadTemplateFile(templateFile);
-  return renderTemplate(section(sections, "user"), { contextHint: topicHint || "", angle: angleInstruction || "" });
+  const facts = approvedFacts
+    ? renderTemplate(section(sections, "fragment.approvedFacts"), {
+        language: locale.prompt.language,
+        left: approvedFacts.left,
+        right: approvedFacts.right,
+        materials: (approvedFacts.materials || []).map((m) => `"${m}"`).join(", "),
+        count: approvedFacts.points.length,
+        points: approvedFacts.points
+          .map((p, i) => renderTemplate(section(sections, "fragment.approvedFacts.point"), { n: i + 1, side: p.side, meaning: p.meaning }))
+          .join("\n"),
+      })
+    : "";
+  return renderTemplate(section(sections, "user"), { contextHint: topicHint || "", angle: angleInstruction || "", approvedFacts: facts });
 }
 
 // ============================================================
@@ -71,7 +85,7 @@ export function schemaMaxLength(limits, key) {
   return limits.unit === "word" && WORD_UNIT_KEYS.has(key) ? limits[key] * limits.charsPerWord : limits[key];
 }
 
-export function buildResponseSchema(allIds, hashtagCfg, locale = getDefaultLocale()) {
+export function buildResponseSchema(allIds, hashtagCfg, locale = getDefaultLocale(), { pointCount = null } = {}) {
   const limits = Object.fromEntries(Object.keys(locale.limits).map((k) => [k, schemaMaxLength(locale.limits, k)]));
   // Thị trường cần nghĩa tiếng Việt: field hiển thị là { text, vi }. `vi` dài tối đa bằng giới hạn của locale tiếng Việt
   // (hoặc bằng `text` nếu lớn hơn, vì dịch sang tiếng Việt thường dài hơn chữ Nhật/Thái) — chỉ để chặn model lặp vô hạn.
@@ -121,7 +135,8 @@ export function buildResponseSchema(allIds, hashtagCfg, locale = getDefaultLocal
       suggestedTags: { type: "array", maxItems: 2, items: { type: "string", maxLength: limits.suggestedTag } },
       points: {
         type: "array",
-        maxItems: 8,
+        // có dữ kiện đã duyệt: số point cố định bằng bản gốc; không thì 1..8 như thường
+        ...(pointCount ? { minItems: pointCount, maxItems: pointCount } : { maxItems: 8 }),
         items: {
           type: "object",
           // Every field required, for the same reason the top-level ones are:
@@ -152,10 +167,10 @@ export function buildResponseSchema(allIds, hashtagCfg, locale = getDefaultLocal
  * dễ test. `locale` mặc định = thị trường mặc định (DEFAULT_LOCALE).
  * @returns {{systemPrompt:string, userPrompt:string, responseSchema:object}}
  */
-export function buildComparePrompt({ catalog, hashtagCfg, topicHint, angleInstruction, locale = getDefaultLocale(), templateFile = PROMPT_TEMPLATE_PATH }) {
+export function buildComparePrompt({ catalog, hashtagCfg, topicHint, angleInstruction, approvedFacts = null, locale = getDefaultLocale(), templateFile = PROMPT_TEMPLATE_PATH }) {
   return {
     systemPrompt: buildSystemPrompt(catalog, hashtagCfg, locale, templateFile),
-    userPrompt: buildUserPrompt(topicHint, angleInstruction, templateFile),
-    responseSchema: buildResponseSchema(catalog.allIds, hashtagCfg, locale),
+    userPrompt: buildUserPrompt(topicHint, angleInstruction, templateFile, { approvedFacts, locale }),
+    responseSchema: buildResponseSchema(catalog.allIds, hashtagCfg, locale, { pointCount: approvedFacts ? approvedFacts.points.length : null }),
   };
 }

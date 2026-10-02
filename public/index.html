@@ -112,7 +112,8 @@
         <!-- Optional Topic Hint -->
         <div class="topic-hint-group">
           <label for="topic-hint">💡 Gợi ý ngữ cảnh thêm cho Gemini AI (không bắt buộc):</label>
-          <input type="text" id="topic-hint" class="input-text" placeholder="Ví dụ: Đồ trang sức kim hoàn, hoặc Công nghệ lập trình..." />
+          <input type="text" id="topic-hint" class="input-text" placeholder="Nên ghi rõ tên 2 đối tượng, vd: ảnh trái là aquamarine, ảnh phải là sapphire" aria-describedby="topic-hint-help" />
+          <small id="topic-hint-help" class="field-help">Ghi rõ tên 2 đối tượng giúp Gemini không nhận dạng nhầm ảnh (vd gọi đá aquamarine là &quot;kim cương xanh&quot;). Các phiên bản thị trường khác sẽ giữ đúng 2 đối tượng bạn đã duyệt ở bản gốc.</small>
         </div>
 
         <!-- Content Angle Selector -->
@@ -175,6 +176,7 @@
         <div class="card-header">
           <h2>🤖 Bước 2: Studio Chỉnh Sửa Kịch Bản & Chọn Tư Thế Nhân Vật</h2>
           <div id="gen-model-badge" class="model-badge hidden"></div>
+          <div id="fact-note" class="fact-note hidden"></div>
           <p>Gemini Vision AI đã sinh kịch bản bên dưới. Bạn có thể tự do chỉnh sửa câu từ và <strong>chọn tư thế biểu cảm của nhân vật host (`assets/actions/`)</strong> cho từng điểm so sánh.</p>
         </div>
 

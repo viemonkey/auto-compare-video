@@ -4,7 +4,7 @@
 import { warningsForField, readingSeconds } from "/shared/field-warnings.mjs";
 import { createLatestRunner, STALE } from "/shared/latest-request.mjs";
 
-const ICON_CLASS = { "too-long": "warn", "forbidden-phrase": "danger", "glossary-term": "warn", "missing-vi": "info" };
+const ICON_CLASS = { "too-long": "warn", "forbidden-phrase": "danger", "glossary-term": "warn", "missing-vi": "info", "fact-mismatch": "danger" };
 
 async function postJson(url, body, signal) {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
@@ -107,6 +107,8 @@ export function createFieldEditor(o) {
     // Cảnh báo theo dòng (cùng module với server). Nghĩa đã cũ -> bỏ cảnh báo dựa vào nghĩa (đã có dấu "chưa cập nhật").
     let warnings = warningsForField(o.kind, { text, vi: o.state.vi }, rules);
     if (staleNow) warnings = warnings.filter((w) => w.code !== "glossary-term" && w.code !== "missing-vi");
+    // Lệch dữ kiện đã duyệt của bản gốc (phiên bản thị trường): còn hiệu lực chừng nào người dùng chưa sửa chữ dòng này.
+    if (o.state.fact && text === o.state.fact.forText) warnings.push({ code: "fact-mismatch", message: o.state.fact.message });
     warnList.innerHTML = "";
     for (const w of warnings) {
       const li = el("li", `bi-warn bi-warn-${ICON_CLASS[w.code] || "warn"}`, `⚠ ${w.message}`);

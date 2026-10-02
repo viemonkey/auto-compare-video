@@ -412,7 +412,7 @@ function localeFromCode(code) {
 
 // Sinh nội dung bằng Gemini (script generate-compare-content.mjs chạy như tiến trình con). Dùng chung cho /api/generate-content (Bước 1) và
 // /api/market-versions (tạo phiên bản cho thị trường khác từ ảnh đã lưu). Trả { ok:true, content, locale, pendingSlug, ... } hoặc { ok:false, status, error }.
-async function runGenerateContent({ leftPath, rightPath, hint = "", localeCode = "", contentAngleId = "", customAngleText = "" }) {
+async function runGenerateContent({ leftPath, rightPath, hint = "", localeCode = "", contentAngleId = "", customAngleText = "", approvedFacts = null }) {
   // slug thật của video chưa xác định ở Bước 1 (người dùng chỉ đặt/sửa slug ở Bước 2, sau khi
   // thấy label_left/label_right Gemini vừa sinh ra) — dùng slug TẠM để dòng content-generation
   // ghi vào cost-ledger.jsonl không bị "slug": null. Client giữ pendingSlug này và gửi lại ở
@@ -422,6 +422,13 @@ async function runGenerateContent({ leftPath, rightPath, hint = "", localeCode =
   const args = [path.join(SCRIPTS_DIR, "generate-compare-content.mjs"), leftPath, rightPath, "--out", outPath, "--slug", pendingSlug];
   const cleanHint = String(hint || "").trim();
   if (cleanHint) args.push("--topic-hint", cleanHint);
+  // Phiên bản thị trường: dữ kiện đã duyệt của bản gốc (nhãn, ý từng điểm) làm sự thật cố định — qua file tạm, xoá sau khi chạy.
+  let factsPath = null;
+  if (approvedFacts) {
+    factsPath = path.join(TEMP_DIR, `facts-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.json`);
+    fs.writeFileSync(factsPath, JSON.stringify(approvedFacts));
+    args.push("--approved-facts", factsPath);
+  }
 
   // Thị trường mục tiêu. Không gửi -> thị trường mặc định; mã không tồn tại/bị tắt -> lỗi 400.
   const code = String(localeCode || "").trim();
@@ -439,6 +446,7 @@ async function runGenerateContent({ leftPath, rightPath, hint = "", localeCode =
   }
 
   const { code: exitCode, out } = await runNode(args);
+  if (factsPath) fs.rmSync(factsPath, { force: true });
   // Log NGAY cả khi thành công — đây là nơi duy nhất còn lại dòng chẩn đoán "Gemini đánh dấu
   // needs_context_image=true cho X/N point" (xem generate-compare-content.mjs), một khi client
   // rời trang thì output/logs/ là chỗ duy nhất còn xem lại được.
@@ -491,6 +499,7 @@ app.post("/api/generate-content", async (req, res) => {
     hashtags: withMeanings(plan, cfg),
     hashtagMax: maxHashtags(),
     warnings: content._meta?.warnings || [],
+    factWarnings: content._meta?.fact_warnings || [],
     generatedBy: generatedByOf(content._meta), // { model, primary, isFallback } — UI Bước 2 hiện badge model (+ "(dự phòng)")
   });
 });

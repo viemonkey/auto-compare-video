@@ -13,6 +13,7 @@ document.addEventListener("DOMContentLoaded", () => {
   let pointsData = [];
   let generatedContent = null; // nội dung Gemini nguyên bản (field song ngữ { text, vi } với thị trường ngoài tiếng Việt)
   let generatedWarnings = []; // cảnh báo theo field: [{ path, code, message }]
+  let generatedBy = null; // model đã sinh nội dung { model, primary, isFallback } — gửi kèm khi lưu để mở lại còn badge
   // Trình soạn song ngữ: nghĩa tiếng Việt của từng dòng { vi, baseText } (stale = chữ đích hiện tại khác baseText)
   const emptyPair = () => ({ vi: "", baseText: "" });
   const emptyPointBi = () => ({ text: emptyPair(), tag: emptyPair(), sub: emptyPair() });
@@ -246,6 +247,8 @@ document.addEventListener("DOMContentLoaded", () => {
     geminiHashtagMeta = { materials: [], topicTags: [], suggestedTags: [] };
     generatedContent = null;
     generatedWarnings = [];
+    renderModelBadge(null);
+    renderFactNote([]);
     biState = { title: emptyPair(), label_left: emptyPair(), label_right: emptyPair() };
     refreshBiEditors();
     renderHashtagChips();
@@ -559,9 +562,13 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   // Content from Gemini -> editor state. Markets with a gloss line keep { vi, baseText } per line; flat markets are unchanged.
-  function initBilingualState(content) {
-    const pairOf = (f) => ({ vi: viOf(f), baseText: textOf(f) });
-    biState = { title: pairOf(content.title), label_left: pairOf(content.label_left), label_right: pairOf(content.label_right) };
+  // factWarnings: lệch so với bản gốc đã duyệt (chỉ có ở phiên bản thị trường). Nhãn lệch -> gắn vào đúng dòng, tự mất khi người dùng sửa chữ đó.
+  function initBilingualState(content, factWarnings = []) {
+    const pairOf = (f, path) => {
+      const w = path && factWarnings.find((x) => x.path === path);
+      return { vi: viOf(f), baseText: textOf(f), ...(w ? { fact: { message: w.message, forText: textOf(f) } } : {}) };
+    };
+    biState = { title: pairOf(content.title), label_left: pairOf(content.label_left, "label_left"), label_right: pairOf(content.label_right, "label_right") };
     pointsData = (content.points || []).map((p) => {
       const q = { ...p, text: textOf(p.text), tag: textOf(p.tag), sub: textOf(p.sub) };
       if (isGloss()) q._bi = { text: pairOf(p.text), tag: pairOf(p.tag), sub: pairOf(p.sub) };
@@ -571,6 +578,10 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // Content for /api/create-video (and, later, drafts): bilingual markets send { text, vi } per line, flat markets unchanged.
   function buildContentPayload() {
+    return { ...contentFields(), ...(generatedBy ? { _meta: { generatedBy } } : {}) };
+  }
+
+  function contentFields() {
     const hashtagMeta = { materials: geminiHashtagMeta.materials, topicTags: geminiHashtagMeta.topicTags, suggestedTags: geminiHashtagMeta.suggestedTags };
     if (!isGloss()) {
       return {
@@ -628,15 +639,26 @@ document.addEventListener("DOMContentLoaded", () => {
       : "Model Gemini đã sinh nội dung này.";
   }
 
-  function populateStep2({ content: raw, hashtags, hashtagMax: max, warnings, slug, generatedBy }) {
+  // Khối cảnh báo chung (không gắn được vào 1 dòng): vd số điểm so sánh lệch bản gốc.
+  function renderFactNote(factWarnings) {
+    const el = document.getElementById("fact-note");
+    if (!el) return;
+    const general = factWarnings.filter((w) => w.path !== "label_left" && w.path !== "label_right");
+    el.classList.toggle("hidden", general.length === 0);
+    el.textContent = general.map((w) => `⚠ ${w.message}`).join(" ");
+  }
+
+  function populateStep2({ content: raw, hashtags, hashtagMax: max, warnings, slug, generatedBy: gen, factWarnings = [] }) {
+    generatedBy = gen || null;
     renderModelBadge(generatedBy);
+    renderFactNote(factWarnings);
     generatedContent = raw;
     generatedWarnings = warnings || [];
     const content = flattenContent(raw);
     scriptTitle.value = content.title || "";
     scriptLabelLeft.value = content.label_left || "";
     scriptLabelRight.value = content.label_right || "";
-    initBilingualState(generatedContent); // biState first: the slug of a foreign-language version comes from the vi labels
+    initBilingualState(generatedContent, factWarnings); // biState first: the slug of a foreign-language version comes from the vi labels
     scriptSlug.value = slug || buildSlugWithAngle(content.label_left, content.label_right);
     refreshBiEditors();
     geminiHashtagMeta = {
@@ -674,7 +696,7 @@ document.addEventListener("DOMContentLoaded", () => {
         if (contentAngleCustomText) contentAngleCustomText.value = rec.source.customAngleText || "";
       }
     }
-    populateStep2({ content: rec.content, hashtags: rec.hashtags, hashtagMax: rec.hashtagMax, warnings: rec.warnings, slug: rec.slug, generatedBy: rec.generatedBy });
+    populateStep2({ content: rec.content, hashtags: rec.hashtags, hashtagMax: rec.hashtagMax, warnings: rec.warnings, slug: rec.slug, generatedBy: rec.generatedBy, factWarnings: rec.factWarnings });
     gotoStep(2);
     return true;
   }

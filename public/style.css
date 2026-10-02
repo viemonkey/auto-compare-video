@@ -1331,3 +1331,8 @@ body {
 /* Dòng chi phí thiếu đơn giá (model chưa có trong config/pricing.mjs) */
 .cost-unpriced-note { margin: 0 0 12px; padding: 8px 12px; border-radius: 8px; font-size: 13px; color: #f5b942; background: rgba(245, 185, 66, 0.1); border: 1px solid rgba(245, 185, 66, 0.5); }
 .cost-unpriced-tag { display: inline-block; margin-left: 6px; padding: 0 6px; border-radius: 999px; font-size: 11px; color: #f5b942; border: 1px solid rgba(245, 185, 66, 0.6); white-space: nowrap; }
+
+/* Cảnh báo lệch dữ kiện bản gốc (phiên bản thị trường, Bước 2) */
+.fact-note { margin: 4px 0 10px; padding: 8px 12px; border-radius: 8px; font-size: 13px; color: #ff8a7a; background: rgba(255, 90, 70, 0.08); border: 1px solid rgba(255, 90, 70, 0.45); }
+
+.field-help { display: block; margin-top: 4px; font-size: 12px; color: #9aa3b2; }
