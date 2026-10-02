@@ -1161,7 +1161,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
       row.innerHTML = `
         <div class="point-num">#${idx + 1}</div>
-        <input type="text" class="input-text point-text-input" value="${escapeAttr(p.text)}" data-idx="${idx}" />
+        <span class="point-row-spacer"></span>
         <button type="button" class="action-badge-btn" data-idx="${idx}">
           <img src="/assets/actions/${actionObj.file}" class="action-badge-img" alt="${actionObj.id}" />
           <span>${actionObj.id}</span>
@@ -1169,8 +1169,12 @@ document.addEventListener("DOMContentLoaded", () => {
         <button type="button" class="btn-del-point" data-idx="${idx}" title="Xóa điểm này">✕</button>
       `;
 
-      // Input change listener
-      const input = row.querySelector(".point-text-input");
+      // Số thứ tự, pose, xoá nằm ở hàng đầu của card; ô chữ đích + nghĩa ngay dưới
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "input-text point-text-input";
+      input.value = p.text;
+      input.dataset.idx = String(idx);
       input.addEventListener("input", (e) => {
         pointsData[idx].text = e.target.value;
       });
@@ -1189,7 +1193,7 @@ document.addEventListener("DOMContentLoaded", () => {
         renderPointsList();
       });
 
-      item.appendChild(row);
+      item.append(row, input);
 
       // Dưới mỗi dòng: nghĩa tiếng Việt + cảnh báo của lời thoại; thị trường có dòng nghĩa còn sửa được nhãn (tag) và dòng phụ (sub).
       const extra = document.createElement("div");

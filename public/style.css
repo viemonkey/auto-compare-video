@@ -503,22 +503,25 @@ body {
   gap: 12px;
 }
 
+/* Card điểm so sánh: hàng đầu = badge số (trái) · pose · xoá (phải); ô chữ đích + nghĩa + footer nằm dưới */
 .point-row {
   display: flex;
   align-items: center;
-  gap: 12px;
-  background: var(--bg);
-  border: 1px solid var(--panel-edge);
-  border-radius: var(--radius-md);
-  padding: 10px 14px;
+  gap: 8px;
+  margin-bottom: 12px;
 }
 
 .point-num {
   font-weight: 800;
   color: var(--accent-pink);
-  font-size: 14px;
-  min-width: 24px;
+  font-size: 12px;
+  line-height: 1;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(255, 79, 163, 0.12);
 }
+
+.point-row-spacer { flex: 1; }
 
 .point-text-input {
   flex: 1;
@@ -531,12 +534,12 @@ body {
   background: var(--panel);
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius-sm);
-  padding: 6px 10px;
+  padding: 4px 10px;
   color: var(--accent-cyan);
   font-size: 12px;
   font-weight: 700;
   cursor: pointer;
-  transition: all 0.2s ease;
+  transition: border-color 0.18s ease, background 0.18s ease;
   white-space: nowrap;
 }
 
@@ -546,8 +549,8 @@ body {
 }
 
 .action-badge-img {
-  width: 24px;
-  height: 24px;
+  width: 22px;
+  height: 22px;
   object-fit: contain;
 }
 
@@ -555,13 +558,18 @@ body {
   background: transparent;
   border: none;
   color: var(--fg-dim);
-  font-size: 16px;
+  font-size: 14px;
+  line-height: 1;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
   cursor: pointer;
-  padding: 4px;
+  transition: color 0.18s ease, background 0.18s ease;
 }
 
 .btn-del-point:hover {
   color: var(--danger);
+  background: rgba(255, 77, 77, 0.1);
 }
 
 /* -------------------------------------------------------------
@@ -1274,8 +1282,6 @@ body {
 .locale-flag { width: 24px; height: 16px; border-radius: 2px; box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18); flex: none; }
 
 /* Step 2 bilingual editor ------------------------------------------------- */
-.point-item { display: flex; flex-direction: column; gap: 6px; }
-.point-extra { padding: 0 14px 4px 56px; display: flex; flex-direction: column; gap: 8px; }
 .point-subfield { display: flex; flex-direction: column; gap: 4px; }
 .point-subfield > label { font-size: 11px; color: var(--fg-dim); font-weight: 700; }
 
@@ -1285,22 +1291,17 @@ body {
 .bi-btn {
   border: 1px solid var(--panel-edge); background: var(--panel); color: var(--fg); border-radius: var(--radius-sm);
   min-width: 28px; height: 26px; cursor: pointer; font: inherit; line-height: 1;
+  transition: background 0.18s ease, border-color 0.18s ease, opacity 0.18s ease;
 }
 .bi-btn:hover:not(:disabled) { background: var(--panel-hover); border-color: var(--accent-cyan); }
-.bi-btn:disabled, .bi-field.is-busy .bi-edit button:disabled { opacity: 0.5; cursor: progress; }
-.bi-edit { display: flex; flex-wrap: wrap; gap: 8px; align-items: flex-start; }
-.bi-edit-text { flex: 1 1 260px; min-height: 52px; resize: vertical; font-size: 13px; }
+.bi-btn:disabled { cursor: progress; }
 .bi-meta { display: flex; flex-wrap: wrap; gap: 4px 12px; font-size: 11.5px; }
 .bi-reading { color: var(--fg-dim); }
 .bi-warn-warn, .bi-warn-info { color: var(--accent-yellow); }
 .bi-warn-danger { color: var(--danger); font-weight: 700; }
 .bi-error { color: var(--danger); font-weight: 700; flex-basis: 100%; }
 
-/* view modes: both | target (hide the Vietnamese line) | vi (hide the target-language inputs) */
-.bi-view-vi .bi-main {
-  height: 0; min-height: 0; padding: 0; border-width: 0; margin: 0; overflow: hidden; opacity: 0; pointer-events: none;
-}
-.bi-view-vi .bi-vi-text { color: var(--fg); font-size: 14px; }
+/* view modes: both | target (hide the Vietnamese line) | vi (hide the target-language inputs) — rules live in the card block below */
 .bi-view-vi .point-subfield > label { display: none; }
 
 /* Market badges, drafts, version modal */
@@ -1340,60 +1341,138 @@ body {
 .bi-warn-line.bi-warn-warn, .bi-warn-line.bi-warn-info { color: var(--accent-yellow); }
 .bi-warn-line.bi-warn-danger { color: var(--danger); font-weight: 700; }
 .point-labels { margin: 0; }
-.point-labels > summary { cursor: pointer; font-size: 11.5px; font-weight: 700; color: var(--fg-dim); list-style: none; display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+.point-labels > summary { cursor: pointer; font-size: 12px; font-weight: 500; color: var(--fg-dim); list-style: none; display: flex; align-items: center; gap: 6px; padding: 2px 0; transition: color 0.18s ease; }
+.point-labels > summary:hover { color: var(--fg); }
 .point-labels > summary::-webkit-details-marker { display: none; }
-.point-labels > summary::before { content: "▸"; font-size: 10px; }
-.point-labels[open] > summary::before { content: "▾"; }
+.point-labels > summary::before { content: "▸"; font-size: 10px; display: inline-block; transition: transform 0.18s ease; }
+.point-labels[open] > summary::before { transform: rotate(90deg); }
 .point-labels-dot { width: 8px; height: 8px; border-radius: 50%; display: none; background: var(--accent-yellow); }
 .point-labels-dot.is-danger { background: var(--danger); }
 .point-labels.has-warn .point-labels-dot { display: inline-block; }
-.point-labels-body { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+.point-labels-body { display: flex; flex-direction: column; gap: 12px; padding-top: 10px; }
 .info-tip { display: inline-block; margin-left: 4px; width: 14px; height: 14px; line-height: 14px; text-align: center; border-radius: 50%; font-size: 10px; font-style: normal; color: var(--fg-dim); border: 1px solid var(--panel-edge); cursor: help; }
 
-/* ---- Khối song ngữ (card) ở Bước 2 --------------------------------------------------------------------------
-   1 card liền mạch: câu chính (ô nhập) / đường kẻ 1px / dòng nghĩa tiếng Việt. Thời gian đọc + ✎/↻ ở góc phải dưới (✎/↻ chỉ rõ khi
-   hover/focus card, luôn rõ trên màn cảm ứng). Cảnh báo = viền card vàng/đỏ + 1 dòng chữ nhỏ DƯỚI card; nghĩa cũ = viền trái vàng. */
-:root { --gloss-fg: #cfc9ee; } /* ≈ 12:1 trên nền ô (WCAG AA cần ≥ 4.5:1) */
-.bi-field { display: flex; flex-direction: column; gap: 4px; flex: 1 1 auto; min-width: 0; }
-.bi-card {
-  position: relative; background: var(--bg); border: 1px solid var(--panel-edge); border-radius: var(--radius-md);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease;
+/* ---- Khối song ngữ (card) ở Bước 2 -----------------------------------------------------------------------------
+   Card: padding 16, radius 12, các card cách nhau 12. Trong card: [badge #n · pose · xoá] / câu đích (15px, 500, ô sửa được) /
+   dòng nghĩa (13px, 400) + ✎ ↻ / footer "▸ Nhãn & dòng phụ". Bấm ✎: dòng nghĩa thành ô nhập tại chỗ + hướng dẫn + nút.
+   Cảnh báo = viền card vàng/đỏ + 1 dòng chữ nhỏ; nghĩa cũ = vạch vàng bên trái dòng nghĩa. */
+:root { --gloss-fg: #cfc9ee; --bi-radius: 12px; --bi-pad: 16px; --bi-ease: 0.18s ease; } /* --gloss-fg ≈ 12:1 trên nền card (WCAG AA ≥ 4.5:1) */
+.points-list { gap: 12px; }
+.point-item, .bi-card:not(.no-gloss) {
+  background: var(--bg); border: 1px solid var(--panel-edge); border-radius: var(--bi-radius); padding: var(--bi-pad);
+  transition: border-color var(--bi-ease), box-shadow var(--bi-ease);
 }
-.bi-card:focus-within { border-color: var(--accent-pink); box-shadow: 0 0 10px rgba(255, 79, 163, 0.2); }
-.bi-card:has(.input-highlight) { border-color: var(--accent-cyan); }
-.bi-card.has-warn { border-color: var(--accent-yellow); }
-.bi-card.has-danger { border-color: var(--danger); }
-.bi-card.is-stale { box-shadow: inset 3px 0 0 var(--accent-yellow); }
-.bi-card .bi-main, .bi-card .bi-main:focus { border: 0; background: transparent; box-shadow: none; border-radius: var(--radius-md) var(--radius-md) 0 0; }
-.bi-card.no-gloss .bi-main { border-radius: var(--radius-md); }
+.point-item { display: flex; flex-direction: column; }
+.point-item .bi-card:not(.no-gloss), .point-labels .bi-card:not(.no-gloss) { border: 0; padding: 0; border-radius: 0; background: none; }
+.point-item:has(.bi-card.has-warn), .bi-card.has-warn { border-color: var(--accent-yellow); }
+.point-item:has(.bi-card.has-danger), .bi-card.has-danger { border-color: var(--danger); }
+.point-item .bi-card.has-warn, .point-item .bi-card.has-danger, .point-labels .bi-card.has-warn, .point-labels .bi-card.has-danger { border-color: transparent; }
+.bi-card:has(.input-highlight):not(.has-warn):not(.has-danger) { border-color: var(--accent-cyan); }
+.bi-field { display: flex; flex-direction: column; gap: 6px; flex: 1 1 auto; min-width: 0; }
+.bi-card { position: relative; }
+
+/* câu đích: trông như ô sửa được — nền hơi sáng hơn card, viền mờ khi hover, viền màu nhấn khi focus */
+.bi-card .bi-main.input-text {
+  background: rgba(255, 255, 255, 0.045); border: 1px solid transparent; border-radius: 8px; padding: 10px;
+  font-size: 15px; font-weight: 500; line-height: 1.4; color: #fff; cursor: text;
+  transition: border-color var(--bi-ease), background var(--bi-ease), box-shadow var(--bi-ease);
+}
+.bi-card .bi-main.input-text:hover:not(:disabled):not(:focus) { border-color: rgba(255, 255, 255, 0.2); background: rgba(255, 255, 255, 0.07); }
+.bi-card .bi-main.input-text:focus { border-color: var(--accent-pink); background: rgba(255, 255, 255, 0.06); box-shadow: 0 0 0 3px rgba(255, 79, 163, 0.16); }
+.bi-card.no-gloss .bi-main.input-text { border-color: var(--panel-edge); padding-right: 76px; }
+.bi-card.no-gloss .bi-main.input-text:hover:not(:disabled):not(:focus) { border-color: rgba(255, 255, 255, 0.2); }
+.bi-card.no-gloss .bi-main.input-highlight { border-color: var(--accent-cyan); }
+.bi-card.no-gloss .bi-main.input-highlight:hover:not(:disabled):not(:focus) { border-color: var(--accent-cyan); }
+.point-labels .bi-card .bi-main.input-text { font-size: 14px; }
+
+/* dòng nghĩa: 13px / 400, cách câu đích 10px, lề chữ thẳng với chữ trong ô (1px viền + 10px đệm) */
 .bi-gloss {
-  display: flex; align-items: baseline; gap: 8px; padding: 7px 14px; padding-right: 100px;
-  border-top: 1px solid var(--panel-edge); font-size: 13px; line-height: 1.45; color: var(--gloss-fg);
+  position: relative; display: flex; align-items: flex-start; gap: 8px; margin-top: 10px; padding: 0 11px;
+  font-size: 13px; font-weight: 400; line-height: 1.5; color: var(--gloss-fg);
 }
-.bi-card.is-stale .bi-gloss { padding-right: 240px; }
-.bi-gloss-label { flex: none; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--fg-dim); }
-.bi-vi-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; }
+.bi-gloss-label { flex: none; margin-top: 3px; font-size: 10px; font-weight: 700; letter-spacing: 0.5px; color: var(--fg-dim); }
+.bi-vi-text { flex: 1 1 auto; min-width: 0; overflow-wrap: anywhere; transition: opacity var(--bi-ease); }
 .bi-vi-text.is-stale { opacity: 0.75; }
-.bi-vi-actions { position: absolute; right: 8px; bottom: 6px; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--fg-dim); white-space: nowrap; }
-.bi-card.no-gloss .bi-vi-actions { position: static; justify-content: flex-end; padding: 0 10px 6px; }
+.bi-card.is-stale .bi-gloss::before { content: ""; position: absolute; left: 0; top: 2px; bottom: 2px; width: 2px; border-radius: 2px; background: var(--accent-yellow); }
+
+/* ✎ ↻ + thời gian đọc + "nghĩa chưa cập nhật": cuối dòng nghĩa; nút chỉ rõ khi hover/focus card, luôn rõ trên màn cảm ứng */
+.bi-vi-actions { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--fg-dim); white-space: nowrap; }
+.bi-card.no-gloss .bi-vi-actions { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); }
 .bi-stale { color: var(--accent-yellow); font-weight: 700; font-size: 11px; }
-.bi-vi-actions .bi-btn { min-width: 22px; height: 20px; font-size: 11px; opacity: 0; transition: opacity 0.15s ease; }
+.bi-vi-actions .bi-btn { min-width: 24px; height: 22px; font-size: 11px; opacity: 0; }
 .bi-card:hover .bi-vi-actions .bi-btn, .bi-card:focus-within .bi-vi-actions .bi-btn, .bi-vi-actions .bi-btn:focus-visible { opacity: 1; }
-.bi-vi-actions .bi-btn:disabled { opacity: 0.5; }
+.bi-vi-actions .bi-btn:disabled { opacity: 0.55; }
 @media (hover: none) { .bi-vi-actions .bi-btn { opacity: 1; } }
+.bi-card.is-editing .bi-vi-actions { display: none; }
+
+/* sửa ý tiếng Việt TẠI CHỖ: ô nhập thế chỗ chữ nghĩa (cùng vị trí, cùng lề) */
+.bi-edit-text {
+  flex: 1 1 auto; min-width: 0; margin: -5px -8px -5px -4px; padding: 4px 8px 4px 3px; resize: none; overflow: hidden;
+  font: inherit; line-height: 1.5; color: #fff; background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--accent-cyan); border-radius: 6px; outline: none; box-shadow: 0 0 0 3px rgba(55, 230, 196, 0.14);
+  animation: bi-fade-in var(--bi-ease);
+}
+.bi-edit-text.hidden { display: none; }
+.bi-edit-text:disabled { opacity: 0.6; }
+.bi-edit { display: grid; grid-template-rows: 0fr; opacity: 0; transition: grid-template-rows 0.2s ease, opacity 0.2s ease; }
+.bi-card.is-editing .bi-edit { grid-template-rows: 1fr; opacity: 1; }
+.bi-edit-inner { min-height: 0; overflow: hidden; padding: 0 11px; }
+.bi-edit-hint { margin-top: 8px; font-size: 11.5px; line-height: 1.4; color: var(--fg-dim); }
+.bi-edit-actions { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 10px; padding-bottom: 1px; }
+.bi-kbd-hint { margin-right: auto; font-size: 11px; color: var(--fg-dim); opacity: 0.7; }
+.bi-kbd-hint kbd { font: inherit; font-size: 10.5px; padding: 1px 5px; border: 1px solid var(--panel-edge); border-radius: 4px; background: rgba(255, 255, 255, 0.04); }
+.bi-btn-text { background: none; border: 0; padding: 4px 6px; font: inherit; font-size: 13px; color: var(--fg-dim); cursor: pointer; border-radius: 6px; transition: color var(--bi-ease), background var(--bi-ease); }
+.bi-btn-text:hover:not(:disabled) { color: var(--fg); background: rgba(255, 255, 255, 0.06); }
+.bi-btn-text:disabled { opacity: 0.5; cursor: progress; }
+.bi-btn-rewrite { display: inline-flex; align-items: center; gap: 8px; }
+.bi-btn-rewrite:disabled { opacity: 0.85; cursor: progress; }
+
+/* đang xử lý: card khoá, shimmer ở phần AI đang viết (câu đích khi viết lại, dòng nghĩa khi dịch lại), nút có spinner */
+.bi-field.is-busy .bi-card { pointer-events: none; }
+.bi-field.is-busy-rewrite .bi-main.input-text:disabled,
+.bi-field.is-busy-translate .bi-vi-text {
+  color: transparent; -webkit-text-fill-color: transparent; border-radius: 6px; border-color: transparent; opacity: 1;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0.05) 25%, rgba(255, 255, 255, 0.16) 50%, rgba(255, 255, 255, 0.05) 75%) 0 0 / 200% 100%;
+  animation: bi-shimmer 1.3s linear infinite;
+}
+.bi-field.is-busy-translate .bi-vi-text { align-self: center; height: 1.1em; }
+.bi-spinner, .bi-btn.is-loading::after {
+  display: inline-block; width: 12px; height: 12px; border: 2px solid rgba(255, 255, 255, 0.35); border-top-color: #fff;
+  border-radius: 50%; animation: bi-spin 0.7s linear infinite;
+}
+.bi-btn.is-loading { font-size: 0; display: inline-flex; align-items: center; justify-content: center; opacity: 1 !important; }
+.bi-btn.is-loading::after { content: ""; width: 11px; height: 11px; border-color: rgba(255, 255, 255, 0.25); border-top-color: var(--accent-cyan); }
+
+/* vừa cập nhật: sáng nhẹ rồi tắt dần (~1.8s) */
+.bi-card.flash-target .bi-main.input-text { animation: bi-flash 1.8s ease-out; }
+.bi-card.flash-vi .bi-vi-text { animation: bi-flash-text 1.8s ease-out; border-radius: 4px; }
+@keyframes bi-shimmer { to { background-position: -200% 0; } }
+@keyframes bi-spin { to { transform: rotate(360deg); } }
+@keyframes bi-fade-in { from { opacity: 0; } }
+@keyframes bi-flash { 0%, 35% { background-color: rgba(55, 230, 196, 0.22); border-color: rgba(55, 230, 196, 0.7); } 100% { background-color: rgba(255, 255, 255, 0.045); border-color: transparent; } }
+@keyframes bi-flash-text { 0%, 35% { background-color: rgba(55, 230, 196, 0.22); box-shadow: 0 0 0 4px rgba(55, 230, 196, 0.22); } 100% { background-color: transparent; box-shadow: 0 0 0 4px transparent; } }
+@media (prefers-reduced-motion: reduce) {
+  .bi-field.is-busy-rewrite .bi-main.input-text:disabled, .bi-field.is-busy-translate .bi-vi-text, .bi-card.flash-target .bi-main.input-text, .bi-card.flash-vi .bi-vi-text { animation: none; }
+  .bi-edit, .bi-edit-text { transition: none; animation: none; }
+}
+
 .bi-below { display: flex; flex-direction: column; gap: 4px; }
-.point-row .bi-card { background: transparent; }
+.bi-below:not(:has(.bi-meta > :not(.hidden))) { display: none; }
+
+/* footer card điểm so sánh: "▸ Nhãn & dòng phụ" — chữ xám nhỏ, cùng lề với nội dung, ngăn bằng đường kẻ mảnh */
+.point-extra { margin-top: 12px; padding-top: 10px; border-top: 1px solid var(--panel-edge); display: flex; flex-direction: column; }
+.point-extra:empty { display: none; }
+.point-labels > summary { padding-left: 11px; }
+.point-labels[open] .point-labels-body { animation: bi-reveal 0.2s ease; }
+@keyframes bi-reveal { from { opacity: 0; transform: translateY(-4px); } }
 
 /* chế độ xem: target = ẩn dòng nghĩa; vi = ẩn ô chữ đích, chỉ còn nghĩa (to hơn, màu chính) */
-.bi-view-target .bi-gloss, .bi-view-target .bi-vi-actions, .bi-view-target .bi-edit { display: none !important; }
-.bi-view-vi .bi-gloss { border-top: 0; font-size: 14px; color: var(--fg); }
-.bi-view-vi .bi-gloss-label { display: none; }
-
-/* tinh chỉnh: thị trường không có dòng nghĩa -> thời gian đọc nằm góc phải của card; chế độ "chỉ tiếng Việt" -> ẩn hẳn ô chữ đích */
-.bi-card.no-gloss .bi-vi-actions { position: absolute; top: 50%; right: 12px; bottom: auto; transform: translateY(-50%); padding: 0; }
-.bi-card.no-gloss .bi-main { padding-right: 76px; }
+.bi-view-target .bi-gloss, .bi-view-target .bi-edit { display: none !important; }
 .bi-view-vi .bi-card .bi-main { display: none; }
-.bi-view-vi .bi-gloss { padding: 12px 14px; padding-right: 100px; }
+.bi-view-vi .bi-gloss { margin-top: 0; font-size: 14px; color: var(--fg); }
+.bi-view-vi .bi-gloss-label { display: none; }
+.bi-view-vi .bi-vi-text { font-size: 14px; color: var(--fg); }
+.bi-view-vi .bi-field.is-busy-translate .bi-vi-text { color: transparent; }
 
 /* Danh sách video: bản ngoại ngữ — tiêu đề chữ đích là tên chính, nghĩa tiếng Việt nhỏ bên dưới, slug mờ hơn */
 .video-title-vi { font-size: 12.5px; color: var(--gloss-fg, #cfc9ee); margin-top: 2px; }

@@ -1,10 +1,11 @@
 // Trình soạn 1 dòng hiển thị ở Bước 2: dòng chính (ô nhập chữ ngôn ngữ đích, do app.js cung cấp) + dòng nghĩa tiếng Việt
-// màu nhạt bên dưới + cảnh báo theo dòng. Sửa ý bằng tiếng Việt (✎ -> "Viết lại bằng <ngôn ngữ>") và dịch lại nghĩa (↻) đều chỉ gọi
-// Gemini cho ĐÚNG dòng này. Chống race bằng createLatestRunner (requestId + AbortController); nút bị khoá trong lúc chờ.
+// màu nhạt bên dưới + cảnh báo theo dòng. Sửa ý bằng tiếng Việt (✎: chính dòng nghĩa thành ô nhập tại chỗ -> "Viết lại bằng <ngôn ngữ>",
+// Ctrl+Enter / Esc) và dịch lại nghĩa (↻) đều chỉ gọi Gemini cho ĐÚNG dòng này. Chống race bằng createLatestRunner (requestId + AbortController); nút bị khoá trong lúc chờ.
 import { warningsForField, readingSeconds } from "/shared/field-warnings.mjs";
 import { createLatestRunner, STALE } from "/shared/latest-request.mjs";
 import { rewriteFeedback, translateFeedback, friendlyError } from "/shared/edit-feedback.mjs";
 
+const FLASH_MS = 1800; // câu / nghĩa vừa được AI cập nhật sáng nhẹ chừng này
 const NOTICE_MS = 10_000; // so sánh ý / thông báo tự ẩn sau chừng này (hoặc người dùng đóng)
 
 const ICON_CLASS = { "too-long": "warn", "forbidden-phrase": "danger", "glossary-term": "warn", "missing-vi": "info", "fact-mismatch": "danger" };
@@ -39,9 +40,11 @@ export function createFieldEditor(o) {
   const runner = createLatestRunner();
   let destroyed = false;
   let busy = false;
+  let flashTimer = null;
 
-  // 1 khối (card) liền mạch: câu chính (ô nhập) ở trên, đường kẻ 1px, dòng nghĩa tiếng Việt ngay dưới; thời gian đọc + ✎ ↻ ở góc phải dưới.
-  // Cảnh báo / lỗi / so sánh ý nằm DƯỚI card. `wrap` thay chỗ ô nhập trong DOM (app.js không phải tạo host).
+  // 1 khối (card): câu chính (ô nhập, trông như ô sửa được) ở trên, dòng nghĩa tiếng Việt ngay dưới (✎ ↻ + thời gian đọc cùng hàng, bên phải).
+  // Bấm ✎: CHÍNH dòng nghĩa thành ô nhập (cùng vị trí) + dòng hướng dẫn + nút Viết lại / Huỷ ngay dưới. Cảnh báo / lỗi / so sánh ý nằm DƯỚI.
+  // `wrap` thay chỗ ô nhập trong DOM (app.js không phải tạo host).
   const wrap = el("div", "bi-field");
   wrap.dataset.kind = o.kind;
   const card = el("div", "bi-card");
@@ -49,6 +52,10 @@ export function createFieldEditor(o) {
   const viLabel = el("span", "bi-gloss-label", "VI");
   viLabel.title = "Nghĩa tiếng Việt";
   const viText = el("span", "bi-vi-text");
+  const editText = el("textarea", "bi-edit-text hidden");
+  editText.rows = 1;
+  editText.placeholder = "Nhập ý bằng tiếng Việt…";
+  editText.setAttribute("aria-label", "Ý mới bằng tiếng Việt");
   const stale = el("span", "bi-stale hidden", "Nghĩa chưa cập nhật");
   const viActions = el("span", "bi-vi-actions");
   const reading = el("span", "bi-reading hidden");
@@ -59,20 +66,26 @@ export function createFieldEditor(o) {
   btnRe.type = "button";
   btnRe.title = "Dịch lại nghĩa tiếng Việt cho dòng này";
   viActions.append(stale, reading, btnEdit, btnRe);
-  viLine.append(viLabel, viText);
+  viLine.append(viLabel, viText, editText, viActions);
 
-  const editBox = el("div", "bi-edit hidden");
-  const editText = el("textarea", "input-text bi-edit-text");
-  editText.rows = 2;
-  editText.placeholder = "Nhập ý mới bằng tiếng Việt…";
-  const btnRewrite = el("button", "btn btn-small btn-primary");
-  btnRewrite.type = "button";
-  const btnCancel = el("button", "btn btn-small btn-secondary", "Huỷ");
+  // khối sửa: hướng dẫn + nút, thu gọn bằng grid 0fr -> 1fr (mượt); `inert` khi đóng để không Tab vào được
+  const editBox = el("div", "bi-edit");
+  editBox.inert = true;
+  const editInner = el("div", "bi-edit-inner");
+  const editHint = el("div", "bi-edit-hint");
+  const editActions = el("div", "bi-edit-actions");
+  const kbdHint = el("span", "bi-kbd-hint");
+  kbdHint.append(el("kbd", "", "Ctrl"), "+", el("kbd", "", "Enter"), " viết lại · ", el("kbd", "", "Esc"), " huỷ");
+  const btnCancel = el("button", "bi-btn-text", "Huỷ");
   btnCancel.type = "button";
-  editBox.append(editText, btnRewrite, btnCancel);
+  const btnRewrite = el("button", "btn btn-small btn-primary bi-btn-rewrite");
+  btnRewrite.type = "button";
+  editActions.append(kbdHint, btnCancel, btnRewrite);
+  editInner.append(editHint, editActions);
+  editBox.append(editInner);
 
   const meta = el("div", "bi-meta");
-  const warnLine = el("div", "bi-warn-line hidden"); // cảnh báo chỉ hiện khi có: viền màu ở ô + 1 dòng chữ nhỏ
+  const warnLine = el("div", "bi-warn-line hidden"); // cảnh báo chỉ hiện khi có: viền màu ở card + 1 dòng chữ nhỏ
   const errBox = el("div", "bi-error hidden");
   const notice = el("div", "bi-notice hidden");
   const noticeText = el("div", "bi-notice-text");
@@ -84,23 +97,62 @@ export function createFieldEditor(o) {
   meta.append(warnLine, errBox, notice);
 
   const below = el("div", "bi-below");
-  below.append(editBox, meta);
+  below.append(meta);
   o.inputEl.before(wrap);
-  card.append(o.inputEl, viLine, viActions);
+  card.append(o.inputEl, viLine, editBox);
   wrap.append(card, below);
 
   const hasGloss = () => !!(o.getRules() && o.getRules().needsGloss);
   const isStale = () => o.inputEl.value.trim() !== (o.state.baseText || "").trim();
 
-  function setBusy(v) {
+  let busyKind = ""; // "rewrite" (shimmer ở câu đích) | "translate" (shimmer ở dòng nghĩa)
+  function rewriteLabel() {
+    const name = (o.getRules() || {}).languageName || "ngôn ngữ đích";
+    if (busy && busyKind === "rewrite") btnRewrite.replaceChildren(el("span", "bi-spinner"), "Đang viết…");
+    else btnRewrite.textContent = `Viết lại bằng ${name}`;
+    btnRewrite.classList.toggle("is-loading", busy && busyKind === "rewrite");
+  }
+
+  function setBusy(v, kind = "") {
     if (busy === v) return;
     busy = v;
+    busyKind = v ? kind : "";
     wrap.classList.toggle("is-busy", v);
+    wrap.classList.toggle("is-busy-rewrite", v && kind === "rewrite");
+    wrap.classList.toggle("is-busy-translate", v && kind === "translate");
+    wrap.setAttribute("aria-busy", String(v));
+    btnRe.classList.toggle("is-loading", v && kind === "translate");
     for (const b of [btnEdit, btnRe, btnRewrite, btnCancel]) b.disabled = v;
     editText.disabled = v;
     o.inputEl.disabled = v; // đang chờ AI ghi đè dòng này -> không cho gõ chen vào
-    btnRewrite.textContent = v ? "⏳ Đang viết…" : `Viết lại bằng ${(o.getRules() || {}).languageName || "ngôn ngữ đích"}`;
+    rewriteLabel();
     o.onBusy(v ? 1 : -1);
+  }
+
+  // câu / nghĩa vừa được AI cập nhật: sáng nhẹ 1–2 giây
+  function flash(which) {
+    clearTimeout(flashTimer);
+    card.classList.remove("flash-target", "flash-vi");
+    void card.offsetWidth; // chạy lại animation nếu bấm liên tiếp
+    card.classList.add(which === "vi" ? "flash-vi" : "flash-target");
+    flashTimer = setTimeout(() => card.classList.remove("flash-target", "flash-vi"), FLASH_MS);
+  }
+
+  const fitEdit = () => {
+    editText.style.height = "auto";
+    editText.style.height = `${editText.scrollHeight}px`;
+  };
+  function setEditing(on) {
+    card.classList.toggle("is-editing", on);
+    editBox.inert = !on;
+    editText.classList.toggle("hidden", !on);
+    viText.classList.toggle("hidden", on);
+    if (on) {
+      editText.value = o.state.vi || "";
+      fitEdit();
+      editText.focus();
+      editText.setSelectionRange(editText.value.length, editText.value.length);
+    }
   }
 
   function showError(msg) {
@@ -140,6 +192,10 @@ export function createFieldEditor(o) {
     viLine.classList.toggle("hidden", !gloss);
     btnEdit.classList.toggle("hidden", !gloss);
     card.classList.toggle("no-gloss", !gloss);
+    // có dòng nghĩa: ✎ ↻ + thời gian đọc nằm cuối dòng nghĩa; không có: nằm góc phải của ô chữ đích
+    const actionsHost = gloss ? viLine : card;
+    if (viActions.parentElement !== actionsHost) actionsHost.append(viActions);
+    if (!gloss && card.classList.contains("is-editing")) setEditing(false);
     if (!rules) return;
     const text = o.inputEl.value;
     const staleNow = gloss && text.trim() !== "" && isStale();
@@ -148,7 +204,8 @@ export function createFieldEditor(o) {
     card.classList.toggle("is-stale", staleNow);
     stale.classList.toggle("hidden", !staleNow);
     btnRe.classList.toggle("hidden", !(staleNow || (gloss && text.trim() !== "" && !o.state.vi)));
-    btnRewrite.textContent = busy ? "⏳ Đang viết…" : `Viết lại bằng ${rules.languageName || "ngôn ngữ đích"}`;
+    rewriteLabel();
+    editHint.textContent = `Nhập ý bằng tiếng Việt — AI sẽ viết lại câu ${rules.languageName || "ngôn ngữ đích"} theo văn phong bản xứ`;
 
     // Cảnh báo theo dòng (cùng module với server). Nghĩa đã cũ -> bỏ cảnh báo dựa vào nghĩa (đã có dấu "chưa cập nhật").
     let warnings = warningsForField(o.kind, { text, vi: o.state.vi }, rules);
@@ -188,13 +245,22 @@ export function createFieldEditor(o) {
 
   btnEdit.addEventListener("click", () => {
     showError("");
-    editText.value = o.state.vi || "";
-    editBox.classList.remove("hidden");
-    editText.focus();
+    setEditing(true);
   });
   btnCancel.addEventListener("click", () => {
     showError("");
-    editBox.classList.add("hidden");
+    setEditing(false);
+  });
+  editText.addEventListener("input", fitEdit);
+  editText.addEventListener("keydown", (e) => {
+    if (e.key === "Enter" && (e.ctrlKey || e.metaKey)) {
+      e.preventDefault();
+      btnRewrite.click();
+    } else if (e.key === "Escape") {
+      e.preventDefault();
+      e.stopPropagation(); // Esc chỉ huỷ sửa, không đóng hộp thoại khác
+      btnCancel.click();
+    }
   });
 
   btnRewrite.addEventListener("click", async () => {
@@ -205,7 +271,7 @@ export function createFieldEditor(o) {
     }
     showError("");
     hideNotice();
-    setBusy(true);
+    setBusy(true, "rewrite");
     try {
       const data = await runner.run((signal, requestId) =>
         postJson(
@@ -225,7 +291,8 @@ export function createFieldEditor(o) {
       if (data === STALE || destroyed) return;
       const fb = rewriteFeedback({ idea, beforeText: o.inputEl.value, afterField: data.field, languageName: (o.getRules() || {}).languageName });
       applyField(data.field.text, data.field.vi); // vi = nghĩa của câu MỚI do AI viết, không phải câu người dùng nhập
-      editBox.classList.add("hidden");
+      setEditing(false);
+      flash("target");
       showNotice({ message: fb.notice, idea: fb.idea, meaning: fb.meaning }); // luôn cho thấy ý bạn nhập ↔ nghĩa câu mới, kể cả khi chữ đích không đổi
     } catch (err) {
       showError(friendlyError(err));
@@ -243,7 +310,7 @@ export function createFieldEditor(o) {
     const text = o.inputEl.value;
     showError("");
     hideNotice();
-    setBusy(true);
+    setBusy(true, "translate");
     try {
       const data = await runner.run((signal, requestId) =>
         postJson("/api/translate-field", { locale: o.getLocaleCode(), kind: o.kind, text, pendingSlug: o.getPendingSlug(), requestId }, signal),
@@ -253,6 +320,7 @@ export function createFieldEditor(o) {
       o.state.vi = data.vi;
       o.state.baseText = text; // nghĩa này là của `text` lúc gửi; nếu người dùng đã gõ tiếp thì vẫn hiện "chưa cập nhật"
       if (o.onChange) o.onChange();
+      flash("vi");
       showNotice({ message: tf.message });
     } catch (err) {
       showError(friendlyError(err));
@@ -275,6 +343,7 @@ export function createFieldEditor(o) {
       if (destroyed) return;
       destroyed = true;
       clearTimeout(noticeTimer);
+      clearTimeout(flashTimer);
       runner.cancel();
       o.inputEl.removeEventListener("input", onInput);
 
