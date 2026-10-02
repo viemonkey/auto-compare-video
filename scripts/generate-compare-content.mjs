@@ -314,7 +314,7 @@ async function callGeminiOnce({ left, right, topicHint, angleInstruction, catalo
   // safety block hoặc thiếu text, nên ghi cost_usd > 0 TRƯỚC khi ném lỗi ở các nhánh dưới.
   const usage = json?.usageMetadata || {};
   const inputTokens = usage.promptTokenCount || 0;
-  const outputTokens = usage.candidatesTokenCount || 0;
+  const outputTokens = (usage.candidatesTokenCount || 0) + (usage.thoughtsTokenCount || 0); // giá output đã gồm token thinking
   appendCostEntry({
     slug,
     locale: locale?.code, task: "content-generation",

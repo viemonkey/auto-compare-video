@@ -31,6 +31,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { CONTENT_ANGLES } from "./config/content-angles.mjs";
 import { COST_LEDGER_PATH, renameCostLedgerSlug, countsAsVideo } from "./scripts/lib/cost-ledger.mjs";
+import { isPriced } from "./config/pricing.mjs";
 import { getConfiguredPages, inspectConfiguredPages } from "./scripts/lib/facebook-pages.mjs";
 import { graphVersion, isAutoPostEnabled, makeLogger, redactSecrets } from "./scripts/lib/fb-config.mjs";
 import { classifyError } from "./scripts/lib/fb-errors.mjs";
@@ -1048,6 +1049,9 @@ app.get("/api/cost-stats", (_req, res) => {
   let totalAllTime = 0;
   let totalToday = 0;
   let totalLast7Days = 0;
+  // Dòng gọi THÀNH CÔNG nhưng model chưa có đơn giá trong config/pricing.mjs: cost_usd=0 là do thiếu giá, KHÔNG phải miễn phí.
+  const unpricedModels = new Set();
+  let unpricedCalls = 0;
   // Không giới hạn 30 ngày ở đây nữa — trả TOÀN BỘ lịch sử theo ngày, để client tự cắt theo bộ
   // lọc khoảng ngày (7/30/tất cả) chọn trong UI mà không cần gọi lại API mỗi lần đổi bộ lọc.
   const byDayMap = new Map();
@@ -1070,6 +1074,11 @@ app.get("/api/cost-stats", (_req, res) => {
     const ts = timestamp ? Date.parse(timestamp) : NaN;
     const dateStr = timestamp ? timestamp.slice(0, 10) : null;
 
+    const unpriced = row.status === "success" && !!row.model && !isPriced(row.model, row.task === "context-image" || row.subtask === "context-image" ? "context-image" : "content-generation");
+    if (unpriced) {
+      unpricedCalls += 1;
+      unpricedModels.add(row.model);
+    }
     totalAllTime += cost;
     if (dateStr === todayStr) totalToday += cost;
     if (!Number.isNaN(ts) && ts >= sevenDaysAgoMs) totalLast7Days += cost;
@@ -1092,6 +1101,7 @@ app.get("/api/cost-stats", (_req, res) => {
           callCount: 0,
           errorCount: 0,
           imagesGenerated: 0,
+          unpricedCalls: 0,
           _lastTimestamp: timestamp,
         });
       }
@@ -1100,6 +1110,7 @@ app.get("/api/cost-stats", (_req, res) => {
       v.byTask[task] = (v.byTask[task] || 0) + cost;
       v.callCount += 1;
       if (row.status === "error") v.errorCount += 1;
+      if (unpriced) v.unpricedCalls += 1;
       // Đếm ẢNH THẬT ĐÃ SINH RA (context-image, status success) — khác với đếm số LẦN GỌI, vì
       // 1 lần gọi thành công luôn ra đúng 1 ảnh ở tính năng này (xem generate-context-image.mjs),
       // nhưng dùng image_count thay vì cộng cứng 1 để không sai nếu sau này 1 lần gọi ra >1 ảnh.
@@ -1133,6 +1144,8 @@ app.get("/api/cost-stats", (_req, res) => {
     totalAllTime,
     totalToday,
     totalLast7Days,
+    unpricedCalls,
+    unpricedModels: [...unpricedModels],
     byDay,
     byTask,
     byLocale,

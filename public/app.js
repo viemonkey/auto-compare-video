@@ -1743,7 +1743,7 @@ document.addEventListener("DOMContentLoaded", () => {
         <td class="cost-td-image">${formatUsd(v.imageCost)}</td>
         <td>${v.imagesGenerated || 0}</td>
         <td class="cost-td-total">
-          ${formatUsd(v.totalCost)}
+          ${formatUsd(v.totalCost)}${v.unpricedCalls ? `<span class="cost-unpriced-tag" title="${v.unpricedCalls} lần gọi dùng model chưa có đơn giá trong config/pricing.mjs — số tiền thật cao hơn số hiện ở đây.">chưa có giá ×${v.unpricedCalls}</span>` : ""}
           <span class="cost-td-total-vnd" title="${USD_TO_VND_TOOLTIP}">${formatVnd(v.totalCost)}</span>
         </td>
       `;
@@ -1793,6 +1793,11 @@ document.addEventListener("DOMContentLoaded", () => {
     costTotalTodayVnd.textContent = formatVnd(costRawData.totalToday);
     costTotal7d.textContent = formatUsd(costRawData.totalLast7Days);
     costTotal7dVnd.textContent = formatVnd(costRawData.totalLast7Days);
+    const unpricedNote = document.getElementById("cost-unpriced-note");
+    unpricedNote.classList.toggle("hidden", !costRawData.unpricedCalls);
+    if (costRawData.unpricedCalls) {
+      unpricedNote.textContent = `⚠ ${costRawData.unpricedCalls} lần gọi dùng model chưa có đơn giá (${(costRawData.unpricedModels || []).join(", ")}) — đang tính 0 USD, chi phí thật cao hơn số hiện. Thêm giá vào config/pricing.mjs rồi chạy scripts/reprice-cost-ledger.mjs.`;
+    }
     costTotalAll.textContent = formatUsd(costRawData.totalAllTime);
     costTotalAllVnd.textContent = formatVnd(costRawData.totalAllTime);
 

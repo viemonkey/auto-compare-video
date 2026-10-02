@@ -4,46 +4,101 @@
 // scripts/lib/cost-ledger.mjs và mọi nơi ghi output/cost-ledger.jsonl đều import từ đây,
 // KHÔNG hardcode số ở nơi khác.
 //
-// ⚠ CẬP NHẬT GIÁ GẦN NHẤT: 2026-09-23.
-// gemini-3.5-flash là model MỚI (xem GEMINI_MODEL trong .env.example) — tại thời điểm ghi
-// bảng giá này, Google CHƯA công bố trang giá riêng cho model đó mà tool đang dùng, nên 2 đơn
-// giá input/output bên dưới là ƯỚC TÍNH dựa theo mặt bằng giá của gemini-2.5-flash (model gần
-// nhất có giá chính thức). Đơn giá gemini-2.5-flash-image lấy từ giá "Nano Banana" chính thức
-// (1290 output token/ảnh * $30/1M token ≈ $0.039/ảnh).
+// NGUỒN: https://ai.google.dev/gemini-api/docs/pricing — mục "Paid Tier, Standard" (không Batch/Flex/Priority).
+// CẬP NHẬT GIÁ GẦN NHẤT: 2026-10-02 (đối chiếu trực tiếp trang trên).
 //
-// TRƯỚC KHI TIN SỐ LIỆU CHI PHÍ ĐỂ RA QUYẾT ĐỊNH TÀI CHÍNH — đối chiếu lại giá thật tại
-// https://ai.google.dev/gemini-api/docs/pricing rồi sửa trực tiếp object PRICING bên dưới
-// (nhớ cập nhật luôn `lastUpdated` của model đó).
+// Lưu ý khi đối chiếu:
+//   - "output" của model text đã GỒM token thinking → tính theo candidatesTokenCount + thoughtsTokenCount.
+//   - Model ảnh: giá theo token output ảnh; $/ảnh dưới đây là mức Google công bố cho độ phân giải 1K (mặc định khi
+//     request không đặt imageSize — xem generate-context-image.mjs). Đổi độ phân giải thì phải đổi perImage.
+//   - Dòng 3.6/3.7/3.8 Flash có giá theo mốc thời gian (đến 31/12/2026 rồi tăng gấp đôi) — chưa dùng nên chưa đưa vào;
+//     khi dùng thì thêm kèm `validUntil`.
+//   - Model KHÔNG có trong bảng: calcXxxCost() trả 0 và cảnh báo; dòng sổ được UI Thống kê chi phí đánh dấu "chưa có giá"
+//     (isPriced() bên dưới) thay vì hiện 0 như thật.
+export const PRICING_SOURCE = {
+  url: "https://ai.google.dev/gemini-api/docs/pricing",
+  lastUpdated: "2026-10-02",
+};
+
 export const PRICING = {
   "gemini-3.5-flash": {
     task: "content-generation",
     unit: "USD / 1M token",
-    inputPerMillion: 0.30,
-    outputPerMillion: 2.50,
-    lastUpdated: "2026-09-23",
-    note: "Ước tính theo mặt bằng giá gemini-2.5-flash — CẦN tự kiểm tra lại khi Google công bố giá chính thức cho gemini-3.5-flash.",
+    inputPerMillion: 1.5,
+    outputPerMillion: 9.0,
+    lastUpdated: "2026-10-02",
+    note: "Giá chính thức. (Bản trước 2026-10-02 ghi ước tính 0.30/2.50 — thấp hơn thật ~5 lần/3.6 lần.)",
+  },
+  "gemini-3.5-flash-lite": {
+    task: "content-generation",
+    unit: "USD / 1M token",
+    inputPerMillion: 0.3,
+    outputPerMillion: 2.5,
+    lastUpdated: "2026-10-02",
+    note: "Giá chính thức.",
+  },
+  "gemini-2.5-flash": {
+    task: "content-generation",
+    unit: "USD / 1M token",
+    inputPerMillion: 0.3,
+    outputPerMillion: 2.5,
+    lastUpdated: "2026-10-02",
+    note: "Giá chính thức.",
+  },
+  "gemini-2.5-flash-lite": {
+    task: "content-generation",
+    unit: "USD / 1M token",
+    inputPerMillion: 0.1,
+    outputPerMillion: 0.4,
+    lastUpdated: "2026-10-02",
+    note: "Giá chính thức.",
+  },
+  "gemini-3.1-flash-image": {
+    task: "context-image",
+    unit: "USD / ảnh",
+    perImage: 0.067,
+    lastUpdated: "2026-10-02",
+    note: "Output ảnh $60/1M token ≈ $0.067/ảnh 1K (512px $0.045, 2K $0.101, 4K $0.151); input $0.50/1M token chưa tính (prompt ngắn, không đáng kể).",
+  },
+  "gemini-3.1-flash-lite-image": {
+    task: "context-image",
+    unit: "USD / ảnh",
+    perImage: 0.0336,
+    lastUpdated: "2026-10-02",
+    note: "Output ảnh $30/1M token ≈ $0.0336/ảnh 1K.",
   },
   "gemini-2.5-flash-image": {
     task: "context-image",
     unit: "USD / ảnh",
     perImage: 0.039,
-    lastUpdated: "2026-09-23",
-    note: "1290 output token/ảnh * $30/1M token (giá Nano Banana chính thức tại thời điểm cập nhật).",
+    lastUpdated: "2026-10-02",
+    note: "Giá chính thức $0.039/ảnh (model đã deprecated).",
   },
 };
+
+/** Model có đơn giá cho loại tác vụ này chưa? kind: "content-generation" (theo token) | "context-image" (theo ảnh). */
+export function isPriced(model, kind = "content-generation") {
+  const price = PRICING[model];
+  if (!price) return false;
+  return kind === "context-image" ? typeof price.perImage === "number" : typeof price.inputPerMillion === "number";
+}
 
 // Fallback dùng khi gặp model không có trong PRICING (vd đổi GEMINI_MODEL/IMAGE_GEN_MODEL
 // trong .env nhưng quên thêm giá mới vào đây) — trả cost 0 thay vì throw, kèm cảnh báo, để
 // KHÔNG BAO GIỜ làm hỏng cả pipeline dựng video chỉ vì thiếu giá tham chiếu.
+const warned = new Set();
 function warnMissingPrice(model) {
+  if (warned.has(model)) return; // mỗi model chỉ cảnh báo 1 lần / tiến trình, tránh spam log
+  warned.add(model);
   console.warn(
-    `⚠ [config/pricing.mjs] Không có đơn giá cho model "${model}" — cost-ledger sẽ ghi 0 USD cho lần gọi này. ` +
-      `Thêm đơn giá vào PRICING trong config/pricing.mjs (kèm ngày cập nhật) để tính đúng chi phí.`,
+    `⚠ [config/pricing.mjs] Không có đơn giá cho model "${model}" — cost-ledger sẽ ghi 0 USD cho lần gọi này ` +
+      `(UI Thống kê chi phí sẽ đánh dấu "chưa có giá"). ` +
+      `Thêm đơn giá vào PRICING trong config/pricing.mjs (kèm ngày cập nhật) rồi chạy "node scripts/reprice-cost-ledger.mjs" để tính lại.`,
   );
 }
 
 /**
- * Tính chi phí USD cho 1 lần gọi Gemini sinh kịch bản (text/vision), theo số token input/output.
+ * Tính chi phí USD cho 1 lần gọi Gemini sinh kịch bản (text/vision), theo số token input/output (output gồm cả thinking).
  * @returns {number} chi phí USD (0 nếu model chưa có giá tham chiếu).
  */
 export function calcContentCost(model, inputTokens, outputTokens) {

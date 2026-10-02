@@ -69,7 +69,7 @@ async function callOnce({ systemPrompt, userText, schema, model, signal, attempt
   // HTTP 200 luôn được tính phí (kể cả khi nội dung dùng không được) — ghi sổ TRƯỚC khi kiểm nội dung.
   const usage = json?.usageMetadata || {};
   const inputTokens = usage.promptTokenCount || 0;
-  const outputTokens = usage.candidatesTokenCount || 0;
+  const outputTokens = (usage.candidatesTokenCount || 0) + (usage.thoughtsTokenCount || 0); // giá output đã gồm token thinking
   appendCostEntry({ ...ledger, model, status: "success", httpStatus: res.status, inputTokens, outputTokens, costUsd: calcContentCost(model, inputTokens, outputTokens), attempt });
 
   const text = json?.candidates?.[0]?.content?.parts?.[0]?.text;
