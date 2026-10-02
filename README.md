@@ -246,7 +246,7 @@ npm run publish   # xuất bản, lấy link chia sẻ
 Web UI (`npm run ui`) có tab **"💰 Thống kê chi phí"** cạnh "Danh sách video đã dựng" — hiển thị:
 
 - 3 thẻ tổng cố định: hôm nay / 7 ngày gần nhất / toàn thời gian (USD + quy đổi VNĐ ước tính,
-  tỷ giá cố định ~26.000đ, **không phải tỷ giá thời gian thực**).
+  tỷ giá cố định đặt bằng `USD_TO_VND` trong `.env` (mặc định 26.000đ), **không phải tỷ giá thời gian thực**).
 - Biểu đồ cột chi phí theo ngày (zero-fill ngày không phát sinh chi phí để trục thời gian đúng
   thực tế), có tooltip khi hover từng cột.
 - Bộ lọc khoảng ngày (7 ngày / 30 ngày / tất cả) — lọc cả biểu đồ lẫn bảng chi tiết cùng lúc

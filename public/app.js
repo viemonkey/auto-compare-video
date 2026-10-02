@@ -175,8 +175,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const costPageLabel = document.getElementById("cost-page-label");
   const costTableHeaders = document.querySelectorAll("#cost-content th[data-sort]");
 
-  // Tỷ giá ƯỚC TÍNH cố định — không phải tỷ giá thời gian thực, chỉ để hình dung nhanh.
-  const USD_TO_VND_RATE = 26000;
+  // Tỷ giá ƯỚC TÍNH cố định — không phải tỷ giá thời gian thực, chỉ để hình dung nhanh. Server gửi kèm /api/cost-stats (USD_TO_VND trong .env).
+  let usdToVndRate = 26000;
   const COST_PAGE_SIZE = 20;
 
   // -------------------------------------------------------------
@@ -1524,7 +1524,7 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 
   function formatVnd(usdAmount) {
-    const vnd = Math.round((usdAmount || 0) * USD_TO_VND_RATE);
+    const vnd = Math.round((usdAmount || 0) * usdToVndRate);
     return `≈ ${vnd.toLocaleString("vi-VN")}₫`;
   }
 
@@ -1551,6 +1551,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!res.ok) throw new Error(data.error || "Không tải được thống kê chi phí.");
 
       costRawData = data;
+      if (Number.isFinite(data.usdToVnd) && data.usdToVnd > 0) usdToVndRate = data.usdToVnd;
       costPage = 1;
       populateCostLocaleSelect(data);
       costStateLoading.classList.add("hidden");

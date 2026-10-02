@@ -42,3 +42,18 @@ test("reprice: chỉ sửa dòng thành công đang 0 USD có token; không đ�
   assert.ok(Math.abs(JSON.parse(r2.lines[3]).cost_usd - 1.5) < 1e-9);
   assert.equal(repricedCost(rows[1]), null);
 });
+
+test("usdToVnd: mặc định 26000; đọc USD_TO_VND (cho phép dấu , _); giá trị sai -> mặc định", async () => {
+  const { usdToVnd, DEFAULT_USD_TO_VND } = await import("../config/pricing.mjs");
+  assert.equal(DEFAULT_USD_TO_VND, 26000);
+  assert.equal(usdToVnd({}), 26000);
+  assert.equal(usdToVnd({ USD_TO_VND: "25500" }), 25500);
+  assert.equal(usdToVnd({ USD_TO_VND: " 25,500 " }), 25500);
+  const warn = console.warn;
+  console.warn = () => {};
+  try {
+    for (const bad of ["abc", "0", "-5"]) assert.equal(usdToVnd({ USD_TO_VND: bad }), 26000);
+  } finally {
+    console.warn = warn;
+  }
+});

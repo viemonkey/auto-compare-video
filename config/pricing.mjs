@@ -76,6 +76,21 @@ export const PRICING = {
   },
 };
 
+export const DEFAULT_USD_TO_VND = 26000;
+
+/**
+ * Tỷ giá USD→VND dùng để hiện số tiền ước tính ở Thống kê chi phí (đặt USD_TO_VND trong .env; không hợp lệ -> mặc định).
+ * Là tỷ giá cố định do bạn đặt, KHÔNG phải tỷ giá thời gian thực.
+ */
+export function usdToVnd(env = process.env) {
+  const raw = String(env.USD_TO_VND ?? "").trim();
+  if (!raw) return DEFAULT_USD_TO_VND;
+  const n = Number(raw.replace(/[_,]/g, ""));
+  if (Number.isFinite(n) && n > 0) return n;
+  console.warn(`⚠ [config/pricing.mjs] USD_TO_VND="${raw}" không hợp lệ — dùng mặc định ${DEFAULT_USD_TO_VND}.`);
+  return DEFAULT_USD_TO_VND;
+}
+
 /** Model có đơn giá cho loại tác vụ này chưa? kind: "content-generation" (theo token) | "context-image" (theo ảnh). */
 export function isPriced(model, kind = "content-generation") {
   const price = PRICING[model];

@@ -31,7 +31,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { CONTENT_ANGLES } from "./config/content-angles.mjs";
 import { COST_LEDGER_PATH, renameCostLedgerSlug, countsAsVideo } from "./scripts/lib/cost-ledger.mjs";
-import { isPriced } from "./config/pricing.mjs";
+import { isPriced, usdToVnd } from "./config/pricing.mjs";
 import { getConfiguredPages, inspectConfiguredPages } from "./scripts/lib/facebook-pages.mjs";
 import { graphVersion, isAutoPostEnabled, makeLogger, redactSecrets } from "./scripts/lib/fb-config.mjs";
 import { classifyError } from "./scripts/lib/fb-errors.mjs";
@@ -1154,6 +1154,7 @@ app.get("/api/cost-stats", (_req, res) => {
 
   res.json({
     generatedAt: new Date(now).toISOString(),
+    usdToVnd: usdToVnd(),
     totalAllTime,
     totalToday,
     totalLast7Days,
