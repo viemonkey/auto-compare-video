@@ -11,6 +11,12 @@ import { renameCostLedgerSlug } from "./scripts/lib/cost-ledger.mjs";
 import { textOf, viOf } from "./public/shared/bilingual.mjs";
 import { buildApprovedFacts, checkAgainstApprovedFacts } from "./scripts/lib/approved-facts.mjs";
 
+/** Tiêu đề (chữ đích + nghĩa tiếng Việt) của bản ghi cho danh sách video; không có -> null (giao diện dùng tên cũ). */
+export function titleOf(record) {
+  const text = textOf(record?.title).trim();
+  return text ? { text, vi: viOf(record.title).trim() } : null;
+}
+
 /** Dựng bản ghi bền vững (xem scripts/lib/content-store.mjs). */
 export function buildRecord({ content, locale, hashtagPlan, status, source = null, derivedFrom = null, savedAt = new Date().toISOString() }) {
   const { _meta: genMeta, hashtagPlan: _plan, locale: _loc, ...rest } = content;
@@ -78,6 +84,7 @@ export function createMarketApi(ctx) {
       displayName: locale.displayName,
       status: record?._meta?.status || "built",
       derivedFrom: record?._meta?.derivedFrom || null,
+      title: titleOf(record),
     };
   }
 

@@ -2,6 +2,7 @@
 // (ES module: dùng chung hàm đọc field song ngữ với server — public/shared/bilingual.mjs)
 import { flattenContent, textOf, viOf } from "/shared/bilingual.mjs";
 import { createFieldEditor } from "/field-editor.js";
+import { slugify, baseSlugFromContent } from "/shared/slug-base.mjs";
 
 document.addEventListener("DOMContentLoaded", () => {
   // State
@@ -82,20 +83,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   let uploadedRefAudioPath = null;
 
-  // Slug — must match the kebab-case rule scaffold-compare-video.mjs enforces
-  // (/^[a-z0-9]+(-[a-z0-9]+)*$/). Vietnamese needs the NFD pass: plain
-  // .replace(/[^a-z0-9]+/g, "-") deletes the accented letter itself, so
-  // "Cá voi sát thủ" came out "c-voi-s-t-th-" and the build aborted.
-  function slugify(s) {
-    return (s || "")
-      .normalize("NFD")
-      .replace(/[̀-ͯ]/g, "") // combining tone/diacritic marks
-      .replace(/[đĐ]/g, "d") // U+0111 has no NFD decomposition
-      .toLowerCase()
-      .replace(/[^a-z0-9]+/g, "-")
-      .replace(/^-+|-+$/g, "");
-  }
-
+  // Slug — kebab-case a-z0-9 (xem /shared/slug-base.mjs, dùng chung với server): scaffold-compare-video.mjs chỉ nhận /^[a-z0-9]+(-[a-z0-9]+)*$/.
   function buildSlug(left, right) {
     return [slugify(left), slugify(right)].filter(Boolean).join("-vs-");
   }
@@ -122,7 +110,13 @@ document.addEventListener("DOMContentLoaded", () => {
   // ra slug rỗng); không có nghĩa thì trả rỗng để người dùng nhập tay. Thị trường mặc định không có hậu tố.
   function buildSlugWithAngle(left, right) {
     const gloss = typeof isGloss === "function" && isGloss();
-    const base = buildSlug(gloss ? biState.label_left.vi || left : left, gloss ? biState.label_right.vi || right : right);
+    // bản ngoại ngữ: tên tiếng Anh/quốc tế (materials / label Latin) trước, rồi nghĩa tiếng Việt — cùng quy tắc với server (shared/slug-base.mjs)
+    const base = gloss
+      ? baseSlugFromContent(
+          { label_left: { text: left, vi: biState.label_left.vi }, label_right: { text: right, vi: biState.label_right.vi }, materials: geminiHashtagMeta.materials },
+          { foreign: true },
+        )
+      : buildSlug(left, right);
     if (!base || !base.includes("-vs-")) return "";
     const info = typeof currentLocaleInfo === "function" ? currentLocaleInfo() : null;
     const parts = [base, contentAngleSlugSuffix(), info && info.slugSuffix ? info.slugSuffix : ""].filter(Boolean);
@@ -654,13 +648,13 @@ document.addEventListener("DOMContentLoaded", () => {
     scriptLabelLeft.value = content.label_left || "";
     scriptLabelRight.value = content.label_right || "";
     initBilingualState(generatedContent, factWarnings); // biState first: the slug of a foreign-language version comes from the vi labels
-    scriptSlug.value = slug || buildSlugWithAngle(content.label_left, content.label_right);
-    refreshBiEditors();
     geminiHashtagMeta = {
       materials: content.materials || [],
       topicTags: content.topicTags || [],
       suggestedTags: content.suggestedTags || [],
-    };
+    }; // trước khi gợi ý slug: slug bản ngoại ngữ dùng materials
+    scriptSlug.value = slug || buildSlugWithAngle(content.label_left, content.label_right);
+    refreshBiEditors();
     hashtagPlan = hashtags || [];
     hashtagMax = max || 4;
     renderHashtagChips();
@@ -826,8 +820,14 @@ document.addEventListener("DOMContentLoaded", () => {
         : "";
       card.innerHTML = `
         <div>
-          <h4>${flagBadgeHtml(v)} ${escapeHtml(v.name)}${draft ? ' <span class="draft-badge">Bản nháp</span>' : ""}</h4>
-          <span style="font-size: 11px; color: var(--accent-cyan); font-family: monospace;">${escapeHtml(v.location || `videos/${v.slug}/`)}</span>
+          ${
+            v.title && v.title.vi
+              ? `<h4>${flagBadgeHtml(v)} ${escapeHtml(v.title.text)}${draft ? ' <span class="draft-badge">Bản nháp</span>' : ""}</h4>
+          <div class="video-title-vi">${escapeHtml(v.title.vi)}</div>
+          <div class="video-slug-dim">${escapeHtml(v.slug)} · ${escapeHtml(v.location || `videos/${v.slug}/`)}</div>`
+              : `<h4>${flagBadgeHtml(v)} ${escapeHtml(v.name)}${draft ? ' <span class="draft-badge">Bản nháp</span>' : ""}</h4>
+          <span style="font-size: 11px; color: var(--accent-cyan); font-family: monospace;">${escapeHtml(v.location || `videos/${v.slug}/`)}</span>`
+          }
           ${v.derivedFrom ? `<div style="font-size: 11px; color: var(--fg-dim); margin-top: 2px;">Phiên bản của ${escapeHtml(v.derivedFrom)}</div>` : ""}
           ${socialStatusHtml(v.social)}
         </div>

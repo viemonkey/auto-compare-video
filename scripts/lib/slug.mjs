@@ -4,9 +4,4 @@
 import { stripDiacritics } from "../../public/shared/text-fold.mjs";
 
 export { stripDiacritics };
-
-export function slugify(str) {
-  return stripDiacritics(str)
-    .replace(/[^a-z0-9]+/g, "-")
-    .replace(/^-+|-+$/g, "");
-}
+export { slugify } from "../../public/shared/slug-base.mjs";

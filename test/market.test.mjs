@@ -194,3 +194,59 @@ test("resolveSocialPost: title = chữ đích (không phải vi); hashtag theo b
     fs.rmSync(dir, { recursive: true, force: true });
   }
 });
+
+// ---------------------------------------------------------------------------------------------
+// slug bản ngoại ngữ: ưu tiên tên tiếng Anh/quốc tế, KHÔNG chứa chữ Nhật/Thái
+// ---------------------------------------------------------------------------------------------
+test("slug bản ngoại ngữ: materials Latin -> label Latin -> nghĩa tiếng Việt (thứ tự ưu tiên)", async () => {
+  const { isLatinName } = await import("../public/shared/slug-base.mjs");
+  const jp = (text, vi) => bilingual(text, vi);
+  // 1. materials Latin thắng cả label Latin lẫn vi
+  assert.equal(
+    baseSlugFromContent({ label_left: jp("Aquamarine Cut", "Cắt aquamarine"), label_right: jp("Rough", "Thô"), materials: ["Aquamarine", "Sapphire"] }),
+    "aquamarine-vs-sapphire",
+  );
+  // 2. materials không Latin -> label Latin (vd en-US: label là tên quốc tế)
+  assert.equal(baseSlugFromContent({ label_left: jp("Aquamarine", "Đá Aquamarine"), label_right: jp("Blue Sapphire", "Sapphire xanh"), materials: ["アクアマリン", "サファイア"] }), "aquamarine-vs-blue-sapphire");
+  // 3. cả materials lẫn label đều Nhật -> nghĩa tiếng Việt
+  assert.equal(baseSlugFromContent({ label_left: jp("アクアマリン", "Aquamarine"), label_right: jp("サファイア", "Sapphire"), materials: ["アクアマリン", "サファイア"] }), "aquamarine-vs-sapphire");
+  assert.equal(baseSlugFromContent({ label_left: jp("アメジスト", "Thạch anh tím"), label_right: jp("シトリン", "Thạch anh vàng") }), "thach-anh-tim-vs-thach-anh-vang");
+  // trộn: mỗi bên tự rơi về mức ưu tiên kế tiếp
+  assert.equal(baseSlugFromContent({ label_left: jp("アクアマリン", "Aquamarine"), label_right: jp("サファイア", "Sapphire"), materials: ["アクアマリン", "Sapphire"] }), "aquamarine-vs-sapphire");
+  // chuỗi lai Nhật+Latin ("シルバー925") KHÔNG được thành slug "925"
+  assert.equal(isLatinName("シルバー925"), false);
+  assert.equal(isLatinName("Silver 925"), true);
+  assert.equal(isLatinName("アクアマリン"), false);
+  assert.equal(
+    baseSlugFromContent({ label_left: jp("シルバー925", "Bạc 925"), label_right: jp("プラチナ", "Bạch kim"), materials: ["シルバー925", "プラチナ"] }),
+    "bac-925-vs-bach-kim",
+  );
+});
+
+test("slug bản ngoại ngữ (mọi thị trường có nghĩa tiếng Việt): luôn khớp SLUG_RE, không có ký tự CJK/Thái, thêm slugSuffix vẫn hợp lệ", () => {
+  const samples = [
+    { label_left: bilingual("アクアマリン", "Aquamarine"), label_right: bilingual("サファイア", "Sapphire"), materials: ["アクアマリン", "サファイア"] },
+    { label_left: bilingual("อความารีน", "Aquamarine"), label_right: bilingual("แซฟไฟร์", "Sapphire"), materials: ["อความารีน", "แซฟไฟร์"] },
+    { label_left: bilingual("Aquamarine", "Aquamarine"), label_right: bilingual("Sapphire", "Sapphire"), materials: ["Aquamarine", "Sapphire"] },
+  ];
+  for (const l of all.filter((x) => x.slugSuffix)) {
+    for (const c of samples) {
+      const slug = slugForLocale(baseSlugFromContent(c), l, getDefaultLocale().code);
+      assert.match(slug, SLUG_RE, `${l.code}: ${slug}`);
+      assert.ok(!/[^\x00-\x7f]/.test(slug));
+    }
+  }
+});
+
+test("slug tiếng Việt / dữ liệu phẳng giữ nguyên hành vi cũ (không đổi slug dữ liệu đã có)", () => {
+  assert.equal(baseSlugFromContent({ label_left: "Thạch anh tím", label_right: "Peridot", materials: ["Amethyst", "Peridot"] }), "thach-anh-tim-vs-peridot");
+  assert.equal(baseSlugFromContent({ label_left: "Kim cương", label_right: "Moissanite" }), "kim-cuong-vs-moissanite");
+});
+
+test("titleOf: tiêu đề chữ đích + nghĩa tiếng Việt cho danh sách video; bản tiếng Việt vi rỗng; không có title -> null", async () => {
+  const { titleOf } = await import("../server-market.mjs");
+  assert.deepEqual(titleOf({ title: bilingual("タイトル", "Tiêu đề") }), { text: "タイトル", vi: "Tiêu đề" });
+  assert.deepEqual(titleOf({ title: "Aquamarine hay Sapphire?" }), { text: "Aquamarine hay Sapphire?", vi: "" });
+  assert.equal(titleOf({}), null);
+  assert.equal(titleOf(null), null);
+});

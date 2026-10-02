@@ -1,9 +1,8 @@
-// Slug theo thị trường: slug bản ngoại ngữ = slug gốc + slugSuffix (vd thach-anh-tim-vs-thach-anh-vang-ja). Thị trường mặc định giữ
-// slug như cũ. Slug gốc của bản ngoại ngữ sinh từ nghĩa tiếng Việt (`vi`) của label — KHÔNG từ chữ đích (chữ Nhật/Thái ra slug rỗng
-// vì slugify chỉ giữ a-z0-9).
-import { slugify } from "./slug.mjs";
+// Slug theo thị trường: slug bản ngoại ngữ = slug gốc + slugSuffix (vd aquamarine-vs-sapphire-ja). Thị trường mặc định giữ slug như cũ.
+// Slug gốc của bản ngoại ngữ ưu tiên tên tiếng Anh/quốc tế (materials / label Latin), rồi tới nghĩa tiếng Việt — KHÔNG bao giờ chứa chữ
+// Nhật/Thái. Quy tắc nằm ở public/shared/slug-base.mjs (dùng chung với trình duyệt).
 import { getDefaultLocale } from "./locales.mjs";
-import { textOf, viOf } from "../../public/shared/bilingual.mjs";
+export { baseSlugFromContent } from "../../public/shared/slug-base.mjs";
 
 export const SLUG_RE = /^[a-z0-9]+(-[a-z0-9]+)*$/;
 
@@ -28,18 +27,6 @@ export function hasLocaleSuffix(slug, locale, defaultCode) {
 export function stripLocaleSuffix(slug, locale, defaultCode) {
   const suffix = effectiveSlugSuffix(locale, defaultCode);
   return suffix && hasLocaleSuffix(slug, locale, defaultCode) ? slug.slice(0, -(suffix.length + 1)) : slug;
-}
-
-/**
- * Slug gốc "<trái>-vs-<phải>" từ nội dung. Mỗi bên thử lần lượt: nghĩa tiếng Việt (vi) -> chữ đích -> tên vật liệu; bên nào ra rỗng
- * (toàn chữ Nhật/Thái...) thì cả slug là null — người dùng phải nhập tay, KHÔNG sinh slug rỗng/hỏng.
- */
-export function baseSlugFromContent(content) {
-  const side = (field, material) => slugify(viOf(field)) || slugify(textOf(field)) || slugify(String(material ?? ""));
-  const mats = Array.isArray(content?.materials) ? content.materials : [];
-  const left = side(content?.label_left, mats[0]);
-  const right = side(content?.label_right, mats[1]);
-  return left && right ? `${left}-vs-${right}` : null;
 }
 
 /**
