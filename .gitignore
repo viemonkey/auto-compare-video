@@ -138,3 +138,8 @@ videos/*/pose-calibration/
 videos/*/_caption_preview/
 
 !docs/ui-step2/*
+
+# Backup tự sinh (vd. output/cost-ledger.jsonl.bak-*) — không commit
+*.bak
+*.bak-*
+*.bak.*
