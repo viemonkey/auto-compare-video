@@ -104,3 +104,19 @@ Ja/th không in nghiêng/in hoa (`video.italic` / `video.uppercase` = false).
 
 Câu mở đầu ("Đây là X."), câu chốt, thẻ kênh, tiêu đề tài liệu nằm ở `config/locales/<mã>.json` → `video` (`hookLine`, `payoffLine`, `payoffTag`, `payoffSub`, `eyebrow`, `docTitle`, `htmlLang`).
 Thẻ kênh `#eyebrow` (góc trên trái) lấy tên từ `config/locales/<mã>.json` → `video.channel` (ja/en/th đang khai báo "HuyK"); thị trường không khai báo (vi-VN) dùng `CHANNEL` trong `.env` như cũ. `scripts/sync-channel.mjs` của video (bản canonical `templates/auto-compare/sync-channel.mjs`) đọc thị trường từ `VIDEO_LOCALE` trong `.env` của video và chạy trước dev/check/render.
+
+## 7. Bảng phát âm cho giọng đọc
+
+TTS đọc sai ký hiệu viết tắt ("1.5ct", "Mohs", "GIA"…) nên mỗi thị trường có **bảng phát âm** ở `config/locales/<mã>.json` → `tts.pronunciation`
+(ja/en/th đã có sẵn; **vi-VN không có bảng = giữ nguyên**). Bảng chỉ đổi **chữ gửi cho TTS**; chữ hiện trên video (caption, nhãn) luôn là chữ gốc,
+và timing karaoke được ánh xạ ngược từ chữ đã đọc về từng từ của chữ gốc (video vẫn hiện "1.5ct" trong khi giọng đọc "1.5 carats").
+
+```json
+{ "match": "Mohs", "say": "Moze", "wholeWord": true }
+{ "pattern": "(\d+(?:[.,]\d+)?)\s*cts?(?![A-Za-z0-9])", "flags": "iu", "say": "$1 carats" }
+```
+
+- `match` = chữ nguyên văn (`wholeWord`: chỉ khớp cả từ Latin, `ignoreCase`); `pattern` = regex (cờ `g`/`u` tự thêm), `say` dùng `$1`… như `String.replace`.
+- Luật chồng nhau: luật bắt đầu sớm hơn thắng, hoà thì luật đứng trước trong file. Luật sai bị `validateLocale` từ chối khi khởi động.
+- Audio được cache theo **chữ đọc**; đổi bảng thì chỉ các dòng bị ảnh hưởng được đọc lại. Số ký tự tính phí (Azure) cũng theo chữ đọc.
+- Bảng hiện có (đơn vị ct/mm/cm/g/K/°C, Mohs, GIA, UV, CVD/HPHT, vài tên đá…) được viết theo hiểu biết chung, **chưa nghe thử từng cách đọc** — nghe thử rồi chỉnh trong file.

@@ -246,6 +246,7 @@ async function mainPipeline() {
   const { planEngines, resolveVoice, resolveSpeed } = await lib("tts", "select.mjs");
   const { runVoiceover } = await lib("tts", "voiceover.mjs");
   const { createTtsCache } = await lib("tts", "cache.mjs");
+  const { compilePronunciation } = await lib("tts", "pronounce.mjs");
   const { audioTools } = await lib("tts", "audio-tools.mjs");
   const { appendCostEntry } = await lib("cost-ledger.mjs");
   const { calcTtsCost } = await import(pathToFileURL(path.join(REPO_ROOT, "config", "pricing.mjs")).href);
@@ -295,6 +296,8 @@ async function mainPipeline() {
     engines,
     voiceFor,
     speed: resolveSpeed(LOCALE),
+    // Bảng phát âm của thị trường (config/locales/<code>.json → tts.pronunciation): chỉ đổi chữ GỬI TTS, không đổi chữ hiện trên video. vi-VN không có bảng = giữ nguyên.
+    pronounce: compilePronunciation(LOCALE.tts?.pronunciation),
     outDir,
     cache: createTtsCache(ENV.TTS_CACHE_DIR || undefined),
     tools: audioTools,

@@ -63,7 +63,28 @@
     "voices": {
       "edge": "en-US-AndrewNeural",
       "azure": "en-US-AndrewNeural"
-    }
+    },
+    "pronunciation": [
+      {"pattern":"(?<![\\d.,])1\\s*cts?(?![A-Za-z0-9])","flags":"iu","say":"1 carat"},
+      {"pattern":"(\\d+(?:[.,]\\d+)?)\\s*cts?(?![A-Za-z0-9])","flags":"iu","say":"$1 carats"},
+      {"pattern":"(?<![\\d.,])1\\s*mm(?![A-Za-z0-9])","say":"1 millimeter"},
+      {"pattern":"(\\d+(?:[.,]\\d+)?)\\s*mm(?![A-Za-z0-9])","say":"$1 millimeters"},
+      {"pattern":"(?<![\\d.,])1\\s*cm(?![A-Za-z0-9])","say":"1 centimeter"},
+      {"pattern":"(\\d+(?:[.,]\\d+)?)\\s*cm(?![A-Za-z0-9])","say":"$1 centimeters"},
+      {"pattern":"(\\d+(?:[.,]\\d+)?)\\s*°C","say":"$1 degrees Celsius"},
+      {"pattern":"(\\d+(?:[.,]\\d+)?)\\s*°F","say":"$1 degrees Fahrenheit"},
+      {"pattern":"(\\d+)\\s*[Kk](?![A-Za-z0-9])","say":"$1 karat"},
+      {"pattern":"(\\d)\\s*[~–]\\s*(\\d)","say":"$1 to $2"},
+      {"match":"Mohs","say":"Moze","wholeWord":true},
+      {"match":"GIA","say":"G I A","wholeWord":true},
+      {"match":"CVD","say":"C V D","wholeWord":true},
+      {"match":"HPHT","say":"H P H T","wholeWord":true},
+      {"match":"UV","say":"U V","wholeWord":true},
+      {"match":"SiC","say":"silicon carbide","wholeWord":true},
+      {"match":"Moissanite","say":"moy suh nite","wholeWord":true,"ignoreCase":true},
+      {"match":"Peridot","say":"pair uh doh","wholeWord":true,"ignoreCase":true},
+      {"match":"Rhodium","say":"roh dee um","wholeWord":true,"ignoreCase":true}
+    ]
   },
   "styleSummary": "Direct, strong hook, conversational, no unverifiable marketing claims",
   "styleGuide": "- Giọng điệu: trực diện, tự tin, trò chuyện như người Mỹ giải thích cho bạn bè; được dùng dạng viết tắt (it's, don't). Dùng tiếng Anh Mỹ (US spelling, carat, Mohs scale).\n- Hook mạnh ngay 5 từ đầu: một câu hỏi hoặc một sự thật bất ngờ, ví dụ \"Diamond or moissanite? Most people can't tell.\" / \"Why does amethyst fade in the sun?\".\n- Câu ngắn, mạnh, thể chủ động (active voice), mỗi câu 1 ý (khoảng 8-18 từ). Không dùng từ lóng thái quá, không dùng emoji.\n- Tránh tuyên bố quảng cáo không kiểm chứng và so sánh tuyệt đối: không \"best in the world\", \"guaranteed\", \"100% genuine\", \"investment-grade\". Dùng số liệu/tính chất kiểm chứng được (Mohs hardness, refractive index, carat) thay cho tính từ khen.\n- Không hứa hẹn giá trị đầu tư; không gọi hàng khác là \"fake\" hay \"cheap\" — nói \"lab-grown\", \"synthetic\", \"imitation\" đúng nghĩa.\n- Dùng đúng thuật ngữ trong glossary.\n- Ý nghĩa biểu tượng/tâm linh: ĐƯỢC PHÉP nêu như ý nghĩa biểu tượng/văn hoá — viết dạng \"is said to symbolize…\", \"is traditionally seen as a symbol of…\", \"is often associated with…\". TUYỆT ĐỐI KHÔNG khẳng định công dụng: \"brings luck\", \"protects you\", \"heals\", \"attracts wealth\", \"makes you rich\"… (xem các cụm bị cấm).\n- Phân biệt hardness (độ cứng — chống trầy, thang Mohs) và toughness (độ dai — chống nứt vỡ khi va đập). Khi nói về thang Mohs PHẢI dùng \"hard\"/\"hardness\" (vd \"scores a 9 on the Mohs hardness scale\"), KHÔNG dùng \"tough\"/\"toughness\" cho thang Mohs; chỉ dùng \"tough/toughness\" khi nói về khả năng chống vỡ (vd \"jade is tougher than diamond\").",

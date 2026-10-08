@@ -8,6 +8,7 @@ import { countGraphemes } from "../../../public/shared/text-length.mjs";
 import { ttsCacheKey } from "./cache.mjs";
 import { withRetry } from "./retry.mjs";
 import { ttsErrorMessage } from "./messages.mjs";
+import { alignWords } from "./pronounce.mjs";
 
 // Cắt khoảng lặng so với từ ĐẦU/CUỐI theo word boundary (cùng nguồn với timing karaoke nên hai thứ khớp nhau) và chừa lề nhỏ.
 // Giữ đúng các hằng số của luồng vi-VN (xem templates/auto-compare/generate-vo.mjs: TL_START1 / TL_GAP / TL_OUTRO ở phía scaffold).
@@ -57,6 +58,7 @@ export function estimateWordTimings(tokens, speechStart, speechEnd) {
  * @param {string|null} [o.slug]
  * @param {(msg:string)=>void} [o.log]
  * @param {object} [o.retry]                 tuỳ chọn withRetry (sleep/random/maxRetries...)
+ * @param {(text:string)=>{text:string, spans:Array}} [o.pronounce] bảng phát âm (compilePronunciation): chỉ đổi chữ GỬI TTS, chữ hiện trên video giữ nguyên
  * @param {(ms:number)=>Promise<void>} [o.pace]   nghỉ ngắn giữa 2 lần gọi dịch vụ thật (lịch sự với endpoint công khai)
  */
 export async function runVoiceover(o) {
@@ -77,7 +79,9 @@ export async function runVoiceover(o) {
   throw new Error(lastError ? lastError.message : "Không có engine giọng đọc nào để chạy.");
 }
 
-async function runWithEngine({ lines, locale, engineId, engines, voiceFor, speed, outDir, cache, tools, ledger, costOf, slug, log, retry = {}, pace }) {
+const identity = (text) => ({ text, spans: [] });
+
+async function runWithEngine({ lines, locale, engineId, engines, voiceFor, speed, outDir, cache, tools, ledger, costOf, slug, log, retry = {}, pace, pronounce = identity }) {
   const engine = engines[engineId];
   if (!engine) throw new Error(`Engine giọng đọc "${engineId}" chưa được khởi tạo.`);
   const voice = voiceFor(engineId);
@@ -95,8 +99,12 @@ async function runWithEngine({ lines, locale, engineId, engines, voiceFor, speed
   for (const line of lines) {
     const rawPath = path.join(rawDir, `${line.id}.mp3`);
     const finalPath = path.join(outDir, `${line.id}.mp3`);
-    const key = ttsCacheKey({ engine: engineId, voice, speed, text: line.text });
-    const characters = [...line.text].length;
+    // Chữ ĐỌC (đã qua bảng phát âm) khác chữ HIỆN: cache, số ký tự tính phí và lời gọi engine đều theo chữ đọc.
+    const { text: spoken, spans } = pronounce(line.text);
+    const respelled = spoken !== line.text;
+    if (respelled) log(`  ${line.id}: đọc là "${spoken.slice(0, 80)}" (chữ hiện trên video giữ nguyên)`);
+    const key = ttsCacheKey({ engine: engineId, voice, speed, text: spoken });
+    const characters = [...spoken].length;
 
     let hit = cache.get(key);
     if (hit) {
@@ -104,12 +112,12 @@ async function runWithEngine({ lines, locale, engineId, engines, voiceFor, speed
       log(`  ${line.id}: dùng lại audio đã đọc (cache) — "${line.text.slice(0, 40)}"`);
     } else {
       try {
-        const out = await withRetry(() => engine.synthesize({ text: line.text, voice, speed }), {
+        const out = await withRetry(() => engine.synthesize({ text: spoken, voice, speed }), {
           ...retry,
           onRetry: ({ attempt, maxRetries, error, waitMs }) =>
             log(`  [Thử lại ${attempt}/${maxRetries} cho ${line.id}] ${ttsErrorMessage(engineId, error)} — chờ ${waitMs}ms`),
         });
-        cache.put(key, out, { engine: engineId, voice, speed, text: line.text });
+        cache.put(key, out, { engine: engineId, voice, speed, text: spoken });
         hit = out;
         stats.synthesized++;
         stats.characters += characters;
@@ -143,7 +151,14 @@ async function runWithEngine({ lines, locale, engineId, engines, voiceFor, speed
     const dur = await tools.probeDuration(finalPath);
     durations[line.id] = round3(dur);
 
-    if (b.length) {
+    if (b.length && respelled) {
+      // Boundary là của chữ ĐỌC: ánh xạ ngược về token của chữ GỐC bằng vị trí ký tự
+      words[line.id] = alignWords({ original: line.text, spoken, spans, boundaries: b, language: locale.language, mode: locale.layout.lineBreak.mode }).map((w) => ({
+        t: w.t,
+        s: round3(Math.max(0, w.s - trimStart)),
+        d: round3(w.d),
+      }));
+    } else if (b.length) {
       // Token hiển thị = chữ gốc (kèm dấu câu dính liền) khớp với từng word boundary của engine
       const { tokens, misses } = alignBoundaries(line.text, b.map((w) => w.text));
       if (misses) log(`  ⚠ ${line.id}: ${misses} từ do engine trả về không tìm thấy trong câu gốc — dùng nguyên chữ engine.`);
