@@ -434,3 +434,26 @@ test("template generate-vo.mjs: khối LINES vẫn thay được bằng regex c�
   assert.match(src, /VIDEO_LOCALE/);
   assert.match(src, /mainPipeline/);
 });
+
+test("env của generate-vo: .env RIÊNG của video thắng process.env (server nạp TTS_PROVIDER mặc định của máy), process.env thắng .env gốc", async () => {
+  const { loadVideoEnv } = await import("../scripts/lib/tts/env.mjs");
+  const root = tmp();
+  try {
+    fs.mkdirSync(path.join(root, "videos", "v"), { recursive: true });
+    fs.writeFileSync(path.join(root, ".env.example"), "TTS_PROVIDER=edge\nEDGE_VOICE=nen\nAZURE_SPEECH_KEY=\n");
+    fs.writeFileSync(path.join(root, ".env"), "TTS_PROVIDER=vieneu\nEDGE_VOICE=goc\r\nAZURE_SPEECH_KEY=k1\n");
+    fs.writeFileSync(path.join(root, "videos", "v", ".env"), "VIDEO_LOCALE=ja-JP\nTTS_PROVIDER=edge\nTTS_VOICE=ja-JP-KeitaNeural\n");
+    const env = loadVideoEnv({ repoRoot: root, videoRoot: path.join(root, "videos", "v"), processEnv: { TTS_PROVIDER: "vieneu", EDGE_VOICE: "heThong", OTHER: "x" } });
+    assert.equal(env.TTS_PROVIDER, "edge", "lựa chọn của video thắng process.env");
+    assert.equal(env.EDGE_VOICE, "heThong", "process.env thắng .env gốc");
+    assert.equal(env.AZURE_SPEECH_KEY, "k1");
+    assert.equal(env.VIDEO_LOCALE, "ja-JP");
+    assert.equal(env.TTS_VOICE, "ja-JP-KeitaNeural");
+    assert.equal(env.OTHER, undefined, "chỉ nhận các khoá TTS đã khai báo từ process.env");
+    // video không có .env riêng: process.env > .env gốc
+    const env2 = loadVideoEnv({ repoRoot: root, videoRoot: path.join(root, "videos", "none"), processEnv: { TTS_PROVIDER: "azure" } });
+    assert.equal(env2.TTS_PROVIDER, "azure");
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
+});

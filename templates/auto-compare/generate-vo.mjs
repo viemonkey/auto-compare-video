@@ -21,37 +21,12 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
 const REPO_ROOT = path.resolve(ROOT, "..", "..");
 
-function readEnvFile(file, into) {
-  if (!fs.existsSync(file)) return;
-  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
-    const m = line.trim().match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
-    if (m) into[m[1]] = m[2].trim();
-  }
-}
-
-function loadEnv() {
-  const env = {};
-  // 0. .env.example — chỉ làm nền cho các giá trị không phải bí mật (TTS_PROVIDER=edge,
-  //    EDGE_VOICE...). Không có bước này thì người vừa `git pull` mà chưa tạo .env sẽ rơi
-  //    về provider mặc định dưới đây và gặp lỗi "thiếu VBEE_APP_ID", dù README và
-  //    .env.example đều nói mặc định là Edge TTS. scripts/sync-channel.mjs của mỗi video
-  //    đã fallback y hệt — giữ cho hai bên hành xử giống nhau.
-  readEnvFile(path.join(REPO_ROOT, ".env.example"), env);
-  // 1. Root .env
-  readEnvFile(path.join(REPO_ROOT, ".env"), env);
-  // 2. Local video .env (overrides root .env)
-  readEnvFile(path.join(ROOT, ".env"), env);
-  // 3. process.env (overrides all)
-  for (const k of ["TTS_PROVIDER", "TTS_VOICE", "VIENEU_VOICE", "EDGE_VOICE", "VBEE_APP_ID", "VBEE_ACCESS_TOKEN", "VBEE_VOICE_CODE", "VIDEO_LOCALE", "AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION", "TTS_CACHE_DIR"]) {
-    if (process.env[k]) env[k] = process.env[k];
-  }
-  return env;
-}
-
-const ENV = loadEnv();
+const lib = (...p) => import(pathToFileURL(path.join(REPO_ROOT, "scripts", "lib", ...p)).href);
+// Thứ tự ưu tiên env: .env.example < .env gốc < process.env < .env riêng của video (xem scripts/lib/tts/env.mjs)
+const { loadVideoEnv } = await lib("tts", "env.mjs");
+const ENV = loadVideoEnv({ repoRoot: REPO_ROOT, videoRoot: ROOT });
 const REQUESTED_PROVIDER = (ENV.TTS_PROVIDER || "").toLowerCase();
 
-const lib = (...p) => import(pathToFileURL(path.join(REPO_ROOT, "scripts", "lib", ...p)).href);
 const { resolveLocale, defaultLocaleCode } = await lib("locales.mjs");
 // Thị trường của video = VIDEO_LOCALE (scaffold ghi vào .env cục bộ của video), không có thì DEFAULT_LOCALE (process.env / .env gốc).
 const LOCALE = resolveLocale(ENV.VIDEO_LOCALE || defaultLocaleCode());

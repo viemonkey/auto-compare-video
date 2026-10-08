@@ -36,6 +36,7 @@ import { resolveLocale } from "./lib/locales.mjs";
 import { baseSlugFromContent, slugForLocale } from "./lib/market-slug.mjs";
 import { checkRenderability } from "./lib/capabilities.mjs";
 import { copyFontsToVideo, familiesOfLocale } from "./lib/fonts.mjs";
+import { flattenContent } from "../public/shared/bilingual.mjs";
 import { planVideoText } from "./lib/fit-check.mjs";
 import { buildLines, computeTiming, buildIndexHtml } from "./lib/compose.mjs";
 
@@ -547,6 +548,10 @@ async function main() {
     contextImageCorrections = result.contextImageCorrections;
     sourceImages = result.source_images;
   }
+
+  // Nội dung thị trường ngoại ngữ là song ngữ ({text, vi} mỗi field) — dựng video chỉ cần chữ đích. (Trước đây lỗi "title rỗng" vì
+  // chưa bao giờ dựng được thị trường ngoại ngữ.) Bản song ngữ gốc vẫn nằm trong output/content/<slug>.compare-content.json.
+  content = flattenContent(content);
 
   // Thị trường của nội dung (thiếu = mặc định). Chưa đủ điều kiện dựng (giọng đọc / chữ / pipeline) -> dừng, không dựng hỏng.
   const contentLocale = resolveLocale(content.locale);

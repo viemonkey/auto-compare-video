@@ -6,10 +6,15 @@
   "order": 10,
   "default": true,
   "scripts": [
-    "Latn"
+    "Latn",
+    "Jpan",
+    "Thai"
   ],
   "languages": [
-    "vi"
+    "vi",
+    "en",
+    "ja",
+    "th"
   ],
   "frames": {
     "label": { "widthPx": 444, "lineHeight": 1.08, "strokePx": 4, "letterSpacingEm": -0.01, "maxHeightPx": 106 },
