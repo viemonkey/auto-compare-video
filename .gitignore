@@ -137,7 +137,8 @@ videos/test-marble-bg/
 videos/*/pose-calibration/
 videos/*/_caption_preview/
 
-!docs/ui-step2/*
+# Ảnh chụp kiểm tra giao diện (Bước 2...) — chỉ để xem, không commit
+docs/ui-step2/
 
 # Backup tự sinh (vd. output/cost-ledger.jsonl.bak-*) — không commit
 *.bak
