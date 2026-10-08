@@ -63,6 +63,13 @@ export function validateTheme(raw) {
     '"scripts" phải là mảng mã ISO 15924 (vd ["Latn"]), không rỗng');
   need(Array.isArray(raw.languages) && raw.languages.length > 0 && raw.languages.every(isLangCode),
     '"languages" phải là mảng mã ngôn ngữ mà pipeline dựng video đã kiểm chứng (vd ["vi"]), không rỗng');
+  if (raw.frames !== undefined) {
+    const num = (v) => typeof v === "number" && Number.isFinite(v) && v > 0;
+    const f = raw.frames;
+    need(isObj(f) && isObj(f.label) && isObj(f.caption), '"frames" phải có label và caption (hình học khung chữ trong video)');
+    if (isObj(f) && isObj(f.label)) need(num(f.label.widthPx) && num(f.label.lineHeight) && (f.label.maxHeightPx === undefined || num(f.label.maxHeightPx)), '"frames.label" cần widthPx, lineHeight (số dương), maxHeightPx tuỳ chọn');
+    if (isObj(f) && isObj(f.caption)) need(num(f.caption.widthPx), '"frames.caption.widthPx" phải là số dương');
+  }
   return problems.length ? { theme: null, problems } : { theme: Object.freeze({ ...raw }), problems };
 }
 

@@ -10,5 +10,9 @@
   ],
   "languages": [
     "vi"
-  ]
+  ],
+  "frames": {
+    "label": { "widthPx": 444, "lineHeight": 1.08, "strokePx": 4, "letterSpacingEm": -0.01, "maxHeightPx": 106 },
+    "caption": { "widthPx": 960, "lineHeight": 1.1, "strokePx": 5 }
+  }
 }

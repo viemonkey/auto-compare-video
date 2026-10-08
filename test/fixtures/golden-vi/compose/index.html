@@ -1,22 +1,45 @@
 <!DOCTYPE html>
-<html lang="__HTML_LANG__">
+<html lang="vi">
   <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=1080, height=1920">
-    <title>__DOC_TITLE__</title>
+    <title>So sánh — Bạch kim vs Vàng trắng</title>
     <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
     <style>
       /* Font: file woff2 LOCAL trong assets/fonts/ (giấy phép OFL, xem assets/fonts/README.md) — KHÔNG tải CDN lúc render.
          Danh sách @font-face + chuỗi font theo thị trường do scaffold-compare-video.mjs điền từ config/locales/<code>.json. */
-/*FONT_FACES*/
+      @font-face {
+        font-family: "Be Vietnam Pro";
+        font-style: normal;
+        font-weight: 900;
+        font-display: block;
+        src: url(assets/fonts/be-vietnam-pro/BeVietnamPro-Black-vietnamese.woff2) format("woff2");
+        unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+      }
+      @font-face {
+        font-family: "Be Vietnam Pro";
+        font-style: normal;
+        font-weight: 900;
+        font-display: block;
+        src: url(assets/fonts/be-vietnam-pro/BeVietnamPro-Black-latin.woff2) format("woff2");
+        unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+      }
+      @font-face {
+        font-family: "JetBrains Mono";
+        font-style: normal;
+        font-weight: 700;
+        font-display: block;
+        src: url(assets/fonts/jetbrains-mono/JetBrainsMono-Bold-vietnamese.woff2) format("woff2");
+        unicode-range: U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB;
+      }
       :root {
-        --font-display: __FONT_DISPLAY__;
-        --font-mono: __FONT_MONO__;
-        --label-px: __LABEL_PX__px;
-        --label-style: __LABEL_STYLE__;
-        --label-transform: __LABEL_TRANSFORM__;
-        --cap-px: __CAP_PX__px;
-        --cap-gap: __CAP_GAP__px;
+        --font-display: "Be Vietnam Pro", sans-serif;
+        --font-mono: "JetBrains Mono", monospace;
+        --label-px: 46px;
+        --label-style: italic;
+        --label-transform: uppercase;
+        --cap-px: 44px;
+        --cap-gap: 16px;
       }
     </style>
     <style>
@@ -326,20 +349,20 @@
     </style>
   </head>
   <body>
-    <div data-hf-id="hf-acv0" id="root" data-composition-id="main" data-start="0" data-width="1080" data-height="1920" data-duration="__ROOT_DURATION__">
-      <section data-hf-id="hf-acv1" id="scene" class="clip" data-start="0" data-duration="__ROOT_DURATION__" data-track-index="1">
+    <div data-hf-id="hf-acv0" id="root" data-composition-id="main" data-start="0" data-width="1080" data-height="1920" data-duration="51">
+      <section data-hf-id="hf-acv1" id="scene" class="clip" data-start="0" data-duration="51" data-track-index="1">
 
         <!-- top: full-bleed comparison panels -->
         <div data-hf-id="hf-acv4" id="card-left" class="card" data-layout-allow-overflow="true">
-          <img data-hf-id="hf-acv6" class="card-image" src="__CARD_LEFT_SRC__" alt="__LABEL_LEFT__" />
+          <img data-hf-id="hf-acv6" class="card-image" src="assets/images/card-left.jpg" alt="Bạch kim" />
           <div data-hf-id="hf-acv5" class="card-veil"></div>
         </div>
         <div data-hf-id="hf-acv8" id="card-right" class="card" data-layout-allow-overflow="true">
-          <img data-hf-id="hf-acva" class="card-image" src="__CARD_RIGHT_SRC__" alt="__LABEL_RIGHT__" />
+          <img data-hf-id="hf-acva" class="card-image" src="assets/images/card-right.jpg" alt="Vàng trắng" />
           <div data-hf-id="hf-acv9" class="card-veil"></div>
         </div>
 
-        <div data-hf-id="hf-acve" id="eyebrow">__DEFAULT_EYEBROW__</div>
+        <div data-hf-id="hf-acve" id="eyebrow">SO SÁNH KIẾN THỨC</div>
 
         <!-- FIXED comparison titles above each photo (Mousse/Panna-Cotta style).
              2026-09-03: one static pair for the whole video — the video's subject
@@ -347,15 +370,15 @@
              carried by the running caption below, so these never change. -->
         <div data-hf-id="hf-acvf" id="label-zone">
           <div class="beat-labels" id="lb-fixed">
-            <div class="lb-col lb-left"><div class="lb-1">__LABEL_LEFT_HTML__</div></div>
-            <div class="lb-col lb-right"><div class="lb-1">__LABEL_RIGHT_HTML__</div></div>
+            <div class="lb-col lb-left"><div class="lb-1">Bạch kim</div></div>
+            <div class="lb-col lb-right"><div class="lb-1">Vàng trắng</div></div>
           </div>
         </div>
 
         <!-- bottom: photo host HuyK -->
         <div data-hf-id="hf-acvg" id="avatar-host">
           <div data-hf-id="hf-acvz" id="host-fx" data-layout-allow-overflow="true">
-            <img data-hf-id="hf-acvh" id="host-img" class="host-avatar-img" src="__AVATAR_INITIAL_SRC__" alt="Host" />
+            <img data-hf-id="hf-acvh" id="host-img" class="host-avatar-img" src="assets/actions/point-up-left.svg" alt="Host" />
           </div>
         </div>
 
@@ -364,7 +387,17 @@
       </section>
 
       <!-- narration: audio clips -->
-<!--AUDIO_TAGS-->
+      <audio id="vo-1" src="assets/vo/line-1.mp3" data-start="0.55" data-duration="2.24" data-track-index="20"></audio>
+      <audio id="vo-2" src="assets/vo/line-2.mp3" data-start="2.93" data-duration="0.96" data-track-index="20"></audio>
+      <audio id="vo-3" src="assets/vo/line-3.mp3" data-start="4.03" data-duration="3.52" data-track-index="20"></audio>
+      <audio id="vo-4" src="assets/vo/line-4.mp3" data-start="7.69" data-duration="5.2" data-track-index="20"></audio>
+      <audio id="vo-5" src="assets/vo/line-5.mp3" data-start="13.03" data-duration="5.44" data-track-index="20"></audio>
+      <audio id="vo-6" src="assets/vo/line-6.mp3" data-start="18.61" data-duration="5.76" data-track-index="20"></audio>
+      <audio id="vo-7" src="assets/vo/line-7.mp3" data-start="24.51" data-duration="5.84" data-track-index="20"></audio>
+      <audio id="vo-8" src="assets/vo/line-8.mp3" data-start="30.49" data-duration="4.88" data-track-index="20"></audio>
+      <audio id="vo-9" src="assets/vo/line-9.mp3" data-start="35.51" data-duration="5.44" data-track-index="20"></audio>
+      <audio id="vo-10" src="assets/vo/line-10.mp3" data-start="41.09" data-duration="6" data-track-index="20"></audio>
+      <audio id="vo-11" src="assets/vo/line-11.mp3" data-start="47.23" data-duration="2.56" data-track-index="20"></audio>
     </div>
 
     <script>
@@ -386,17 +419,37 @@
       // boundaries), starts relative to each clip's trimmed audio.
       // Injected by scaffold-compare-video.mjs from assets/vo/words.json.
       const CAPTIONS = {
-/*CAPTIONS_OBJECT*/
+        1: [["Đây",0],["là",0.56],["Bạch",1.12],["kim.",1.68]],
+        2: [["Đây",0],["là",0.24],["Vàng",0.48],["trắng.",0.72]],
+        3: [["Bạch",0],["kim",0.235],["và",0.47],["Vàng",0.705],["trắng",0.94],["khác",1.175],["nhau",1.41],["thế",1.645],["nào",1.88],["mà",2.115],["giá",2.35],["lệch",2.585],["cả",2.82],["chục",3.055],["triệu?",3.29]],
+        4: [["Bạch",0],["kim",0.248],["là",0.496],["kim",0.744],["loại",0.992],["quý",1.24],["nguyên",1.488],["chất,",1.736],["sở",1.984],["hữu",2.232],["sắc",2.48],["trắng",2.728],["tự",2.976],["nhiên",3.224],["vô",3.472],["cùng",3.72],["sang",3.968],["trọng",4.216],["và",4.464],["đẳng",4.712],["cấp.",4.96]],
+        5: [["Vàng",0],["trắng",0.237],["là",0.474],["hợp",0.711],["kim",0.948],["của",1.185],["vàng",1.422],["nguyên",1.659],["chất",1.896],["pha",2.133],["với",2.37],["kim",2.607],["loại",2.844],["khác,",3.081],["rồi",3.318],["phủ",3.555],["lớp",3.792],["Rhodium",4.029],["để",4.266],["tạo",4.503],["độ",4.74],["sáng",4.977],["bóng.",5.214]],
+        6: [["Bạch",0],["kim",0.24],["có",0.48],["mật",0.72],["độ",0.96],["kim",1.2],["loại",1.44],["rất",1.68],["cao",1.92],["nên",2.16],["cầm",2.4],["cực",2.64],["kỳ",2.88],["đầm",3.12],["tay,",3.36],["nặng",3.6],["hơn",3.84],["vàng",4.08],["trắng",4.32],["khoảng",4.56],["ba",4.8],["mươi",5.04],["phần",5.28],["trăm.",5.52]],
+        7: [["Vàng",0],["trắng",0.243],["tuy",0.486],["nhẹ",0.729],["hơn",0.972],["nhưng",1.215],["lại",1.458],["có",1.701],["độ",1.944],["cứng",2.187],["cao",2.43],["hơn",2.673],["nhờ",2.916],["các",3.159],["kim",3.402],["loại",3.645],["pha",3.888],["trộn,",4.131],["giúp",4.374],["giữ",4.617],["form",4.86],["nhẫn",5.103],["rất",5.346],["tốt.",5.589]],
+        8: [["Bạch",0],["kim",0.232],["có",0.464],["độ",0.696],["bền",0.928],["vĩnh",1.16],["cửu,",1.392],["không",1.624],["bao",1.856],["giờ",2.088],["bị",2.32],["phai",2.552],["màu",2.784],["hay",3.016],["ố",3.248],["vàng",3.48],["theo",3.712],["thời",3.944],["gian",4.176],["sử",4.408],["dụng.",4.64]],
+        9: [["Vàng",0],["trắng",0.237],["sau",0.474],["một",0.711],["thời",0.948],["gian",1.185],["đeo",1.422],["sẽ",1.659],["bị",1.896],["mòn",2.133],["lớp",2.37],["xi",2.607],["mạ",2.844],["và",3.081],["ngả",3.318],["sang",3.555],["màu",3.792],["vàng",4.029],["nhẹ,",4.266],["cần",4.503],["đi",4.74],["xi",4.977],["lại.",5.214]],
+        10: [["Nếu",0],["muốn",0.24],["đeo",0.48],["bền",0.72],["trọn",0.96],["đời",1.2],["không",1.44],["cần",1.68],["bảo",1.92],["dưỡng",2.16],["thì",2.4],["chọn",2.64],["Bạch",2.88],["kim,",3.12],["còn",3.36],["muốn",3.6],["tiết",3.84],["kiệm",4.08],["chi",4.32],["phí",4.56],["thì",4.8],["chọn",5.04],["Vàng",5.28],["trắng",5.52],["nhé!",5.76]],
+        11: [["Bạch",0],["kim",0.213],["hay",0.426],["Vàng",0.639],["trắng",0.852],["giờ",1.065],["thì",1.278],["bạn",1.491],["đã",1.704],["rõ",1.917],["rồi",2.13],["đấy!",2.343]],
       };
 
       // Phrase layout per spoken line: [wordCount, fontPx|0] per on-screen phrase (0 = default size).
       // Computed at scaffold time by scripts/lib/fit-check.mjs (locale-aware line breaking + overflow check
       // measured with the real fonts), so the composition itself stays deterministic and locale-agnostic.
       const PHRASES = {
-/*PHRASES_OBJECT*/
+        1: [[4,0]],
+        2: [[4,0]],
+        3: [[4,0],[4,0],[4,0],[3,0]],
+        4: [[4,0],[4,0],[4,0],[4,0],[5,0]],
+        5: [[4,0],[4,0],[4,0],[2,0],[4,0],[5,0]],
+        6: [[4,0],[4,0],[4,0],[3,0],[4,0],[5,0]],
+        7: [[4,0],[4,0],[4,0],[4,0],[2,0],[4,0],[2,0]],
+        8: [[4,0],[3,0],[4,0],[4,0],[4,0],[2,0]],
+        9: [[4,0],[4,0],[4,0],[4,0],[3,0],[4,0]],
+        10: [[4,0],[4,0],[4,0],[2,0],[4,0],[4,0],[3,0]],
+        11: [[4,0],[4,0],[4,0]],
       };
-      const CAP_JOINER = "__CAP_JOINER__"; // "" for ja/th (no spaces between words), " " otherwise
-      const CAP_ACTIVE_SCALE = __CAP_ACTIVE_SCALE__;
+      const CAP_JOINER = " "; // "" for ja/th (no spaces between words), " " otherwise
+      const CAP_ACTIVE_SCALE = 1.13;
 
       function chunkPhrases(words, n) {
         const out = [];
@@ -530,17 +583,69 @@
       // line-*.mp3 (TTS padding) and a flat timeline gap — see generate-vo.mjs.
       // Values mirror assets/vo/durations.json; injected by scaffold-compare-video.mjs.
       const VO = {
-/*VO_OBJECT*/
+        1: { start: 0.55, dur: 2.24 },
+        2: { start: 2.93, dur: 0.96 },
+        3: { start: 4.03, dur: 3.52 },
+        4: { start: 7.69, dur: 5.2 },
+        5: { start: 13.03, dur: 5.44 },
+        6: { start: 18.61, dur: 5.76 },
+        7: { start: 24.51, dur: 5.84 },
+        8: { start: 30.49, dur: 4.88 },
+        9: { start: 35.51, dur: 5.44 },
+        10: { start: 41.09, dur: 6 },
+        11: { start: 47.23, dur: 2.56 },
       };
 
-/*TIMELINE_BEATS*/
+      // Pose set: khung vuông cố định, không transform per-pose — xem
+      // .host-avatar-img + const POSE_ADJUST trong index.html.
+      tl.set("#host-img", poseFor("point-up-left"), 0);
+
+      // ---------- BEAT: HOOK ----------
+      changePose("point-up-left", VO[1].start);
+      focus("left", VO[1].start);
+
+      changePose("point-up-right", VO[2].start);
+      focus("right", VO[2].start);
+
+
+      // ---------- BEAT: QUESTION ----------
+      changePose("thinking", VO[3].start);
+      focus("both", VO[3].start);
+
+
+      // ---------- BEAT: BODY (7 điểm so sánh, từ Gemini) ----------
+      changePose("explain-a", VO[4].start);
+      focus("left", VO[4].start);
+
+      changePose("explain-b", VO[5].start);
+      focus("right", VO[5].start);
+
+      changePose("shocked-a", VO[6].start);
+      focus("left", VO[6].start);
+
+      changePose("point-up-right", VO[7].start);
+      focus("right", VO[7].start);
+
+      changePose("thumbs-up-a", VO[8].start);
+      focus("left", VO[8].start);
+
+      changePose("confused", VO[9].start);
+      focus("right", VO[9].start);
+
+      changePose("thinking", VO[10].start);
+      focus("both", VO[10].start);
+
+
+      // ---------- BEAT: PAYOFF ----------
+      changePose("thumbs-up-a", VO[11].start);
+      tl.fromTo("#avatar-host", { scale: 1 }, { scale: 1.03, duration: 0.3, ease: "power2.out", yoyo: true, repeat: 1 }, VO[11].start);
 
       // ---------- running captions ----------
       // Fixed titles above the photos never change, so every spoken line gets
       // its own running caption in the gap between the photos and the host.
       for (const n of Object.keys(CAPTIONS).map(Number)) showCaption(n);
 
-      const ROOT_DURATION = __ROOT_DURATION__;
+      const ROOT_DURATION = 51;
       window.__timelines["main"] = tl;
     </script>
 
@@ -593,8 +698,8 @@
     </style>
     <div id="hf-standalone-player">
       <button id="hf-play-btn">▶ PLAY VIDEO</button>
-      <input type="range" id="hf-scrubber" min="0" max="__ROOT_DURATION__" step="0.05" value="0">
-      <span id="hf-time-display">0.0s / __ROOT_DURATION__s</span>
+      <input type="range" id="hf-scrubber" min="0" max="51" step="0.05" value="0">
+      <span id="hf-time-display">0.0s / 51s</span>
     </div>
 
     <script>
@@ -611,7 +716,7 @@
         const scrubber = document.getElementById("hf-scrubber");
         const timeDisplay = document.getElementById("hf-time-display");
         const audios = Array.from(document.querySelectorAll("audio"));
-        const ROOT_DURATION = __ROOT_DURATION__;
+        const ROOT_DURATION = 51;
 
         let isPlaying = false;
 

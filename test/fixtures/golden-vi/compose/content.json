@@ -1,0 +1,56 @@
+{
+  "title": "Bạch kim và Vàng trắng khác nhau thế nào mà giá lệch cả chục triệu?",
+  "label_left": "Bạch kim",
+  "label_right": "Vàng trắng",
+  "points": [
+    {
+      "text": "Bạch kim là kim loại quý nguyên chất, sở hữu sắc trắng tự nhiên vô cùng sang trọng và đẳng cấp.",
+      "side": "left",
+      "tag": "Trắng tự nhiên",
+      "sub": "Kim loại nguyên chất",
+      "suggested_action": "explain-a"
+    },
+    {
+      "text": "Vàng trắng là hợp kim của vàng nguyên chất pha với kim loại khác, rồi phủ lớp Rhodium để tạo độ sáng bóng.",
+      "side": "right",
+      "tag": "Trắng nhờ xi mạ",
+      "sub": "Phủ lớp Rhodium bóng",
+      "suggested_action": "explain-b"
+    },
+    {
+      "text": "Bạch kim có mật độ kim loại rất cao nên cầm cực kỳ đầm tay, nặng hơn vàng trắng khoảng ba mươi phần trăm.",
+      "side": "left",
+      "tag": "Rất đầm tay",
+      "sub": "Nặng hơn khoảng 30%",
+      "suggested_action": "shocked-a"
+    },
+    {
+      "text": "Vàng trắng tuy nhẹ hơn nhưng lại có độ cứng cao hơn nhờ các kim loại pha trộn, giúp giữ form nhẫn rất tốt.",
+      "side": "right",
+      "tag": "Cứng cáp hơn",
+      "sub": "Giữ form nhẫn cực tốt",
+      "suggested_action": "point-up-right"
+    },
+    {
+      "text": "Bạch kim có độ bền vĩnh cửu, không bao giờ bị phai màu hay ố vàng theo thời gian sử dụng.",
+      "side": "left",
+      "tag": "Bền bỉ vĩnh cửu",
+      "sub": "Không lo bị phai màu",
+      "suggested_action": "thumbs-up-a"
+    },
+    {
+      "text": "Vàng trắng sau một thời gian đeo sẽ bị mòn lớp xi mạ và ngả sang màu vàng nhẹ, cần đi xi lại.",
+      "side": "right",
+      "tag": "Dễ bị ngả vàng",
+      "sub": "Cần xi mạ lại định kỳ",
+      "suggested_action": "confused"
+    },
+    {
+      "text": "Nếu muốn đeo bền trọn đời không cần bảo dưỡng thì chọn Bạch kim, còn muốn tiết kiệm chi phí thì chọn Vàng trắng nhé!",
+      "side": "both",
+      "tag": "Mẹo chọn nhẫn",
+      "sub": "Tùy thuộc vào ngân sách",
+      "suggested_action": "thinking"
+    }
+  ]
+}

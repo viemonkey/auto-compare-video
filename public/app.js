@@ -3,6 +3,7 @@
 import { flattenContent, textOf, viOf } from "/shared/bilingual.mjs";
 import { createFieldEditor } from "/field-editor.js";
 import { slugify, baseSlugFromContent } from "/shared/slug-base.mjs";
+import { createLatestRunner, STALE } from "/shared/latest-request.mjs";
 
 document.addEventListener("DOMContentLoaded", () => {
   // State
@@ -434,6 +435,9 @@ document.addEventListener("DOMContentLoaded", () => {
   let staticEditors = []; // editor của title + 2 label
   let pointEditors = []; // widget của từng dòng point (dựng lại mỗi lần renderPointsList)
   let busyCount = 0; // số dòng đang chờ AI
+  let fitIssues = []; // lỗi chữ-không-vừa-khung-video do server đo (/api/fit-check): [{field, code, message}] — chặn dựng cho tới khi sửa
+  const fitRunner = createLatestRunner();
+  let fitTimer = null;
 
   const isGloss = () => !!(localeRules && localeRules.needsGloss);
 
@@ -448,16 +452,68 @@ document.addEventListener("DOMContentLoaded", () => {
     const info = currentLocaleInfo();
     const locked = !!info && !info.renderable;
     const busyNow = busyCount > 0;
-    btnApproveBuild.disabled = locked || busyNow;
+    const fitBlocked = !locked && fitIssues.length > 0;
+    btnApproveBuild.disabled = locked || busyNow || fitBlocked;
     if (btnSaveDraft) btnSaveDraft.disabled = busyNow; // nội dung đang được AI sửa -> chưa lưu bản nửa vời
-    btnApproveBuild.title = locked ? "Thị trường này chưa dựng được video" : busyNow ? "Đang chờ AI sửa dòng…" : "";
+    btnApproveBuild.title = locked ? "Thị trường này chưa dựng được video" : busyNow ? "Đang chờ AI sửa dòng…" : fitBlocked ? "Có dòng chữ không vừa khung video" : "";
     if (locked) {
       renderLockNote.textContent = `🔒 Chưa dựng được video cho ${info.displayName}: ${info.blockers.map((b) => b.message).join(" ")} Bạn vẫn xem và sửa kịch bản bình thường.`;
     } else if (busyNow) {
       renderLockNote.textContent = "⏳ Đang chờ AI sửa dòng — nút dựng video tạm khoá để không gửi nội dung chưa xong.";
     }
-    renderLockNote.classList.toggle("hidden", !(locked || busyNow));
+    else if (fitBlocked) {
+      renderLockNote.textContent = `🔒 Có ${fitIssues.length} chỗ chữ không vừa khung video (đánh dấu đỏ ở trên) — rút gọn rồi mới dựng được, để video không bị tràn chữ.`;
+    }
+    renderLockNote.classList.toggle("hidden", !(locked || busyNow || fitBlocked));
   }
+
+  // Kiểm tra chữ vừa khung video: gọi server (đo bằng Chrome + font thật), debounce, chỉ nhận kết quả mới nhất.
+  const FIT_DEBOUNCE_MS = 700;
+  function editorForField(field) {
+    if (field === "title" || field === "label_left" || field === "label_right") {
+      const i = ["title", "label_left", "label_right"].indexOf(field);
+      return staticEditors[i];
+    }
+    const m = /^points\.(\d+)\.text$/.exec(field);
+    return m ? pointEditors[Number(m[1])] : undefined;
+  }
+  function applyFitIssues() {
+    const byField = new Map();
+    for (const issue of fitIssues) byField.set(issue.field, [...(byField.get(issue.field) || []), { code: issue.code, message: issue.message }]);
+    for (const editor of [...staticEditors, ...pointEditors]) editor.setFitIssues([]);
+    for (const [field, list] of byField) {
+      const editor = editorForField(field);
+      if (editor) editor.setFitIssues(list);
+    }
+    updateApproveState();
+  }
+  function scheduleFitCheck() {
+    clearTimeout(fitTimer);
+    if (!currentLocale || !hasStep2Content()) {
+      fitRunner.cancel();
+      fitIssues = [];
+      updateApproveState();
+      return;
+    }
+    fitTimer = setTimeout(async () => {
+      try {
+        const data = await fitRunner.run((signal) =>
+          fetch("/api/fit-check", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ locale: currentLocale, content: buildContentPayload() }),
+            signal,
+          }).then((r) => r.json()),
+        );
+        if (data === STALE || !Array.isArray(data.issues)) return;
+        fitIssues = data.issues;
+        applyFitIssues();
+      } catch (err) {
+        console.warn("fit-check lỗi:", err); // không chặn người dùng nếu không kiểm được; server vẫn kiểm lại lúc dựng
+      }
+    }, FIT_DEBOUNCE_MS);
+  }
+  step2.addEventListener("input", scheduleFitCheck);
 
   function biContext(point) {
     const pair = (input, st) => ({ text: input.value, vi: st.vi });
@@ -534,6 +590,7 @@ document.addEventListener("DOMContentLoaded", () => {
     renderViewModeBar();
     applyViewMode();
     updateApproveState();
+    scheduleFitCheck();
   }
 
   async function loadLocaleRules(requestId) {

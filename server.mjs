@@ -68,8 +68,9 @@ import {
   recordHashtagSuggestions,
   withMeanings,
 } from "./scripts/lib/hashtags.mjs";
-import { textOf } from "./public/shared/bilingual.mjs";
+import { textOf, flattenContent } from "./public/shared/bilingual.mjs";
 import { rulesOf } from "./scripts/lib/compare-content.mjs";
+import { checkContentFit, assertFitsForBuild, FitBlockedError } from "./scripts/lib/fit-check.mjs";
 import { createMarketApi, buildRecord, generatedByOf, resolveSocialPost as resolveSocialPostIn } from "./server-market.mjs";
 import { validateGeminiModels } from "./scripts/lib/gemini-models.mjs";
 import { createCleanupQueue, existingVideoWebPath, MIN_MP4_BYTES } from "./scripts/lib/pending-cleanup.mjs";
@@ -292,6 +293,30 @@ app.get("/api/locale-rules", (req, res) => {
   const locale = localeFromCode(req.query.locale);
   if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
   res.json({ code: locale.code, displayName: locale.displayName, languageName: locale.prompt.language, ...rulesOf(locale) });
+});
+
+// Kiểm tra chữ có vừa khung video không (đo bằng Chrome + font thật của thị trường) và có ký tự font không vẽ được không.
+// Bước 2 gọi khi nội dung đổi để đánh dấu dòng lỗi; /api/create-video kiểm lại ở phía server (không tin client).
+const fitCache = new Map(); // khoá = thị trường + chữ hiển thị; kết quả chỉ phụ thuộc chữ + config nên cache an toàn
+app.post("/api/fit-check", async (req, res) => {
+  const locale = localeFromCode(req.body?.locale);
+  if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
+  try {
+    const content = flattenContent(req.body?.content || {});
+    const key = JSON.stringify([locale.code, content.title, content.label_left, content.label_right, (content.points || []).map((p) => p.text)]);
+    let result = fitCache.get(key);
+    if (!result) {
+      const { ok, measuredBy, issues } = await checkContentFit(content, locale);
+      result = { ok, measuredBy, issues };
+      if (fitCache.size > 200) fitCache.delete(fitCache.keys().next().value);
+      fitCache.set(key, result);
+    }
+    res.json(result);
+  } catch (e) {
+    console.warn(`[fit-check] ${redactSecrets(e.message)}`);
+    // Không đo được (vd thiếu Chrome): không chặn người dùng, chỉ báo là chưa kiểm được.
+    res.json({ ok: true, measuredBy: "none", issues: [], warning: "Chưa kiểm được chữ có vừa khung không." });
+  }
 });
 
 // Sửa 1 dòng bằng Gemini — chỉ gọi cho ĐÚNG trường đó (Bước 2). Huỷ khi client đóng kết nối / gửi yêu cầu mới (AbortController
@@ -615,6 +640,13 @@ app.post("/api/create-video", async (req, res) => {
     const renderability = checkRenderability(locale);
     if (!renderability.renderable) {
       return fail(`Thị trường ${locale.displayName} chưa dựng được video: ${renderability.blockers.map((b) => b.message).join(" ")}`);
+    }
+    // Chữ phải vừa khung video và font phải có đủ ký tự — kiểm lại ở server dù UI đã đánh dấu (không tin client). Tràn chữ -> không dựng.
+    try {
+      await assertFitsForBuild(content, locale);
+    } catch (e) {
+      if (e instanceof FitBlockedError) return fail(e.userMessage);
+      throw e;
     }
     // Slug bản ngoại ngữ = slug gốc + hậu tố thị trường (thị trường mặc định giữ slug như cũ).
     const slugSuffix = effectiveSlugSuffix(locale);

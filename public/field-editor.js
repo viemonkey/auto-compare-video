@@ -8,7 +8,7 @@ import { rewriteFeedback, translateFeedback, friendlyError } from "/shared/edit-
 const FLASH_MS = 1800; // câu / nghĩa vừa được AI cập nhật sáng nhẹ chừng này
 const NOTICE_MS = 10_000; // so sánh ý / thông báo tự ẩn sau chừng này (hoặc người dùng đóng)
 
-const ICON_CLASS = { "too-long": "warn", "forbidden-phrase": "danger", "glossary-term": "warn", "missing-vi": "info", "fact-mismatch": "danger" };
+const ICON_CLASS = { "too-long": "warn", "forbidden-phrase": "danger", "glossary-term": "warn", "missing-vi": "info", "fact-mismatch": "danger", overflow: "danger", tofu: "danger" };
 
 async function postJson(url, body, signal) {
   const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body), signal });
@@ -41,6 +41,7 @@ export function createFieldEditor(o) {
   let destroyed = false;
   let busy = false;
   let flashTimer = null;
+  let fitIssues = []; // lỗi vừa-khung-video do server đo (POST /api/fit-check): [{code:"overflow"|"tofu", message}] — chặn dựng cho tới khi sửa
 
   // 1 khối (card): câu chính (ô nhập, trông như ô sửa được) ở trên, dòng nghĩa tiếng Việt ngay dưới (✎ ↻ + thời gian đọc cùng hàng, bên phải).
   // Bấm ✎: CHÍNH dòng nghĩa thành ô nhập (cùng vị trí) + dòng hướng dẫn + nút Viết lại / Huỷ ngay dưới. Cảnh báo / lỗi / so sánh ý nằm DƯỚI.
@@ -212,6 +213,7 @@ export function createFieldEditor(o) {
     if (staleNow) warnings = warnings.filter((w) => w.code !== "glossary-term" && w.code !== "missing-vi");
     // Lệch dữ kiện đã duyệt của bản gốc (phiên bản thị trường): còn hiệu lực chừng nào người dùng chưa sửa chữ dòng này.
     if (o.state.fact && text === o.state.fact.forText) warnings.push({ code: "fact-mismatch", message: o.state.fact.message });
+    warnings.push(...fitIssues);
     const level = warnings.some((w) => ICON_CLASS[w.code] === "danger") ? "danger" : warnings.some((w) => ICON_CLASS[w.code] !== "info") ? "warn" : warnings.length ? "info" : "";
     warnLine.textContent = warnings.map((w) => w.message).join(" · ");
     warnLine.className = `bi-warn-line${level ? ` bi-warn-${level}` : " hidden"}`;
@@ -338,6 +340,11 @@ export function createFieldEditor(o) {
 
   return {
     refresh,
+    /** Gắn kết quả kiểm tra vừa khung từ server cho dòng này (rỗng = hết lỗi). */
+    setFitIssues(list) {
+      fitIssues = list || [];
+      refresh();
+    },
     /** Gỡ khỏi DOM, huỷ yêu cầu đang chờ, trả lại ô nhập. */
     destroy() {
       if (destroyed) return;
