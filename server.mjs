@@ -722,10 +722,10 @@ app.post("/api/create-video", async (req, res) => {
       if (!getEngine(ttsProvider)) return fail(`Engine giọng đọc "${ttsProvider}" không tồn tại hoặc đang bị tắt (config/tts-engines/).`);
       args.push("--tts-provider", ttsProvider);
     }
-    if (ttsProvider === "edge" && req.body?.ttsVoice) {
+    if (ttsProvider && ttsProvider !== "vieneu" && req.body?.ttsVoice) {
       const v = String(req.body.ttsVoice).trim();
-      if (!/^[A-Za-z0-9-]+$/.test(v)) return fail("Giọng Edge TTS không hợp lệ.");
-      args.push("--edge-voice", v);
+      if (!/^[A-Za-z0-9-]+$/.test(v)) return fail("Tên giọng đọc không hợp lệ.");
+      args.push("--tts-voice", v);
     }
     if (ttsProvider === "vieneu") {
       if (vieneuRefPath) {

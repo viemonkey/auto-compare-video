@@ -4,21 +4,19 @@
 //   - ký tự font không hỗ trợ (ô vuông / tofu).
 // Đo bằng Chrome thật + font thật (browser-fit.mjs); không có Chrome -> ước lượng theo số ký tự (measuredBy: "estimate").
 import { textOf, flattenContent } from "../../public/shared/bilingual.mjs";
-import { atomize, breakLines } from "../../public/shared/line-break.mjs";
-import { alignBoundaries, chunkCaption } from "../../public/shared/caption-chunk.mjs";
+import { breakLines } from "../../public/shared/line-break.mjs";
+import { chunkCaption, estimateTokens as estimateTokensFor } from "../../public/shared/caption-chunk.mjs";
 import { overflowMessage, sizeSteps } from "../../public/shared/text-fit.mjs";
 import { spokenLines } from "./video-lines.mjs";
 import { uncoveredChars } from "./fonts.mjs";
 import { findChrome, buildMeasurePage, runMeasurePage } from "./browser-fit.mjs";
 import { listThemes, getDefaultTheme } from "./capabilities.mjs";
 
-const HAS_LETTER = /[\p{L}\p{N}]/u;
 const NON_LATIN_SCRIPT = /[^\p{Script=Latin}\p{Script=Common}\p{Script=Inherited}]/u;
 
 /** Token caption ƯỚC LƯỢNG từ câu chữ (khi chưa có word boundary thật của TTS): từ do Intl.Segmenter / khoảng trắng, dấu câu dính token. */
 export function estimateTokens(text, locale) {
-  const atoms = atomize(text, { language: locale.language, mode: locale.layout.lineBreak.mode }).map((a) => a.text).filter((t) => HAS_LETTER.test(t));
-  return alignBoundaries(text, atoms).tokens;
+  return estimateTokensFor(text, { language: locale.language, mode: locale.layout.lineBreak.mode });
 }
 
 function themeFor(themeId) {

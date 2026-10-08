@@ -139,3 +139,22 @@ export function calcImageCost(model, imageCount) {
   }
   return (imageCount || 0) * price.perImage;
 }
+
+// ---------------------------------------------------------------------------------------------
+// Giọng đọc (TTS): tính theo SỐ KÝ TỰ gửi đi đọc. Engine miễn phí ghi 0 USD nhưng vẫn có dòng trong sổ (task "tts") để thống kê.
+// ---------------------------------------------------------------------------------------------
+export const TTS_PRICING = {
+  edge: {
+    unit: "USD / 1M ký tự",
+    usdPerMillionChars: 0,
+    lastUpdated: "2026-10-08",
+    note: "Edge TTS (Read Aloud của Microsoft Edge) miễn phí, không chính thức — không có SLA.",
+  },
+};
+
+/** Chi phí USD đọc `characters` ký tự bằng engine `engine` (0 nếu engine miễn phí hoặc chưa có trong bảng). */
+export function calcTtsCost(engine, characters) {
+  const price = TTS_PRICING[engine];
+  if (!price) return 0;
+  return ((characters || 0) / 1_000_000) * price.usdPerMillionChars;
+}

@@ -88,6 +88,16 @@ function validateVideoBlocks(raw, repoRoot, need) {
     need(typeof v.italic === "boolean" && typeof v.uppercase === "boolean", '"video.italic" và "video.uppercase" phải là boolean');
   }
 
+  if (raw.tts !== undefined) {
+    const t = raw.tts;
+    need(isObj(t) && Array.isArray(t.priority) && t.priority.length > 0 && t.priority.every((id) => isNonEmptyStr(id) && /^[a-z0-9-]+$/.test(id)),
+      '"tts.priority" phải là mảng id engine (vd ["azure","edge"]) theo thứ tự ưu tiên');
+    if (isObj(t)) {
+      need(isObj(t.voices) && Object.entries(t.voices).every(([k, v]) => /^[a-z0-9-]+$/.test(k) && isNonEmptyStr(v)), '"tts.voices" phải là object { "<id engine>": "<tên giọng>" }');
+      need(t.speed === undefined || (isNum(t.speed) && t.speed >= 0.5 && t.speed <= 2), '"tts.speed" phải trong 0.5..2');
+    }
+  }
+
   const l = raw.layout;
   if (!isObj(l)) {
     need(false, '"layout" phải là object { lineBreak, label, caption }');

@@ -2,12 +2,12 @@
 // (Canonical copy: templates/auto-compare/generate-vo.mjs — scaffold-compare-video.mjs
 //  copies this over the create-video scaffold's generic generate-vo.mjs. LINES is
 //  rewritten per-video by scaffold-compare-video.mjs.)
-// Supports two providers via TTS_PROVIDER in repo-root .env:
-//   "edge" (default in .env.example) — Microsoft Edge TTS (free, no API key), via
-//          edge-tts-universal. ALSO returns per-word boundaries → assets/vo/words.json,
-//          which the running karaoke caption needs. Required for new videos.
-//   "vbee" — Vbee TTS API (VBEE_APP_ID + VBEE_ACCESS_TOKEN). No word boundaries →
-//          no words.json → captions fall back to nothing. Prefer edge.
+//
+// Engines (config/tts-engines/*.json; chosen per market in config/locales/<code>.json → tts):
+//   "edge"  — Microsoft Edge TTS (free, no key), via edge-tts-universal. Returns per-word boundaries.   ┐ shared pipeline
+//   "azure" — Azure AI Speech REST (AZURE_SPEECH_KEY + AZURE_SPEECH_REGION). No boundaries → estimated. ┘ scripts/lib/tts/voiceover.mjs
+//             (audio cache by hash, retry/backoff, automatic fallback between engines, cost-ledger rows)
+//   "vieneu" / "vbee" — Vietnamese only; kept as the original code below (unchanged behaviour).
 // Writes one mp3 per line to assets/vo/ (silence-trimmed to the first/last word
 // boundary), plus assets/vo/durations.json and assets/vo/words.json.
 import fs from "node:fs";
@@ -23,8 +23,8 @@ const REPO_ROOT = path.resolve(ROOT, "..", "..");
 
 function readEnvFile(file, into) {
   if (!fs.existsSync(file)) return;
-  for (const line of fs.readFileSync(file, "utf8").split("\n")) {
-    const m = line.trim().match(/^([A-Z_]+)=(.*)$/);
+  for (const line of fs.readFileSync(file, "utf8").split(/\r?\n/)) {
+    const m = line.trim().match(/^([A-Z][A-Z0-9_]*)=(.*)$/);
     if (m) into[m[1]] = m[2].trim();
   }
 }
@@ -38,57 +38,41 @@ function loadEnv() {
   //    đã fallback y hệt — giữ cho hai bên hành xử giống nhau.
   readEnvFile(path.join(REPO_ROOT, ".env.example"), env);
   // 1. Root .env
-  const rootEnvPath = path.join(REPO_ROOT, ".env");
-  if (fs.existsSync(rootEnvPath)) {
-    const raw = fs.readFileSync(rootEnvPath, "utf8");
-    for (const line of raw.split("\n")) {
-      const m = line.trim().match(/^([A-Z_]+)=(.*)$/);
-      if (m) env[m[1]] = m[2].trim();
-    }
-  }
+  readEnvFile(path.join(REPO_ROOT, ".env"), env);
   // 2. Local video .env (overrides root .env)
-  const localEnvPath = path.join(ROOT, ".env");
-  if (fs.existsSync(localEnvPath)) {
-    const raw = fs.readFileSync(localEnvPath, "utf8");
-    for (const line of raw.split("\n")) {
-      const m = line.trim().match(/^([A-Z_]+)=(.*)$/);
-      if (m) env[m[1]] = m[2].trim();
-    }
-  }
+  readEnvFile(path.join(ROOT, ".env"), env);
   // 3. process.env (overrides all)
-  for (const k of ["TTS_PROVIDER", "VIENEU_VOICE", "EDGE_VOICE", "VBEE_APP_ID", "VBEE_ACCESS_TOKEN", "VBEE_VOICE_CODE"]) {
+  for (const k of ["TTS_PROVIDER", "TTS_VOICE", "VIENEU_VOICE", "EDGE_VOICE", "VBEE_APP_ID", "VBEE_ACCESS_TOKEN", "VBEE_VOICE_CODE", "VIDEO_LOCALE", "AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION", "TTS_CACHE_DIR"]) {
     if (process.env[k]) env[k] = process.env[k];
   }
   return env;
 }
 
 const ENV = loadEnv();
-const TTS_PROVIDER = (ENV.TTS_PROVIDER || "vbee").toLowerCase();
+const REQUESTED_PROVIDER = (ENV.TTS_PROVIDER || "").toLowerCase();
+
+const lib = (...p) => import(pathToFileURL(path.join(REPO_ROOT, "scripts", "lib", ...p)).href);
+const { resolveLocale, defaultLocaleCode } = await lib("locales.mjs");
+// Thị trường của video = VIDEO_LOCALE (scaffold ghi vào .env cục bộ của video), không có thì DEFAULT_LOCALE (process.env / .env gốc).
+const LOCALE = resolveLocale(ENV.VIDEO_LOCALE || defaultLocaleCode());
+
+const SPEED_RATE = 1.1;
 
 // --- Vbee config (only required when TTS_PROVIDER=vbee) ---
 const VBEE_APP_ID = ENV.VBEE_APP_ID;
 const VBEE_ACCESS_TOKEN = ENV.VBEE_ACCESS_TOKEN;
 const VOICE_CODE = ENV.VBEE_VOICE_CODE || "n_hanoi_male_protrainer_education_vc";
 
-// --- Edge TTS config (only required when TTS_PROVIDER=edge) ---
-// Giọng mặc định theo thị trường lấy từ config/tts-engines/edge.json (không hard-code tên giọng ở đây).
-// Thị trường của video = VIDEO_LOCALE (.env cục bộ của video), không có thì DEFAULT_LOCALE (process.env / .env gốc).
-async function edgeDefaultVoice() {
-  const { defaultLocaleCode } = await import(pathToFileURL(path.join(REPO_ROOT, "scripts", "lib", "locales.mjs")).href);
-  const localeCode = ENV.VIDEO_LOCALE || defaultLocaleCode();
-  const cfg = JSON.parse(fs.readFileSync(path.join(REPO_ROOT, "config", "tts-engines", "edge.json"), "utf8"));
-  const voice = cfg.defaultVoices?.[localeCode];
-  if (!voice) throw new Error(`Chưa có giọng Edge TTS mặc định cho "${localeCode}" — đặt EDGE_VOICE trong .env hoặc thêm vào config/tts-engines/edge.json.`);
-  return voice;
-}
-const EDGE_VOICE = ENV.EDGE_VOICE || (await edgeDefaultVoice());
-
 // --- VieNeu TTS config (only required when TTS_PROVIDER=vieneu) ---
 const VIENEU_VOICE = ENV.VIENEU_VOICE || "Adam";
 
-const SPEED_RATE = 1.1;
+// vieneu/vbee chỉ đọc tiếng Việt: thị trường khác vi luôn đi đường Edge/Azure (kể cả khi .env gốc đang đặt TTS_PROVIDER=vieneu).
+const LEGACY_PROVIDERS = ["vieneu", "vbee"];
+const USE_LEGACY = LOCALE.language === "vi" && (REQUESTED_PROVIDER === "" || LEGACY_PROVIDERS.includes(REQUESTED_PROVIDER));
+// Không đặt gì: giữ mặc định cũ của template (vbee) cho tiếng Việt.
+const TTS_PROVIDER = USE_LEGACY ? REQUESTED_PROVIDER || "vbee" : REQUESTED_PROVIDER;
 
-if (TTS_PROVIDER === "vbee") {
+if (USE_LEGACY && TTS_PROVIDER === "vbee") {
   if (!VBEE_APP_ID || !VBEE_ACCESS_TOKEN) {
     throw new Error(
       "TTS_PROVIDER=vbee nhưng thiếu VBEE_APP_ID / VBEE_ACCESS_TOKEN trong .env.\n" +
@@ -96,8 +80,6 @@ if (TTS_PROVIDER === "vbee") {
     );
   }
 }
-
-console.log(`TTS provider: ${TTS_PROVIDER}${TTS_PROVIDER === "vieneu" ? ` (voice: ${VIENEU_VOICE})` : ""}`);
 
 async function generateVieNeuSpeech(text, outPath) {
   // venv layout khác nhau giữa Windows (Scripts/python.exe) và Unix (bin/python).
@@ -146,66 +128,15 @@ const LINES = [
   { id: "line-12", text: "Vàng vàng hay Vàng trắng — giờ thì bạn đã rõ rồi đấy!" },
 ];
 
-// ============================================================
-// Edge TTS — Node.js API via edge-tts-universal (no Python needed)
-// ============================================================
-
-function speedRateToEdgeRate(rate) {
-  const pct = Math.round((rate - 1) * 100);
-  return pct >= 0 ? `+${pct}%` : `${pct}%`;
-}
-
-// Returns { subtitle } where subtitle is Edge TTS's per-word boundary array
-// ([{ text, offset, duration }] in 100-nanosecond units, offset from the start
-// of the *untrimmed* clip). Writes the raw (untrimmed) mp3 to outPath.
-async function generateEdgeSpeech(text, outPath, maxRetries = 8) {
-  const { EdgeTTS } = await import("edge-tts-universal");
-  const rate = speedRateToEdgeRate(SPEED_RATE);
-
-  // Edge TTS's public endpoint intermittently returns "No audio was received"
-  // (empty stream) for a request that succeeds on retry — not text-dependent.
-  // Retry generously with a capped backoff so one flaky line doesn't abort the
-  // whole scaffold run.
-  for (let attempt = 1; attempt <= maxRetries; attempt++) {
-    try {
-      const tts = new EdgeTTS(text, EDGE_VOICE, { rate });
-      const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error("EdgeTTS synthesize timeout (20s)")), 20000),
-      );
-      const result = await Promise.race([tts.synthesize(), timeoutPromise]);
-      const audioBuffer = Buffer.from(await result.audio.arrayBuffer());
-      if (!audioBuffer || audioBuffer.length === 0) {
-        throw new Error("Empty audio buffer returned");
-      }
-      fs.writeFileSync(outPath, audioBuffer);
-      await new Promise((r) => setTimeout(r, 400));
-      return { subtitle: result.subtitle || [] };
-    } catch (err) {
-      if (attempt === maxRetries) throw err;
-      const backoff = Math.min(1500 * attempt, 9000) + Math.floor(Math.random() * 500);
-      console.warn(
-        `  [Thử lại ${attempt}/${maxRetries} cho dòng "${text.slice(0, 20)}..."]: ${err.message} — chờ ${backoff}ms`,
-      );
-      await new Promise((r) => setTimeout(r, backoff));
-    }
-  }
-}
-
-// ---- silence trim (matches the 2026-09-02 pacing fix) --------------------
-// TTS clips carry ~0.2s leading + ~0.8s trailing silence. Trim relative to the
-// first/last WORD BOUNDARY (same source as the karaoke timing, so the two stay
-// consistent) and keep a small margin so soft onsets/decays aren't clipped.
-const TRIM_LEAD = 0.08;
-const TRIM_TRAIL = 0.14;
+// ---- timeline constants (matches the 2026-09-02 pacing fix) --------------
+// TTS clips carry ~0.2s leading + ~0.8s trailing silence; the edge/azure pipeline trims them
+// (scripts/lib/tts/voiceover.mjs: TRIM_LEAD / TRIM_TRAIL, relative to the first/last word boundary).
+// Keep TL_START1 / TL_GAP / TL_OUTRO in sync with scripts/lib/compose.mjs (START_1 / GAP_FLAT / OUTRO_HOLD).
 const TL_START1 = 0.55;        // first VO start (after the entrance animation)
-const TL_GAP = 0.14;           // flat timeline gap. Word-boundary trim (below) keeps
+const TL_GAP = 0.14;           // flat timeline gap. Word-boundary trim keeps
                                // a little more head/tail than the old envelope trim,
                                // so a smaller gap lands speech-to-speech at ~0.5s.
 const TL_OUTRO = 1.2;          // hold after the last clip
-
-function tickToSec(t) {
-  return t / 1e7;
-}
 
 async function ffprobeDuration(filePath) {
   const { stdout } = await execFileAsync("ffprobe", [
@@ -213,14 +144,6 @@ async function ffprobeDuration(filePath) {
     "-of", "default=noprint_wrappers=1:nokey=1", filePath,
   ]);
   return parseFloat(stdout.trim());
-}
-
-async function trimClip(rawPath, finalPath, startSec, durSec) {
-  await execFileAsync("ffmpeg", [
-    "-v", "error", "-y",
-    "-ss", startSec.toFixed(3), "-t", durSec.toFixed(3),
-    "-i", rawPath, "-c:a", "libmp3lame", "-q:a", "2", finalPath,
-  ]);
 }
 
 // ============================================================
@@ -285,17 +208,20 @@ async function downloadAudio(url, outPath) {
   fs.writeFileSync(outPath, buf);
 }
 
-async function main() {
+// ============================================================
+// vieneu / vbee (chỉ tiếng Việt) — vòng lặp gốc, không đổi
+// ============================================================
+async function mainLegacy() {
+  console.log(`TTS provider: ${TTS_PROVIDER}${TTS_PROVIDER === "vieneu" ? ` (voice: ${VIENEU_VOICE})` : ""}`);
   const outDir = path.join(ROOT, "assets", "vo");
   const rawDir = path.join(outDir, ".raw");
   fs.mkdirSync(outDir, { recursive: true });
   fs.mkdirSync(rawDir, { recursive: true });
 
   const durations = {};
-  const words = {};          // { "line-1": [{ t, s, d }] }  (s/d in seconds, relative to TRIMMED clip)
-  const edgeOnly = TTS_PROVIDER === "edge";
+  const words = {};          // { "line-1": [{ t, s, d }] }  (s/d in seconds, relative to the clip)
   const isVieNeu = TTS_PROVIDER === "vieneu";
-  if (!edgeOnly && !isVieNeu) {
+  if (!isVieNeu) {
     console.warn("\n⚠ TTS_PROVIDER != edge/vieneu — Vbee không trả word boundary.\n");
   }
 
@@ -304,52 +230,18 @@ async function main() {
     const finalPath = path.join(outDir, `${line.id}.mp3`);
     process.stdout.write(`Generating ${line.id}: "${line.text}" ... `);
 
-    let subtitle = [];
     if (isVieNeu) {
       await generateVieNeuSpeech(line.text, rawPath);
-    } else if (edgeOnly) {
-      ({ subtitle } = await generateEdgeSpeech(line.text, rawPath));
     } else {
       const audioUrl = await generateVbeeSpeech(line.text);
       await downloadAudio(audioUrl, rawPath);
     }
-
-    // Trim bounds from the word boundaries (Edge) — falls back to no-trim if absent.
-    let trimStart = 0;
-    if (subtitle.length) {
-      const first = tickToSec(subtitle[0].offset);
-      const last = tickToSec(subtitle.at(-1).offset + subtitle.at(-1).duration);
-      const rawDur = await ffprobeDuration(rawPath);
-      trimStart = Math.max(0, first - TRIM_LEAD);
-      const trimEnd = Math.min(rawDur, last + TRIM_TRAIL);
-      await trimClip(rawPath, finalPath, trimStart, trimEnd - trimStart);
-    } else {
-      fs.copyFileSync(rawPath, finalPath);
-    }
+    fs.copyFileSync(rawPath, finalPath);
 
     const dur = await ffprobeDuration(finalPath);
     durations[line.id] = Math.round(dur * 1000) / 1000;
 
-    if (subtitle.length) {
-      // Match display tokens (original text, keeps punctuation like "biệt:" / "đời,")
-      // to Edge word boundaries by index. Drop punctuation-only tokens first
-      // (e.g. a standalone "—") — Edge doesn't emit a boundary for them.
-      const display = line.text
-        .split(/\s+/)
-        .filter((tok) => /[\p{L}\p{N}]/u.test(tok));
-      const wt = subtitle.map((w, i) => ({
-        t: display[i] ?? w.text,
-        s: Math.round(Math.max(0, tickToSec(w.offset) - trimStart) * 1000) / 1000,
-        d: Math.round(tickToSec(w.duration) * 1000) / 1000,
-      }));
-      if (display.length !== subtitle.length) {
-        console.warn(
-          `\n  ⚠ ${line.id}: ${display.length} token chữ vs ${subtitle.length} word boundary — ` +
-          `kiểm tra lại text dòng này.`,
-        );
-      }
-      words[line.id] = wt;
-    } else if (isVieNeu) {
+    if (isVieNeu) {
       // Estimate word boundaries for VieNeu so karaoke captions work smoothly
       const display = line.text.split(/\s+/).filter((tok) => /[\p{L}\p{N}]/u.test(tok));
       if (display.length) {
@@ -361,15 +253,90 @@ async function main() {
         }));
       }
     }
-    console.log(`${dur.toFixed(2)}s${subtitle.length ? `  (${subtitle.length} từ)` : ""}`);
+    console.log(`${dur.toFixed(2)}s`);
   }
 
   fs.writeFileSync(path.join(outDir, "durations.json"), JSON.stringify(durations, null, 2));
   if (Object.keys(words).length) {
     fs.writeFileSync(path.join(outDir, "words.json"), JSON.stringify(words, null, 2));
   }
+  printTimeline(durations, Object.keys(words).length > 0);
+}
 
-  // ---- print the retimed HyperFrames timeline (paste into index.html) -------
+// ============================================================
+// edge / azure — pipeline dùng chung (scripts/lib/tts)
+// ============================================================
+async function mainPipeline() {
+  const { listEngines, engineReadiness } = await lib("capabilities.mjs");
+  const { planEngines, resolveVoice, resolveSpeed } = await lib("tts", "select.mjs");
+  const { runVoiceover } = await lib("tts", "voiceover.mjs");
+  const { createTtsCache } = await lib("tts", "cache.mjs");
+  const { audioTools } = await lib("tts", "audio-tools.mjs");
+  const { appendCostEntry } = await lib("cost-ledger.mjs");
+  const { calcTtsCost } = await import(pathToFileURL(path.join(REPO_ROOT, "config", "pricing.mjs")).href);
+
+  const engineConfigs = listEngines();
+  const readiness = (e) => engineReadiness(e, { env: ENV, repoRoot: REPO_ROOT });
+  const { chain, notes } = planEngines({ locale: LOCALE, requested: REQUESTED_PROVIDER || undefined, engines: engineConfigs, readiness });
+  for (const n of notes) console.log(`ℹ ${n}`);
+  if (!chain.length) {
+    throw new Error(`Không có engine giọng đọc nào dùng được cho ${LOCALE.displayName}. Edge TTS cần mạng; Azure cần AZURE_SPEECH_KEY + AZURE_SPEECH_REGION trong .env.`);
+  }
+
+  // Giọng ghi đè (TTS_VOICE từ UI / EDGE_VOICE cũ) chỉ áp cho engine được chọn rõ ràng và CHỈ khi đúng ngôn ngữ của video
+  // (.env gốc có thể còn EDGE_VOICE=vi-VN-... — không được đem đọc tiếng Nhật).
+  const langOk = (v) => typeof v === "string" && v.startsWith(`${LOCALE.language}-`);
+  const overrideFor = (engineId) => {
+    const raw = engineId === REQUESTED_PROVIDER || (!REQUESTED_PROVIDER && engineId === chain[0]) ? ENV.TTS_VOICE || (engineId === "edge" ? ENV.EDGE_VOICE : "") : "";
+    if (raw && !langOk(raw)) {
+      console.warn(`⚠ Bỏ qua giọng "${raw}" vì không phải giọng ${LOCALE.displayName} — dùng giọng mặc định trong config.`);
+      return "";
+    }
+    return raw;
+  };
+  const voiceFor = (engineId) => resolveVoice({ engine: engineConfigs.find((e) => e.id === engineId), locale: LOCALE, override: overrideFor(engineId) });
+
+  const engines = {};
+  for (const id of chain) {
+    if (id === "edge") {
+      const { EdgeTTS } = await import("edge-tts-universal");
+      const { createEdgeEngine } = await lib("tts", "edge.mjs");
+      engines.edge = createEdgeEngine({ EdgeTTS });
+    } else if (id === "azure") {
+      const { createAzureEngine } = await lib("tts", "azure.mjs");
+      engines.azure = createAzureEngine({ key: ENV.AZURE_SPEECH_KEY, region: ENV.AZURE_SPEECH_REGION });
+    } else {
+      throw new Error(`Engine "${id}" chưa có adapter trong scripts/lib/tts.`);
+    }
+  }
+
+  console.log(`TTS: thị trường ${LOCALE.code}, thứ tự engine: ${chain.join(" → ")}`);
+  const slug = path.basename(ROOT);
+  const outDir = path.join(ROOT, "assets", "vo");
+  const result = await runVoiceover({
+    lines: LINES,
+    locale: LOCALE,
+    chain,
+    engines,
+    voiceFor,
+    speed: resolveSpeed(LOCALE),
+    outDir,
+    cache: createTtsCache(ENV.TTS_CACHE_DIR || undefined),
+    tools: audioTools,
+    ledger: appendCostEntry,
+    costOf: (engineId, characters) => calcTtsCost(engineId, characters),
+    slug,
+    log: (m) => console.log(m),
+    // Edge công khai thỉnh thoảng trả "No audio was received" rồi lại ổn khi thử lại — thử nhiều lần, lùi dần có trần.
+    retry: { maxRetries: 8, baseMs: 1500, maxMs: 9000, jitterMs: 500 },
+    pace: () => new Promise((r) => setTimeout(r, 400)),
+  });
+  console.log(`✔ Giọng đọc xong bằng "${result.engineId}" (${result.voice}): đọc mới ${result.stats.synthesized} dòng (${result.stats.characters} ký tự), dùng lại cache ${result.stats.cached} dòng.`);
+  printTimeline(result.durations, true);
+}
+
+// ---- print the retimed HyperFrames timeline (paste into index.html) -------
+function printTimeline(durations, hasWords) {
   const ids = LINES.map((l) => l.id);
   const starts = {};
   let cur = TL_START1;
@@ -379,7 +346,7 @@ async function main() {
   }
   const total = Math.round((cur - TL_GAP + TL_OUTRO) * 10) / 10;
 
-  console.log("\n--- assets/vo written: durations.json" + (Object.keys(words).length ? " + words.json" : "") + " ---");
+  console.log("\n--- assets/vo written: durations.json" + (hasWords ? " + words.json" : "") + " ---");
   console.log("\n--- <audio> tags (paste into index.html) ---");
   ids.forEach((id, i) => {
     console.log(
@@ -394,7 +361,7 @@ async function main() {
   console.log(`\n--- ROOT_DURATION = ${total}  (data-duration on #root/#scene, both ROOT_DURATION consts, scrubber max, time-display) ---`);
 }
 
-main().catch((err) => {
+(USE_LEGACY ? mainLegacy() : mainPipeline()).catch((err) => {
   console.error(err);
   process.exit(1);
 });

@@ -66,7 +66,7 @@ function fail(msg) {
 // ============================================================
 function parseArgs(argv) {
   const positional = [];
-  const opts = { slug: null, contentPath: null, topicHint: null, skipCheck: false, ttsProvider: null, vieneuVoice: null, edgeVoice: null };
+  const opts = { slug: null, contentPath: null, topicHint: null, skipCheck: false, ttsProvider: null, vieneuVoice: null, edgeVoice: null, ttsVoice: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--slug") opts.slug = argv[++i];
@@ -76,13 +76,14 @@ function parseArgs(argv) {
     else if (a === "--tts-provider") opts.ttsProvider = argv[++i];
     else if (a === "--vieneu-voice") opts.vieneuVoice = argv[++i];
     else if (a === "--edge-voice") opts.edgeVoice = argv[++i];
+    else if (a === "--tts-voice") opts.ttsVoice = argv[++i];
     else if (!a.startsWith("--")) positional.push(a);
     else fail(`Cờ không nhận diện được: ${a}`);
   }
   if (positional.length !== 2) {
     fail(
       "Usage: node scripts/scaffold-compare-video.mjs <left-image> <right-image> " +
-        "[--slug <name>] [--content <path>] [--topic-hint <text>] [--skip-check] [--tts-provider <name>] [--vieneu-voice <voice_or_path>] [--edge-voice <voice>]",
+        "[--slug <name>] [--content <path>] [--topic-hint <text>] [--skip-check] [--tts-provider <name>] [--vieneu-voice <voice_or_path>] [--edge-voice <voice>] [--tts-voice <voice>]",
     );
   }
   opts.left = positional[0];
@@ -606,13 +607,13 @@ async function main() {
   patchGenerateVoLines(target, lines);
 
   // 5b. Ghi .env cục bộ cho video nếu truyền ttsProvider / vieneuVoice
-  const localEnvLines = [];
+  // VIDEO_LOCALE luôn được ghi: generate-vo.mjs dựa vào đó để chọn giọng/ngôn ngữ (không phụ thuộc DEFAULT_LOCALE của máy).
+  const localEnvLines = [`VIDEO_LOCALE=${contentLocale.code}`];
   if (opts.ttsProvider) localEnvLines.push(`TTS_PROVIDER=${opts.ttsProvider}`);
   if (opts.vieneuVoice) localEnvLines.push(`VIENEU_VOICE=${opts.vieneuVoice}`);
   if (opts.edgeVoice) localEnvLines.push(`EDGE_VOICE=${opts.edgeVoice}`);
-  if (localEnvLines.length) {
-    fs.writeFileSync(path.join(target, ".env"), localEnvLines.join("\n") + "\n");
-  }
+  if (opts.ttsVoice) localEnvLines.push(`TTS_VOICE=${opts.ttsVoice}`);
+  fs.writeFileSync(path.join(target, ".env"), localEnvLines.join("\n") + "\n");
 
   // 6. cài dependency (edge-tts-universal) rồi sinh VO thật
   // --ignore-scripts: bare `npm install` here must NOT run the project's lifecycle hooks —

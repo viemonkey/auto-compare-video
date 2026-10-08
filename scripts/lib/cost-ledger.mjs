@@ -33,7 +33,7 @@ export const countsAsVideo = (row) => !!row.slug && row.task !== VERIFICATION_TA
  * @param {object} entry
  * @param {string|null} entry.slug - videos/<slug>/ liên quan, hoặc null nếu chưa xác định
  *   (vd content-generation ở Bước 1 UI chạy trước khi slug được chọn ở Bước 2).
- * @param {"content-generation"|"context-image"} entry.task
+ * @param {"content-generation"|"context-image"|"tts"} entry.task
  * @param {string} entry.model
  * @param {"success"|"error"} entry.status
  * @param {number} [entry.inputTokens] - task content-generation
@@ -45,6 +45,9 @@ export const countsAsVideo = (row) => !!row.slug && row.task !== VERIFICATION_TA
  * @param {number} [entry.attempt] - lần thử thứ mấy (retry)
  * @param {string} [entry.subtask] - tác vụ con (vd "field-rewrite" / "field-translate" ở Bước 2); task vẫn là content-generation để cột chi phí không đổi
  * @param {string} [entry.locale] - mã thị trường (vd "ja-JP") của lần sinh nội dung; dòng cũ không có -> null
+ * @param {string} [entry.engine] - task "tts": engine giọng đọc ("edge" | "azure" ...)
+ * @param {number} [entry.characters] - task "tts": số ký tự đã gửi đọc (Azure tính tiền theo ký tự; Edge chi phí 0)
+ * @param {string} [entry.voice] - task "tts": tên giọng
  */
 export function appendCostEntry(entry) {
   const row = {
@@ -57,6 +60,9 @@ export function appendCostEntry(entry) {
     input_tokens: typeof entry.inputTokens === "number" ? entry.inputTokens : null,
     output_tokens: typeof entry.outputTokens === "number" ? entry.outputTokens : null,
     image_count: typeof entry.imageCount === "number" ? entry.imageCount : null,
+    engine: entry.engine || null,
+    characters: typeof entry.characters === "number" ? entry.characters : null,
+    voice: entry.voice || null,
     cost_usd: entry.status === "success" ? entry.costUsd || 0 : 0,
     status: entry.status,
     http_status: typeof entry.httpStatus === "number" ? entry.httpStatus : null,

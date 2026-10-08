@@ -58,6 +58,30 @@
       {
         "id": "en-US-EmmaNeural",
         "label": "Emma (nữ)"
+      },
+      {
+        "id": "en-US-GuyNeural",
+        "label": "Guy (nam)"
+      },
+      {
+        "id": "en-US-ChristopherNeural",
+        "label": "Christopher (nam)"
+      },
+      {
+        "id": "en-US-EricNeural",
+        "label": "Eric (nam)"
+      },
+      {
+        "id": "en-US-RogerNeural",
+        "label": "Roger (nam)"
+      },
+      {
+        "id": "en-US-JennyNeural",
+        "label": "Jenny (nữ)"
+      },
+      {
+        "id": "en-US-AriaNeural",
+        "label": "Aria (nữ)"
       }
     ],
     "th-TH": [

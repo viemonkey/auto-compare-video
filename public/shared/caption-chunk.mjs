@@ -1,7 +1,7 @@
 // Caption karaoke: (1) gắn dấu câu vào token do TTS trả về, (2) gom token thành các cụm hiện từng lần trên 1 dòng.
 // Module THUẦN, dùng chung server/trình duyệt. Tham số theo thị trường: config/locales/<code>.json → layout.caption.
 import { countGraphemes } from "./text-length.mjs";
-import { NO_START, NO_END } from "./line-break.mjs";
+import { NO_START, NO_END, atomize } from "./line-break.mjs";
 
 const OPENERS = new Set([...NO_END]);
 const isSpace = (c) => /\s/.test(c);
@@ -127,3 +127,14 @@ export function chunkCaption(tokens, p, { fits, kinsoku = false } = {}) {
 
 const firstOf = (s) => [...s][0];
 const lastOf = (s) => [...s].at(-1);
+
+const HAS_LETTER = /[\p{L}\p{N}]/u;
+
+/**
+ * Token caption ƯỚC LƯỢNG từ câu chữ khi chưa có word boundary thật của TTS (Azure REST không trả boundary; kiểm tra ở Bước 2):
+ * từ do Intl.Segmenter (ja/th) hoặc khoảng trắng (vi/en), dấu câu dính vào token liền kề, dấu đứng riêng bị bỏ.
+ */
+export function estimateTokens(text, { language = "en", mode = "space" } = {}) {
+  const atoms = atomize(text, { language, mode }).map((a) => a.text).filter((t) => HAS_LETTER.test(t));
+  return alignBoundaries(text, atoms).tokens;
+}
