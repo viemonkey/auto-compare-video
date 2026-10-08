@@ -36,6 +36,7 @@ import { getConfiguredPages, inspectConfiguredPages } from "./scripts/lib/facebo
 import { graphVersion, isAutoPostEnabled, makeLogger, redactSecrets } from "./scripts/lib/fb-config.mjs";
 import { classifyError } from "./scripts/lib/fb-errors.mjs";
 import { npmCommand } from "./scripts/lib/npm-cmd.mjs";
+import { createJobQueue, runRenderJob, renderFailureMessage, pruneLogs } from "./scripts/lib/render-job.mjs";
 import { extractFailureMessage as geminiFailureMessage } from "./scripts/lib/gemini-retry.mjs";
 import { publishVideo, checkReelStatus } from "./scripts/lib/facebook-post.mjs";
 import {
@@ -117,6 +118,10 @@ const UPLOAD_DIR = path.join(ASSETS_DIR, "uploads");
 const TEMP_DIR = path.join(ASSETS_DIR, "temp");
 // kho thành phẩm — xem archiveAndCleanup()
 const OUTPUT_DIR = path.join(__dirname, "output");
+// Log đầy đủ (stdout + stderr) của từng lần render — mở ra xem khi báo "Render thất bại". Chỉ giữ 50 file mới nhất.
+const RENDER_LOG_DIR = process.env.RENDER_LOG_DIR || path.join(OUTPUT_DIR, "render-logs");
+// Render nặng (Chrome + FFmpeg): chỉ 1 render tại một thời điểm, video sau xếp hàng chờ.
+const renderQueue = createJobQueue({ concurrency: 1 });
 // 2026-09-18: trước đây log chỉ chảy qua SSE tới trình duyệt rồi mất khi đóng tab — không
 // chẩn đoán lại được sự cố (vd 1 batch nhiều video liên tiếp needs_context_image không ra ảnh
 // nào, không có cách nào xem lại vì sao). Giờ mọi dòng log của /api/generate-content và
@@ -729,32 +734,33 @@ app.post("/api/create-video", async (req, res) => {
     const keepProject = req.body?.keepProject === true || process.env.KEEP_PROJECT === "1";
     if (wantRender) {
       say("");
-      say("▶ Đang render MP4 (bước này lâu, khoảng 1-3 phút)...");
-      const render = await new Promise((resolve) => {
-        const npmRender = npmCommand("npm", ["run", "render"]);
-        const child = spawn(npmRender.command, npmRender.args, { cwd: target });
-        let tail = "";
-        const feed = (buf) => {
-          tail += buf.toString();
-          const lines = tail.split("\n");
-          tail = lines.pop() ?? "";
-          // log render rất ồn (mỗi frame 1 dòng) — chỉ đẩy dòng có ý nghĩa
-          for (const l of lines) {
-            if (/error|fail|✖|✔|◇|◆|Render|render|\.mp4/i.test(l) && !l.startsWith("[")) say(l);
-          }
-        };
-        child.stdout.on("data", feed);
-        child.stderr.on("data", feed);
-        child.on("error", () => resolve(-1));
-        child.on("close", (code) => resolve(code));
-      });
+      say("▶ Chuẩn bị render MP4 (bước này lâu, khoảng 1-3 phút)...");
+      const job = await renderQueue.enqueue(
+        () => {
+          say("▶ Đang render MP4 (log đầy đủ lưu ở output/render-logs/)...");
+          const npmRender = npmCommand("npm", ["run", "render"]);
+          return runRenderJob({
+            command: npmRender.command,
+            args: npmRender.args,
+            cwd: target,
+            slug,
+            logDir: RENDER_LOG_DIR,
+            // log render rất ồn (mỗi frame 1 dòng, các dòng [INFO]) — chỉ đẩy dòng có ý nghĩa lên màn hình; TOÀN BỘ vẫn nằm trong file log
+            onLine: (l) => {
+              if (!l.startsWith("[INFO]") && /error|fail|✖|✔|◇|◆|Render|render|\.mp4/i.test(l)) say(l);
+            },
+          });
+        },
+        { onWait: (ahead) => say(`⏳ Đang có ${ahead} video khác được render trước — video này xếp hàng chờ (mỗi lúc chỉ render 1 video).`) },
+      );
+      pruneLogs(RENDER_LOG_DIR, 50);
+      const render = job.code;
 
       const file = latestRender(slug);
       if (render !== 0 || !file) {
         // project vẫn dùng được, chỉ thiếu MP4 — báo chứ không huỷ cả run.
         // Cũng KHÔNG dọn ở nhánh này: dọn khi chưa có MP4 là mất trắng.
-        say(`⚠ Render không thành công (mã ${render}). Project đã dựng xong, render lại bằng:`);
-        say(`   cd videos/${slug} && npm run render`);
+        say(`⚠ ${renderFailureMessage({ slug, code: job.code, signal: job.signal, tail: job.tail, logFile: job.logFile, error: job.error })}`);
       } else {
         renderUrl = file;
         say(`✔ MP4: ${file}`);
