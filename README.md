@@ -287,9 +287,13 @@ tới dòng chi phí thật nào khác đã có trong file.
 ## 🌏 Đa thị trường
 
 Web UI hỗ trợ nhiều **thị trường** (vi-VN mặc định, ja-JP, en-US, th-TH): Gemini viết nội dung bằng ngôn ngữ đích theo văn phong/thuật ngữ của thị trường kèm **dòng nghĩa tiếng Việt** để bạn kiểm soát được nội dung dù không đọc được ngôn ngữ đó; Bước 2 có trình soạn song ngữ, lưu nháp, và tạo phiên bản thị trường khác từ cùng 2 ảnh
-(giữ nguyên đối tượng/ý của bản gốc). Hiện chỉ vi-VN **dựng được video** — các thị trường khác sinh/sửa/lưu nháp được (xem giới hạn và lộ trình ở tài liệu).
+(giữ nguyên đối tượng/ý của bản gốc). **Cả 4 thị trường đều dựng được video** (font local OFL, ngắt dòng theo ngôn ngữ, đo chữ vừa khung bằng font thật, giọng Edge TTS miễn phí + Azure AI Speech dự phòng).
 
-Hướng dẫn đầy đủ — **cách thêm thị trường mới**, cấu trúc `config/locales | hashtags | tts-engines | themes`, quy tắc văn phong, cách dùng Bước 2 song ngữ, model fallback (`GEMINI_FALLBACK_MODEL`), bảng giá, dọn thư mục sau render, kế hoạch Giai đoạn 2/3: [docs/phase1-markets.md](docs/phase1-markets.md).
+- **Dựng video từng thị trường / đổi giọng / bật Azure bằng khoá / giới hạn chữ theo thị trường:** [docs/video-markets.md](docs/video-markets.md).
+- Giọng ja/en/th mặc định (nam, đổi trong `config/locales/<mã>.json` → `tts`): Keita · Andrew · Niwat. Có `AZURE_SPEECH_KEY` + `AZURE_SPEECH_REGION` trong `.env` thì Azure được dùng trước, Edge lỗi liên tục sẽ tự chuyển sang Azure.
+- Font: [assets/fonts/README.md](assets/fonts/README.md). Kiểm tra bố cục chữ của 1 video đã dựng: `node scripts/verify-video-layout.mjs videos/<slug>`.
+
+Hướng dẫn đầy đủ — **cách thêm thị trường mới**, cấu trúc `config/locales | hashtags | tts-engines | themes`, quy tắc văn phong, cách dùng Bước 2 song ngữ, model fallback (`GEMINI_FALLBACK_MODEL`), bảng giá, dọn thư mục sau render, kế hoạch Giai đoạn 3: [docs/phase1-markets.md](docs/phase1-markets.md).
 
 ## 📣 Đăng Reels lên Facebook tự động
 

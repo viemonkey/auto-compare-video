@@ -1,7 +1,7 @@
 # Giai đoạn 1 — Đa thị trường (locale): hướng dẫn & tổng kết
 
 Tài liệu này mô tả hệ thống **thị trường (locale)** của web UI (`npm run ui`): cấu trúc file cấu hình, cách thêm thị trường mới,
-quy tắc văn phong, Bước 2 song ngữ, model Gemini + fallback, bảng giá, và những gì còn thiếu cho Giai đoạn 2/3.
+quy tắc văn phong, Bước 2 song ngữ, model Gemini + fallback, bảng giá, và lộ trình. (Giai đoạn 2 — dựng video ja/en/th — đã xong: xem [video-markets.md](video-markets.md).)
 
 ## 1. Khái niệm
 
@@ -10,7 +10,7 @@ quy tắc văn phong, Bước 2 song ngữ, model Gemini + fallback, bảng giá
 - **Thị trường mặc định**: `DEFAULT_LOCALE` (env hoặc `.env`), không đặt thì `vi-VN`.
 - **Thị trường có "nghĩa tiếng Việt"** (mọi thị trường có `language` ≠ `vi`): Gemini viết mỗi dòng hiển thị dưới dạng `{ "text": <chữ đích>, "vi": <nghĩa tiếng Việt sát nghĩa> }`
   để người vận hành không đọc được ngôn ngữ đích vẫn kiểm soát được nội dung. Thị trường tiếng Việt dùng chuỗi phẳng.
-- **"Chưa dựng được video"**: thị trường vẫn sinh/sửa/lưu nháp kịch bản bình thường nhưng nút dựng video bị khoá cho tới khi đủ năng lực render (mục 3).
+- **"Chưa dựng được video"**: thị trường thiếu năng lực render (giọng đọc / font / pipeline) vẫn sinh/sửa/lưu nháp kịch bản bình thường nhưng nút dựng video bị khoá (mục 3). Hiện cả 4 thị trường đều dựng được — xem [video-markets.md](video-markets.md).
 
 ## 2. Cấu trúc file
 
@@ -92,21 +92,18 @@ An toàn: chỉ xoá khi thư mục nằm trong `videos/` **và** `output/<slug>
 **Đã có (Giai đoạn 1):** hệ thống locale bằng file JSON; sinh nội dung song ngữ + glossary + cụm cấm + giới hạn độ dài theo thị trường; Bước 2 song ngữ (3 chế độ xem, viết lại/dịch lại từng dòng, cảnh báo, khoá render);
 hashtag theo thị trường + caption đăng Facebook đúng thị trường (page gắn `FB_PAGE_n_LOCALE`); bản nháp, mở lại, tạo phiên bản thị trường khác với dữ kiện cố định; fallback model; bảng giá/chi phí theo thị trường.
 
-**Giới hạn:** chỉ thị trường `vi-VN` **dựng được video** (theme "Giấy Kẻ Ô" chỉ có font Latin/Việt, TTS Edge đã khai báo giọng ja/en/th nhưng pipeline chưa kiểm chứng). Nghĩa tiếng Việt do Gemini viết — là **công cụ kiểm tra**, không phải đảm bảo tuyệt đối.
+**Giới hạn:** Nghĩa tiếng Việt do Gemini viết — là **công cụ kiểm tra**, không phải đảm bảo tuyệt đối.
 Đối chiếu dữ kiện bản gốc so nhãn bằng so khớp chữ lỏng (bỏ dấu/hoa thường/chứa nhau), không so ngữ nghĩa; lệch ý ở các điểm so sánh chỉ phát hiện được qua số điểm + khung "ý nhập ↔ nghĩa mới" khi viết lại.
 Tỷ giá USD→VND ở thống kê chi phí là hằng số ước tính (26.000đ) trong `public/app.js`.
 
-### Giai đoạn 2 — dựng được video cho ja / en / th (ước lượng ~6–9 người-ngày)
+### Giai đoạn 2 — dựng được video cho ja / en / th: **ĐÃ XONG**
 
-| Việc | Nội dung | Ước lượng |
-|---|---|---|
-| Font CJK / Thái | Nhúng Noto Sans JP / Noto Sans Thai (subset, `@font-face` + `unicode-range`) vào template; khai báo `scripts` ("Jpan", "Thai") + `languages` trong theme → mở khoá nút dựng. Dung lượng font và thời gian render tăng | 1–1.5 ngày |
-| Ngắt dòng | CJK không có khoảng trắng: `line-break: strict` + `word-break` phù hợp, cấm ngắt trước dấu 、。」; Thái cần tách từ (`Intl.Segmenter('th')` hoặc chèn `<wbr>`); caption karaoke hiện chạy theo **từ** (khoảng trắng) nên cần chuyển sang theo cụm/ký tự cho ja/th | 2–3 ngày |
-| Kiểm tra tràn chữ | Đo hộp chữ tag/sub/caption trong trình duyệt headless trước khi render (đo `scrollWidth/Height` so với khung), báo tràn ở Bước 2 thay vì phát hiện sau render; hiệu chỉnh `limits` từng locale theo số đo thật | 2–3 ngày |
-| Kiểm chứng | Render thử mỗi thị trường, chỉnh theme (cỡ chữ, bề rộng thẻ), thêm snapshot test | 1–1.5 ngày |
+Font local OFL + fallback theo thị trường, ngắt dòng (`Intl.Segmenter`, kinsoku), đo chữ vừa khung bằng Chrome + font thật (tự giảm cỡ, báo tràn ở Bước 2, chặn dựng), giọng Edge mặc định,
+dựng thử thật cả 4 thị trường. Chi tiết, tham số và cách dùng: [video-markets.md](video-markets.md); font: [../assets/fonts/README.md](../assets/fonts/README.md).
 
 ### Giai đoạn 3 — giọng đọc đa ngôn ngữ (ước lượng ~5–8 người-ngày)
 
-- **Edge TTS không phải API chính thức** (thư viện `edge-tts-universal` dùng endpoint của trình duyệt Edge): có thể bị chặn/đổi bất cứ lúc nào, điều khoản không cho phép dùng thương mại rõ ràng. Với video đăng kênh kiếm tiền nên cân nhắc **Azure AI Speech (TTS)** — cùng họ giọng Neural, có SLA, giá theo ký tự (có gói miễn phí hàng tháng), trả **word boundary** (cần cho karaoke caption) và hỗ trợ SSML (ngắt nghỉ, tốc độ, đọc số/ngày đúng ngôn ngữ).
-- Việc: viết engine `config/tts-engines/azure.json` + bước sinh VO tương ứng (~2 ngày); mapping giọng theo locale; chuẩn hoá cách đọc (số, đơn vị, tên khoáng vật, tiếng Nhật kanji đa âm — dùng SSML `<sub>`/`<phoneme>`) (~2 ngày); cắt lặng/đồng bộ thời lượng từng câu theo ngôn ngữ (xem ghi chú pacing: đệm mp3 mới là thứ làm khoảng nghỉ kéo dài) (~1 ngày); kiểm chứng nghe thử + chi phí (~1 ngày).
+- **Edge TTS không phải API chính thức** (thư viện `edge-tts-universal` dùng endpoint của trình duyệt Edge): có thể bị chặn/đổi bất cứ lúc nào, điều khoản không cho phép dùng thương mại rõ ràng. Với video đăng kênh kiếm tiền nên cân nhắc **Azure AI Speech (TTS)** — cùng họ giọng Neural, có SLA, giá theo ký tự (có gói miễn phí hàng tháng), (LƯU Ý: **REST** của Azure không trả word boundary — chỉ Speech SDK/WebSocket mới có; adapter hiện tại dùng REST và **ước lượng** timing karaoke từ thời lượng file thật) và hỗ trợ SSML (ngắt nghỉ, tốc độ, đọc số/ngày đúng ngôn ngữ).
+- **Đã làm:** adapter Azure REST (`scripts/lib/tts/azure.mjs`, `config/tts-engines/azure.json`), ưu tiên engine theo `tts.priority` của thị trường, tự chuyển Edge → Azure khi Edge lỗi liên tục, giá theo ký tự trong `config/pricing.mjs`, cache audio theo hash, cắt lặng/đồng bộ thời lượng như luồng vi-VN, dòng chi phí `task: "tts"`. Bật bằng khoá: [video-markets.md § 3](video-markets.md).
+- **Chưa làm:** word boundary thật từ Azure (cần Speech SDK/WebSocket thay cho REST); chuẩn hoá cách đọc (số, đơn vị, tên khoáng vật, kanji đa âm — SSML `<sub>`/`<phoneme>`); nghe thử chất lượng Azure và đối chiếu giá trên trang chính thức (chưa có khoá Azure để thử thật).
 - Cần quyết định trước: Azure hay giữ Edge cho bản thử; tài khoản + key Azure; ngân sách/ký tự mỗi video.
