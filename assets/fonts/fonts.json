@@ -1,0 +1,45 @@
+{
+  "$comment": "Registry font cho video (mọi font giấy phép OFL, lưu local — KHÔNG tải CDN lúc render). Locale khai báo font qua config/locales/<code>.json → fonts.display / fonts.mono (tên family trong đây). Scaffold copy các file được dùng sang videos/<slug>/assets/fonts/. Nguồn + giấy phép: assets/fonts/README.md.",
+  "families": {
+    "Be Vietnam Pro": {
+      "license": "OFL-1.1",
+      "faces": [
+        {
+          "file": "be-vietnam-pro/BeVietnamPro-Black-vietnamese.woff2",
+          "weight": 900,
+          "style": "normal",
+          "unicodeRange": "U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB"
+        },
+        {
+          "file": "be-vietnam-pro/BeVietnamPro-Black-latin.woff2",
+          "weight": 900,
+          "style": "normal",
+          "unicodeRange": "U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD"
+        }
+      ]
+    },
+    "JetBrains Mono": {
+      "license": "OFL-1.1",
+      "faces": [
+        {
+          "file": "jetbrains-mono/JetBrainsMono-Bold-vietnamese.woff2",
+          "weight": 700,
+          "style": "normal",
+          "unicodeRange": "U+0102-0103, U+0110-0111, U+0128-0129, U+0168-0169, U+01A0-01A1, U+01AF-01B0, U+0300-0301, U+0303-0304, U+0308-0309, U+0323, U+0329, U+1EA0-1EF9, U+20AB"
+        }
+      ]
+    },
+    "Noto Sans JP": {
+      "license": "OFL-1.1",
+      "faces": [
+        { "file": "noto-sans-jp/NotoSansJP-Black-subset.woff2", "weight": 900, "style": "normal" }
+      ]
+    },
+    "Noto Sans Thai": {
+      "license": "OFL-1.1",
+      "faces": [
+        { "file": "noto-sans-thai/NotoSansThai-Black.woff2", "weight": 900, "style": "normal" }
+      ]
+    }
+  }
+}

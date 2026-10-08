@@ -7,6 +7,62 @@
   "flag": "🇺🇸",
   "enabled": true,
   "slugSuffix": "en",
+  "fonts": {
+    "display": [
+      "Be Vietnam Pro"
+    ],
+    "mono": [
+      "JetBrains Mono",
+      "Be Vietnam Pro"
+    ]
+  },
+  "video": {
+    "htmlLang": "en",
+    "eyebrow": "KNOWLEDGE COMPARISON",
+    "docTitle": "Compare — {left} vs {right}",
+    "hookLine": "This is {label}.",
+    "payoffLine": "{left} or {right} — now you know the difference!",
+    "payoffTag": "Which one are you picking?",
+    "payoffSub": "Tell us in the comments",
+    "italic": true,
+    "uppercase": true
+  },
+  "layout": {
+    "lineBreak": {
+      "mode": "space",
+      "kinsoku": false
+    },
+    "label": {
+      "fontPx": 46,
+      "minFontPx": 30,
+      "stepPx": 2,
+      "maxLines": 2,
+      "maxUnitsPerLine": 18
+    },
+    "caption": {
+      "fontPx": 44,
+      "minFontPx": 30,
+      "stepPx": 2,
+      "maxTokens": 4,
+      "hardMaxTokens": 5,
+      "maxUnits": 24,
+      "clauseMinTokens": 2,
+      "clauseEnders": ",.:;!?",
+      "joiner": " ",
+      "wordGapPx": 16,
+      "activeScale": 1.13
+    }
+  },
+  "tts": {
+    "priority": [
+      "azure",
+      "edge"
+    ],
+    "voices": {
+      "edge": "en-US-AndrewNeural",
+      "azure": "en-US-AndrewNeural"
+    }
+  },
   "styleSummary": "Direct, strong hook, conversational, no unverifiable marketing claims",
   "styleGuide": "- Giọng điệu: trực diện, tự tin, trò chuyện như người Mỹ giải thích cho bạn bè; được dùng dạng viết tắt (it's, don't). Dùng tiếng Anh Mỹ (US spelling, carat, Mohs scale).\n- Hook mạnh ngay 5 từ đầu: một câu hỏi hoặc một sự thật bất ngờ, ví dụ \"Diamond or moissanite? Most people can't tell.\" / \"Why does amethyst fade in the sun?\".\n- Câu ngắn, mạnh, thể chủ động (active voice), mỗi câu 1 ý (khoảng 8-18 từ). Không dùng từ lóng thái quá, không dùng emoji.\n- Tránh tuyên bố quảng cáo không kiểm chứng và so sánh tuyệt đối: không \"best in the world\", \"guaranteed\", \"100% genuine\", \"investment-grade\". Dùng số liệu/tính chất kiểm chứng được (Mohs hardness, refractive index, carat) thay cho tính từ khen.\n- Không hứa hẹn giá trị đầu tư; không gọi hàng khác là \"fake\" hay \"cheap\" — nói \"lab-grown\", \"synthetic\", \"imitation\" đúng nghĩa.\n- Dùng đúng thuật ngữ trong glossary.\n- Ý nghĩa biểu tượng/tâm linh: ĐƯỢC PHÉP nêu như ý nghĩa biểu tượng/văn hoá — viết dạng \"is said to symbolize…\", \"is traditionally seen as a symbol of…\", \"is often associated with…\". TUYỆT ĐỐI KHÔNG khẳng định công dụng: \"brings luck\", \"protects you\", \"heals\", \"attracts wealth\", \"makes you rich\"… (xem các cụm bị cấm).\n- Phân biệt hardness (độ cứng — chống trầy, thang Mohs) và toughness (độ dai — chống nứt vỡ khi va đập). Khi nói về thang Mohs PHẢI dùng \"hard\"/\"hardness\" (vd \"scores a 9 on the Mohs hardness scale\"), KHÔNG dùng \"tough\"/\"toughness\" cho thang Mohs; chỉ dùng \"tough/toughness\" khi nói về khả năng chống vỡ (vd \"jade is tougher than diamond\").",
   "glossary": {

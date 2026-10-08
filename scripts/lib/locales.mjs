@@ -7,6 +7,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { makeLogger } from "./fb-config.mjs";
+import { loadFontRegistry, unknownFamilies } from "./fonts.mjs";
 
 const log = makeLogger("locales");
 
@@ -54,6 +55,63 @@ export function glossaryEntries(locale) {
   );
 }
 
+// Các khối cấu hình dựng video của 1 thị trường: fonts (chuỗi font theo registry assets/fonts/fonts.json), video (chữ cố định
+// trên màn hình + kiểu chữ), layout (ngắt dòng + giới hạn khung chữ). Xem docs/video-text-layout.md.
+const isNum = (v) => typeof v === "number" && Number.isFinite(v);
+const VIDEO_STRING_KEYS = ["htmlLang", "eyebrow", "docTitle", "hookLine", "payoffLine", "payoffTag", "payoffSub"];
+export const LINE_BREAK_MODES = ["space", "segmenter"];
+function validateVideoBlocks(raw, repoRoot, need) {
+  const f = raw.fonts;
+  if (!isObj(f)) {
+    need(false, '"fonts" phải là object { display: [family...], mono: [family...] }');
+  } else {
+    let registry = null;
+    try { registry = loadFontRegistry(path.join(repoRoot, "assets", "fonts")); } catch (e) { need(false, `không đọc được registry font assets/fonts/fonts.json: ${e.message}`); }
+    for (const k of ["display", "mono"]) {
+      const chain = f[k];
+      need(Array.isArray(chain) && chain.length > 0 && chain.every(isNonEmptyStr), `"fonts.${k}" phải là mảng tên font không rỗng`);
+      if (registry && Array.isArray(chain) && chain.every(isNonEmptyStr)) {
+        const unknown = unknownFamilies(chain, registry);
+        need(!unknown.length, `"fonts.${k}" có font không có trong assets/fonts/fonts.json: ${unknown.join(", ")}`);
+      }
+    }
+  }
+
+  const v = raw.video;
+  if (!isObj(v)) {
+    need(false, '"video" phải là object (chữ cố định + kiểu chữ trên màn hình)');
+  } else {
+    for (const k of VIDEO_STRING_KEYS) need(isNonEmptyStr(v[k]), `"video.${k}" phải là chuỗi không rỗng`);
+    need(isStr(v.hookLine) && v.hookLine.includes("{label}"), '"video.hookLine" phải chứa {label}');
+    need(isStr(v.payoffLine) && v.payoffLine.includes("{left}") && v.payoffLine.includes("{right}"), '"video.payoffLine" phải chứa {left} và {right}');
+    need(isStr(v.docTitle) && v.docTitle.includes("{left}") && v.docTitle.includes("{right}"), '"video.docTitle" phải chứa {left} và {right}');
+    need(typeof v.italic === "boolean" && typeof v.uppercase === "boolean", '"video.italic" và "video.uppercase" phải là boolean');
+  }
+
+  const l = raw.layout;
+  if (!isObj(l)) {
+    need(false, '"layout" phải là object { lineBreak, label, caption }');
+    return;
+  }
+  need(isObj(l.lineBreak) && LINE_BREAK_MODES.includes(l.lineBreak.mode) && typeof l.lineBreak.kinsoku === "boolean",
+    `"layout.lineBreak" phải là { mode: ${LINE_BREAK_MODES.map((m) => `"${m}"`).join(" | ")}, kinsoku: boolean }`);
+  const fitBox = (name, box, extra) => {
+    if (!isObj(box)) { need(false, `"layout.${name}" phải là object`); return; }
+    for (const k of ["fontPx", "minFontPx", "stepPx", ...extra]) need(isPosInt(box[k]), `"layout.${name}.${k}" phải là số nguyên dương`);
+    need(isPosInt(box.fontPx) && isPosInt(box.minFontPx) && box.minFontPx <= box.fontPx, `"layout.${name}.minFontPx" không được lớn hơn fontPx`);
+  };
+  fitBox("label", l.label, ["maxLines", "maxUnitsPerLine"]);
+  fitBox("caption", l.caption, ["maxTokens", "hardMaxTokens", "maxUnits", "clauseMinTokens"]);
+  const c = l.caption;
+  if (isObj(c)) {
+    need(isPosInt(c.hardMaxTokens) && isPosInt(c.maxTokens) && c.hardMaxTokens >= c.maxTokens, '"layout.caption.hardMaxTokens" phải >= maxTokens');
+    need(isStr(c.clauseEnders) && c.clauseEnders.length > 0, '"layout.caption.clauseEnders" phải là chuỗi các dấu ngắt vế');
+    need(isStr(c.joiner) && (c.joiner === "" || c.joiner === " "), '"layout.caption.joiner" phải là "" hoặc " "');
+    need(isNum(c.wordGapPx) && c.wordGapPx >= 0, '"layout.caption.wordGapPx" phải là số >= 0');
+    need(isNum(c.activeScale) && c.activeScale >= 1 && c.activeScale <= 1.5, '"layout.caption.activeScale" phải trong 1..1.5');
+  }
+}
+
 /**
  * Kiểm tra 1 locale thô. Trả { locale, problems }: problems rỗng = hợp lệ.
  * @param {object} raw
@@ -79,6 +137,8 @@ export function validateLocale(raw, { repoRoot = REPO_ROOT } = {}) {
   need(isStr(raw.slugSuffix) && /^[a-z0-9]+(-[a-z0-9]+)*$|^$/.test(raw.slugSuffix), '"slugSuffix" phải là chuỗi a-z0-9 (có thể rỗng)');
   need(isNonEmptyStr(raw.styleSummary), '"styleSummary" phải là chuỗi không rỗng (mô tả văn phong 1 dòng hiện ở UI)');
   need(isStr(raw.styleGuide), '"styleGuide" phải là chuỗi (có thể rỗng với thị trường mặc định)');
+
+  validateVideoBlocks(raw, repoRoot, need);
 
   need(isObj(raw.glossary) && Object.keys(raw.glossary).every((k) => k.trim()) && Object.values(raw.glossary).every(isGlossaryEntry),
     '"glossary" phải là object { "<khái niệm tiếng Việt>": "<thuật ngữ đích>" | { "term": "...", "ambiguous"?: true, "contexts"?: ["<cụm tiếng Việt>"] } }');

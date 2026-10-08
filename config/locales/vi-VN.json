@@ -7,6 +7,51 @@
   "flag": "🇻🇳",
   "enabled": true,
   "slugSuffix": "",
+  "fonts": {
+    "display": [
+      "Be Vietnam Pro"
+    ],
+    "mono": [
+      "JetBrains Mono"
+    ]
+  },
+  "video": {
+    "htmlLang": "vi",
+    "eyebrow": "SO SÁNH KIẾN THỨC",
+    "docTitle": "So sánh — {left} vs {right}",
+    "hookLine": "Đây là {label}.",
+    "payoffLine": "{left} hay {right} — giờ thì bạn đã rõ rồi đấy!",
+    "payoffTag": "Bạn chọn bên nào?",
+    "payoffSub": "Comment cho mình biết nhé",
+    "italic": true,
+    "uppercase": true
+  },
+  "layout": {
+    "lineBreak": {
+      "mode": "space",
+      "kinsoku": false
+    },
+    "label": {
+      "fontPx": 46,
+      "minFontPx": 30,
+      "stepPx": 2,
+      "maxLines": 2,
+      "maxUnitsPerLine": 22
+    },
+    "caption": {
+      "fontPx": 44,
+      "minFontPx": 30,
+      "stepPx": 2,
+      "maxTokens": 4,
+      "hardMaxTokens": 5,
+      "maxUnits": 22,
+      "clauseMinTokens": 2,
+      "clauseEnders": ",.:;!?",
+      "joiner": " ",
+      "wordGapPx": 16,
+      "activeScale": 1.13
+    }
+  },
   "styleSummary": "Gần gũi, tò mò kiểu viral, câu ngắn, giáo dục nhẹ",
   "styleGuide": "- Ý nghĩa biểu tượng/tâm linh: ĐƯỢC PHÉP nêu như ý nghĩa văn hoá, biểu tượng — viết dạng \"tượng trưng cho…\", \"được xem là…\", \"theo quan niệm…\". TUYỆT ĐỐI KHÔNG khẳng định công dụng: mang lại may mắn, bảo vệ/hộ mệnh, chữa bệnh/chữa lành, giúp giàu có, thu hút tài lộc, xua đuổi tà ma… (xem các cụm bị cấm).\n- Phân biệt độ cứng (khả năng chống trầy xước — thang Mohs) và độ dai (khả năng chống nứt vỡ khi va đập). Nói về thang Mohs thì dùng \"độ cứng\"/\"cứng\", không dùng \"dai\"/\"bền\" thay cho nghĩa này; chỉ dùng \"độ dai\"/\"chịu va đập\" khi nói về khả năng chống vỡ.",
   "glossary": {},

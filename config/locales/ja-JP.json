@@ -7,6 +7,63 @@
   "flag": "🇯🇵",
   "enabled": true,
   "slugSuffix": "ja",
+  "fonts": {
+    "display": [
+      "Noto Sans JP",
+      "Be Vietnam Pro"
+    ],
+    "mono": [
+      "JetBrains Mono",
+      "Noto Sans JP"
+    ]
+  },
+  "video": {
+    "htmlLang": "ja",
+    "eyebrow": "豆知識くらべ",
+    "docTitle": "比較 — {left} vs {right}",
+    "hookLine": "これは{label}です。",
+    "payoffLine": "{left}と{right}、もうわかりましたね！",
+    "payoffTag": "あなたはどっち？",
+    "payoffSub": "コメントで教えてくださいね",
+    "italic": false,
+    "uppercase": false
+  },
+  "layout": {
+    "lineBreak": {
+      "mode": "segmenter",
+      "kinsoku": true
+    },
+    "label": {
+      "fontPx": 46,
+      "minFontPx": 28,
+      "stepPx": 2,
+      "maxLines": 2,
+      "maxUnitsPerLine": 9
+    },
+    "caption": {
+      "fontPx": 44,
+      "minFontPx": 30,
+      "stepPx": 2,
+      "maxTokens": 9,
+      "hardMaxTokens": 11,
+      "maxUnits": 14,
+      "clauseMinTokens": 2,
+      "clauseEnders": "、。！？，．：；,.!?",
+      "joiner": "",
+      "wordGapPx": 0,
+      "activeScale": 1.06
+    }
+  },
+  "tts": {
+    "priority": [
+      "azure",
+      "edge"
+    ],
+    "voices": {
+      "edge": "ja-JP-KeitaNeural",
+      "azure": "ja-JP-KeitaNeural"
+    }
+  },
   "styleSummary": "Lịch sự です/ます, câu ngắn, khiêm tốn, tránh khẳng định tuyệt đối",
   "styleGuide": "- Giọng điệu: lịch sự, điềm đạm, khiêm tốn như người giới thiệu kiến thức cho khán giả Nhật. Dùng thể lịch sự です/ます (丁寧語) NHẤT QUÁN trong toàn bộ video; không trộn thể thường だ/である (ngoại lệ duy nhất: \"tag\"/\"sub\" trên màn hình là cụm danh từ ngắn).\n- Câu ngắn, mỗi câu 1 ý, khoảng 20-35 chữ; tránh câu lồng nhiều mệnh đề. Không dùng kính ngữ nặng (尊敬語/謙譲語 quá mức).\n- Mở đầu thu hút bằng câu hỏi gần gũi, ví dụ 「〇〇と△△、違いを知っていますか？」 hoặc 「〇〇と△△の違いは？」.\n- Tránh khẳng định tuyệt đối: không dùng 絶対, 必ず, 最高, 世界一, 一番 để khen sản phẩm; ưu tiên các cách nói giảm như 〜と言われています, 〜とされています, 〜傾向があります, 〜の場合が多いです.\n- Không dùng ngôn từ quảng cáo thổi phồng, không hứa hẹn giá trị đầu tư hay lợi nhuận, không so sánh giá cả kiểu \"rẻ/đắt\" tuyệt đối; nêu sự khác biệt dựa trên tính chất (độ cứng, màu sắc, độ bền, cách chăm sóc).\n- Tên đá quý/kim loại dùng đúng thuật ngữ trong glossary (katakana chuẩn như ダイヤモンド, アメジスト). Không chèn chữ Việt hay romaji vào câu.\n- Không dùng emoji. \"tag\"/\"sub\" không có dấu 。 ở cuối.\n- Ý nghĩa biểu tượng/tâm linh: ĐƯỢC PHÉP nêu như ý nghĩa biểu tượng, văn hoá — viết dạng 「〜を象徴するとされています」「〜の象徴と言われています」「〜と考えられてきました」. TUYỆT ĐỐI KHÔNG khẳng định công dụng: 運気が上がる, 守ってくれる, 病気が治る, お金持ちになる, 金運アップ, 厄除け… (xem các cụm bị cấm).\n- Phân biệt 硬度 (độ cứng, chống trầy — モース硬度) và 靭性 (độ dai, chống nứt vỡ — 割れにくさ). Khi nói về thang Mohs PHẢI dùng 「硬度」「硬い」, KHÔNG dùng 「頑丈」「丈夫」「強い」 với nghĩa độ cứng; chỉ dùng 「靭性」「割れにくい」 khi nói về khả năng chống vỡ.",
   "glossary": {

@@ -35,6 +35,7 @@ import { stripDiacritics, slugify } from "./lib/slug.mjs";
 import { resolveLocale } from "./lib/locales.mjs";
 import { baseSlugFromContent, slugForLocale } from "./lib/market-slug.mjs";
 import { checkRenderability } from "./lib/capabilities.mjs";
+import { fontFaceCss, fontStack, copyFontsToVideo, familiesOfLocale } from "./lib/fonts.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -527,7 +528,7 @@ function buildTimelineBeatsJs(lines, cardExts) {
 // ============================================================
 // Ghi index.html từ templates/auto-compare/index.html
 // ============================================================
-function buildIndexHtml(target, content, lines, timingResult, cardExts) {
+function buildIndexHtml(target, content, lines, timingResult, cardExts, locale) {
   const templatePath = path.join(REPO_ROOT, "templates", "auto-compare", "index.html");
   let html = fs.readFileSync(templatePath, "utf8");
 
@@ -554,6 +555,10 @@ function buildIndexHtml(target, content, lines, timingResult, cardExts) {
   const timelineBeatsJs = buildTimelineBeatsJs(lines, cardExts);
 
   html = html
+    .replace(/__HTML_LANG__/g, locale.video.htmlLang)
+    .replace("/*FONT_FACES*/", () => fontFaceCss(familiesOfLocale(locale)))
+    .replace(/__FONT_DISPLAY__/g, () => fontStack(locale.fonts.display, "sans-serif"))
+    .replace(/__FONT_MONO__/g, () => fontStack(locale.fonts.mono, "monospace"))
     .replace(/__DOC_TITLE__/g, docTitle)
     .replace(/__LABEL_LEFT__/g, eLabelLeft)
     .replace(/__LABEL_RIGHT__/g, eLabelRight)
@@ -809,6 +814,8 @@ async function main() {
   // 2. copy 2 ảnh gốc vào card + backdrop #root dùng chung
   const cardExts = copyCardImages(target, opts.left, opts.right);
   copyBackground(target);
+  const copiedFonts = copyFontsToVideo(target, familiesOfLocale(contentLocale));
+  console.log(`Font (local, OFL): ${copiedFonts.filter((f) => f.endsWith(".woff2")).join(", ")}`);
 
   // 3. dựng danh sách dòng thoại + pose
   const lines = buildLines(content);
@@ -854,7 +861,7 @@ async function main() {
   console.log(`ROOT_DURATION: ${timingResult.ROOT_DURATION}s`);
 
   // 8. dựng index.html từ template
-  buildIndexHtml(target, content, lines, timingResult, cardExts);
+  buildIndexHtml(target, content, lines, timingResult, cardExts, contentLocale);
 
   // 9. BRIEF.md
   writeBrief(target, content, sourceImages, corrections, contextImageCorrections, lines);

@@ -7,6 +7,63 @@
   "flag": "🇹🇭",
   "enabled": true,
   "slugSuffix": "th",
+  "fonts": {
+    "display": [
+      "Noto Sans Thai",
+      "Be Vietnam Pro"
+    ],
+    "mono": [
+      "JetBrains Mono",
+      "Noto Sans Thai"
+    ]
+  },
+  "video": {
+    "htmlLang": "th",
+    "eyebrow": "เปรียบเทียบความรู้",
+    "docTitle": "เปรียบเทียบ — {left} vs {right}",
+    "hookLine": "นี่คือ {label}",
+    "payoffLine": "{left} หรือ {right} ตอนนี้รู้ความต่างแล้วใช่ไหม",
+    "payoffTag": "คุณเลือกฝั่งไหน",
+    "payoffSub": "คอมเมนต์บอกเราได้เลย",
+    "italic": false,
+    "uppercase": false
+  },
+  "layout": {
+    "lineBreak": {
+      "mode": "segmenter",
+      "kinsoku": false
+    },
+    "label": {
+      "fontPx": 46,
+      "minFontPx": 28,
+      "stepPx": 2,
+      "maxLines": 2,
+      "maxUnitsPerLine": 14
+    },
+    "caption": {
+      "fontPx": 44,
+      "minFontPx": 30,
+      "stepPx": 2,
+      "maxTokens": 6,
+      "hardMaxTokens": 8,
+      "maxUnits": 26,
+      "clauseMinTokens": 2,
+      "clauseEnders": ",.:;!?",
+      "joiner": "",
+      "wordGapPx": 0,
+      "activeScale": 1.06
+    }
+  },
+  "tts": {
+    "priority": [
+      "azure",
+      "edge"
+    ],
+    "voices": {
+      "edge": "th-TH-NiwatNeural",
+      "azure": "th-TH-NiwatNeural"
+    }
+  },
   "styleSummary": "Thân thiện, gần gũi, lịch sự vừa phải, câu ngắn dễ nghe",
   "styleGuide": "- Giọng điệu: thân thiện, gần gũi như người bạn chia sẻ kiến thức, lịch sự vừa phải (ภาษาพูดสุภาพ), không quá trang trọng/ราชาศัพท์. Không dùng đuôi câu phân biệt giới (ครับ/ค่ะ/คะ) — dùng đuôi trung tính như นะ, เลย, ล่ะ để hợp với mọi giọng đọc.\n- Câu ngắn, dễ nghe khi đọc thành tiếng, mỗi câu 1 ý (khoảng 25-45 grapheme). Không dùng khoảng trắng thừa; dùng dấu cách giữa các cụm ý như người Thái viết caption.\n- Mở đầu thu hút bằng câu hỏi gần gũi, ví dụ \"รู้ไหมว่า … กับ … ต่างกันยังไง?\" hoặc \"… หรือ … ต่างกันตรงไหน?\".\n- Tránh khẳng định tuyệt đối và khoe khoang: không \"ที่สุดในโลก\", \"รับประกัน 100%\", \"ของแท้แน่นอน\"; không hứa hẹn โชคลาภ/ความเชื่อเรื่องดวง hay giá trị đầu tư.\n- Tên đá quý/kim loại dùng thuật ngữ người Thái quen dùng theo glossary (เพชร, ทับทิม, มรกต…). Không chèn chữ Việt; tên quốc tế đã quen dùng có thể giữ chữ Latin (เช่น Moissanite) nếu glossary không có.\n- Không dùng emoji.\n- Ý nghĩa biểu tượng/tâm linh: ĐƯỢC PHÉP nêu như ý nghĩa biểu tượng/văn hoá — viết dạng \"ถือเป็นสัญลักษณ์ของ…\", \"เชื่อกันว่าเป็นตัวแทนของ…\", \"มักถูกเชื่อมโยงกับ…\". TUYỆT ĐỐI KHÔNG khẳng định công dụng: โชคลาภ, ปกป้อง, รักษาโรค, เสริมดวง, เรียกทรัพย์… (xem các cụm bị cấm).\n- Phân biệt ความแข็ง (độ cứng, chống trầy — สเกลโมห์ส) và ความเหนียว (độ dai, chống nứt vỡ — ทนต่อแรงกระแทก). Khi nói về thang Mohs PHẢI dùng \"ความแข็ง\"/\"แข็ง\", KHÔNG dùng \"ทนทาน\"/\"เหนียว\" với nghĩa độ cứng; chỉ dùng \"ความเหนียว\" khi nói về khả năng chống vỡ.",
   "glossary": {
