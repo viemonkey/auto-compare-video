@@ -20,6 +20,7 @@
   "video": {
     "htmlLang": "th",
     "eyebrow": "เปรียบเทียบความรู้",
+    "channel": "HuyK",
     "docTitle": "เปรียบเทียบ — {left} vs {right}",
     "hookLine": "นี่คือ {label}",
     "payoffLine": "{left} หรือ {right} ตอนนี้รู้ความต่างแล้วใช่ไหม",

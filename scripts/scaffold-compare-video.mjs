@@ -423,6 +423,13 @@ function patchCheckTimeout(target) {
 // The create-video scaffold copies a generic generate-vo.mjs (no word boundaries,
 // no silence trim). Auto-compare needs the v2 one — word-boundary words.json for the
 // karaoke caption + per-line trim so the flat GAP_FLAT timing lands right.
+// Bản sync-channel canonical: tên kênh theo thị trường của video (video.channel trong config locale; không có thì CHANNEL trong .env).
+function overrideSyncChannel(target) {
+  const src = path.join(REPO_ROOT, "templates", "auto-compare", "sync-channel.mjs");
+  if (!fs.existsSync(src)) fail(`Không tìm thấy ${src} — cần bản sync-channel.mjs canonical cho auto-compare.`);
+  fs.copyFileSync(src, path.join(target, "scripts", "sync-channel.mjs"));
+}
+
 function overrideGenerateVo(target) {
   const src = path.join(REPO_ROOT, "templates", "auto-compare", "generate-vo.mjs");
   if (!fs.existsSync(src)) fail(`Không tìm thấy ${src} — cần bản generate-vo.mjs canonical cho auto-compare.`);
@@ -587,6 +594,7 @@ async function main() {
   runScaffoldMjs(slug);
   patchCheckTimeout(target);
   overrideGenerateVo(target);
+  overrideSyncChannel(target);
   patchRenderWorkers(target);
 
   // 2. copy 2 ảnh gốc vào card + backdrop #root dùng chung

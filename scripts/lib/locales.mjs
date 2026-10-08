@@ -85,6 +85,7 @@ function validateVideoBlocks(raw, repoRoot, need) {
     need(isStr(v.hookLine) && v.hookLine.includes("{label}"), '"video.hookLine" phải chứa {label}');
     need(isStr(v.payoffLine) && v.payoffLine.includes("{left}") && v.payoffLine.includes("{right}"), '"video.payoffLine" phải chứa {left} và {right}');
     need(isStr(v.docTitle) && v.docTitle.includes("{left}") && v.docTitle.includes("{right}"), '"video.docTitle" phải chứa {left} và {right}');
+    need(v.channel === undefined || (isNonEmptyStr(v.channel) && v.channel.length <= 40), '"video.channel" (tên kênh hiện ở góc video) nếu khai báo phải là chuỗi không rỗng, tối đa 40 ký tự; bỏ trống = dùng CHANNEL trong .env');
     need(typeof v.italic === "boolean" && typeof v.uppercase === "boolean", '"video.italic" và "video.uppercase" phải là boolean');
   }
 

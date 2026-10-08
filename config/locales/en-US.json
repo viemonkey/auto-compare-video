@@ -19,6 +19,7 @@
   "video": {
     "htmlLang": "en",
     "eyebrow": "KNOWLEDGE COMPARISON",
+    "channel": "HuyK",
     "docTitle": "Compare — {left} vs {right}",
     "hookLine": "This is {label}.",
     "payoffLine": "{left} or {right} — now you know the difference!",

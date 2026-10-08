@@ -103,4 +103,4 @@ Ja/th không in nghiêng/in hoa (`video.italic` / `video.uppercase` = false).
 ## 6. Chữ cố định trên màn hình theo thị trường
 
 Câu mở đầu ("Đây là X."), câu chốt, thẻ kênh, tiêu đề tài liệu nằm ở `config/locales/<mã>.json` → `video` (`hookLine`, `payoffLine`, `payoffTag`, `payoffSub`, `eyebrow`, `docTitle`, `htmlLang`).
-Lưu ý: thẻ kênh `#eyebrow` bị `scripts/sync-channel.mjs` ghi đè bằng `CHANNEL` trong `.env` lúc render (dùng chung mọi thị trường).
+Thẻ kênh `#eyebrow` (góc trên trái) lấy tên từ `config/locales/<mã>.json` → `video.channel` (ja/en/th đang khai báo "HuyK"); thị trường không khai báo (vi-VN) dùng `CHANNEL` trong `.env` như cũ. `scripts/sync-channel.mjs` của video (bản canonical `templates/auto-compare/sync-channel.mjs`) đọc thị trường từ `VIDEO_LOCALE` trong `.env` của video và chạy trước dev/check/render.

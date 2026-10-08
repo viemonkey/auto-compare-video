@@ -20,6 +20,7 @@
   "video": {
     "htmlLang": "ja",
     "eyebrow": "豆知識くらべ",
+    "channel": "HuyK",
     "docTitle": "比較 — {left} vs {right}",
     "hookLine": "これは{label}です。",
     "payoffLine": "{left}と{right}、もうわかりましたね！",
