@@ -1267,7 +1267,7 @@ document.addEventListener("DOMContentLoaded", () => {
         const summary = document.createElement("summary");
         const dot = document.createElement("span");
         dot.className = "point-labels-dot";
-        summary.append("Nhãn & dòng phụ ", dot);
+        summary.append("Nhãn & dòng phụ (không hiện trên video) ", dot);
         const body = document.createElement("div");
         body.className = "point-labels-body";
         details.append(summary, body);
@@ -1282,8 +1282,8 @@ document.addEventListener("DOMContentLoaded", () => {
           if (worst && !had) details.open = true;
         };
         [
-          ["tag", "Nhãn trên màn hình", "Chữ ngắn hiện phía trên ảnh trái/phải trong video khi câu này đang được đọc."],
-          ["sub", "Dòng phụ", "Dòng chữ nhỏ hiện ngay dưới nhãn trên màn hình (có thể để trống)."],
+          ["tag", "Nhãn ngắn (không hiện trên video)", "Chữ ngắn tóm tắt ý của câu. Giao diện video hiện tại (giấy kẻ ô) KHÔNG vẽ nhãn này lên video — chỉ lưu cùng kịch bản. Trên video chỉ có tên 2 bên (phía trên ảnh) và phụ đề chạy theo lời đọc."],
+          ["sub", "Dòng phụ (không hiện trên video)", "Dòng chữ nhỏ đi kèm nhãn ngắn (có thể để trống). Giống nhãn ngắn: giao diện video hiện tại KHÔNG vẽ dòng này lên video."],
         ].forEach(([kind, label, tip]) => {
           const group = document.createElement("div");
           group.className = "point-subfield";
