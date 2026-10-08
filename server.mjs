@@ -71,6 +71,7 @@ import {
 import { textOf, flattenContent } from "./public/shared/bilingual.mjs";
 import { rulesOf } from "./scripts/lib/compare-content.mjs";
 import { checkContentFit, assertFitsForBuild, FitBlockedError } from "./scripts/lib/fit-check.mjs";
+import { ttsOptionsForLocale, resolveEngineVoices } from "./scripts/lib/tts/options.mjs";
 import { createMarketApi, buildRecord, generatedByOf, resolveSocialPost as resolveSocialPostIn } from "./server-market.mjs";
 import { validateGeminiModels } from "./scripts/lib/gemini-models.mjs";
 import { createCleanupQueue, existingVideoWebPath, MIN_MP4_BYTES } from "./scripts/lib/pending-cleanup.mjs";
@@ -85,11 +86,9 @@ import {
   listThemes,
   getEngine,
   getDefaultTheme,
-  enginesForLanguage,
   themeSupportsScript,
   themeSupportsLanguage,
   engineReadiness,
-  defaultVoiceFor,
   checkRenderability,
   capabilityErrors,
 } from "./scripts/lib/capabilities.mjs";
@@ -225,36 +224,10 @@ app.post("/api/upload-ref-audio", (req, res) => {
   });
 });
 
-// Danh sách giọng của 1 engine cho 1 thị trường — nguồn: file giọng của engine (vd VieNeu) hoặc `voices` khai báo trong
-// config/tts-engines/<id>.json; giọng mặc định / giọng dự phòng cũng khai báo ở đó (không hard-code trong code).
-function resolveEngineVoices(engine, localeCode) {
-  const fallback = engine.voiceFallback ? [{ id: engine.voiceFallback.id, label: engine.voiceFallback.label }] : [];
-  const fallbackId = engine.voiceFallback?.id ?? null;
-  if (engine.voicesFile) {
-    const file = path.join(__dirname, engine.voicesFile);
-    if (!fs.existsSync(file)) return { voices: fallback, defaultVoice: fallbackId };
-    try {
-      const data = JSON.parse(fs.readFileSync(file, "utf8"));
-      const presets = data.presets || {};
-      const voices = Object.keys(presets).map((name) => {
-        const info = presets[name];
-        const desc = info.description ? ` (${info.description})` : "";
-        return { id: name, label: `${name}${desc}` };
-      });
-      return { voices, defaultVoice: data.default_voice || defaultVoiceFor(engine, localeCode) || fallbackId };
-    } catch {
-      return { voices: fallback, defaultVoice: fallbackId };
-    }
-  }
-  const voices = engine.voices?.[localeCode] || [];
-  return { voices, defaultVoice: defaultVoiceFor(engine, localeCode) || voices[0]?.id || fallbackId };
-}
-
-// Tương thích client cũ: giọng VieNeu cho thị trường mặc định.
 app.get("/api/vieneu-voices", (_req, res) => {
   const engine = getEngine("vieneu");
   if (!engine) return res.json({ voices: [], defaultVoice: null });
-  res.json(resolveEngineVoices(engine, getDefaultLocale().code));
+  res.json(resolveEngineVoices(engine, getDefaultLocale(), __dirname));
 });
 
 // Mô tả 1 locale cho UI + khả năng render (tính từ khai báo engine/theme, không có cờ cứng).
@@ -353,31 +326,12 @@ app.post(
   fieldEditHandler(({ locale, body, slug, signal }) => translateField({ locale, kind: body.kind, text: body.text, slug, signal })),
 );
 
-// Engine TTS cho 1 thị trường: supported = engine khai báo ngôn ngữ của locale; ready = đủ cấu hình để chạy.
+// Engine TTS cho 1 thị trường: CHỈ engine hỗ trợ ngôn ngữ của thị trường (và giọng của thị trường đó); ready = đủ cấu hình để chạy.
+// defaultEngine = engine đầu tiên dùng được theo thứ tự ưu tiên trong config/locales (null với thị trường không khai báo: vi-VN giữ mặc định cũ).
 app.get("/api/tts-engines", (req, res) => {
   const locale = getLocale(String(req.query.locale || getDefaultLocale().code));
   if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
-  const supportedIds = new Set(enginesForLanguage(locale.language).map((e) => e.id));
-  const engines = listEngines().map((e) => {
-    const { ready, reason } = engineReadiness(e);
-    const { voices, defaultVoice } = resolveEngineVoices(e, locale.code);
-    return {
-      id: e.id,
-      label: e.label,
-      languages: e.languages,
-      supported: supportedIds.has(e.id),
-      ready,
-      notReadyReason: reason,
-      modes: e.modes,
-      voices,
-      defaultVoice,
-    };
-  });
-  res.json({
-    locale: locale.code,
-    engines,
-    message: supportedIds.size ? "" : `Chưa có giọng đọc (TTS) nào hỗ trợ ${locale.displayName} (${locale.language}).`,
-  });
+  res.json({ locale: locale.code, ...ttsOptionsForLocale(locale, { engines: listEngines(), readiness: (e) => engineReadiness(e), repoRoot: __dirname }) });
 });
 
 // Giao diện video: supported = theme khai báo hệ chữ (script) của locale.

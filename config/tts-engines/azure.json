@@ -3,48 +3,107 @@
   "label": "Azure AI Speech (trả phí, cần khoá)",
   "enabled": true,
   "order": 25,
-  "languages": ["vi", "ja", "en", "th"],
+  "languages": [
+    "ja",
+    "en",
+    "th"
+  ],
   "modes": [
-    { "id": "preset", "label": "☁️ Azure AI Speech (giọng thần kinh chính thức, tính theo ký tự)" }
+    {
+      "id": "preset",
+      "label": "☁️ Azure AI Speech (giọng thần kinh chính thức, tính theo ký tự)"
+    }
   ],
   "defaultVoices": {
-    "vi-VN": "vi-VN-NamMinhNeural",
     "ja-JP": "ja-JP-KeitaNeural",
     "en-US": "en-US-AndrewNeural",
     "th-TH": "th-TH-NiwatNeural"
   },
   "voices": {
-    "vi-VN": [
-      { "id": "vi-VN-NamMinhNeural", "label": "Nam Minh (nam)" },
-      { "id": "vi-VN-HoaiMyNeural", "label": "Hoài My (nữ)" }
-    ],
     "ja-JP": [
-      { "id": "ja-JP-KeitaNeural", "label": "Keita (nam)" },
-      { "id": "ja-JP-DaichiNeural", "label": "Daichi (nam)" },
-      { "id": "ja-JP-NaokiNeural", "label": "Naoki (nam)" },
-      { "id": "ja-JP-NanamiNeural", "label": "Nanami (nữ)" },
-      { "id": "ja-JP-AoiNeural", "label": "Aoi (nữ)" },
-      { "id": "ja-JP-MayuNeural", "label": "Mayu (nữ)" },
-      { "id": "ja-JP-ShioriNeural", "label": "Shiori (nữ)" }
+      {
+        "id": "ja-JP-KeitaNeural",
+        "label": "Keita (nam)"
+      },
+      {
+        "id": "ja-JP-DaichiNeural",
+        "label": "Daichi (nam)"
+      },
+      {
+        "id": "ja-JP-NaokiNeural",
+        "label": "Naoki (nam)"
+      },
+      {
+        "id": "ja-JP-NanamiNeural",
+        "label": "Nanami (nữ)"
+      },
+      {
+        "id": "ja-JP-AoiNeural",
+        "label": "Aoi (nữ)"
+      },
+      {
+        "id": "ja-JP-MayuNeural",
+        "label": "Mayu (nữ)"
+      },
+      {
+        "id": "ja-JP-ShioriNeural",
+        "label": "Shiori (nữ)"
+      }
     ],
     "en-US": [
-      { "id": "en-US-AndrewNeural", "label": "Andrew (nam)" },
-      { "id": "en-US-BrianNeural", "label": "Brian (nam)" },
-      { "id": "en-US-GuyNeural", "label": "Guy (nam)" },
-      { "id": "en-US-ChristopherNeural", "label": "Christopher (nam)" },
-      { "id": "en-US-AvaNeural", "label": "Ava (nữ)" },
-      { "id": "en-US-EmmaNeural", "label": "Emma (nữ)" },
-      { "id": "en-US-JennyNeural", "label": "Jenny (nữ)" },
-      { "id": "en-US-AriaNeural", "label": "Aria (nữ)" }
+      {
+        "id": "en-US-AndrewNeural",
+        "label": "Andrew (nam)"
+      },
+      {
+        "id": "en-US-BrianNeural",
+        "label": "Brian (nam)"
+      },
+      {
+        "id": "en-US-GuyNeural",
+        "label": "Guy (nam)"
+      },
+      {
+        "id": "en-US-ChristopherNeural",
+        "label": "Christopher (nam)"
+      },
+      {
+        "id": "en-US-AvaNeural",
+        "label": "Ava (nữ)"
+      },
+      {
+        "id": "en-US-EmmaNeural",
+        "label": "Emma (nữ)"
+      },
+      {
+        "id": "en-US-JennyNeural",
+        "label": "Jenny (nữ)"
+      },
+      {
+        "id": "en-US-AriaNeural",
+        "label": "Aria (nữ)"
+      }
     ],
     "th-TH": [
-      { "id": "th-TH-NiwatNeural", "label": "Niwat (nam)" },
-      { "id": "th-TH-PremwadeeNeural", "label": "Premwadee (nữ)" },
-      { "id": "th-TH-AcharaNeural", "label": "Achara (nữ)" }
+      {
+        "id": "th-TH-NiwatNeural",
+        "label": "Niwat (nam)"
+      },
+      {
+        "id": "th-TH-PremwadeeNeural",
+        "label": "Premwadee (nữ)"
+      },
+      {
+        "id": "th-TH-AcharaNeural",
+        "label": "Achara (nữ)"
+      }
     ]
   },
   "requires": {
-    "env": ["AZURE_SPEECH_KEY", "AZURE_SPEECH_REGION"],
+    "env": [
+      "AZURE_SPEECH_KEY",
+      "AZURE_SPEECH_REGION"
+    ],
     "hint": "Điền AZURE_SPEECH_KEY / AZURE_SPEECH_REGION trong .env (Azure Portal → Speech resource → Keys and Endpoint)."
   }
 }

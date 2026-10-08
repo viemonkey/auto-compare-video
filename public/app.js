@@ -348,6 +348,7 @@ document.addEventListener("DOMContentLoaded", () => {
     await Promise.all([loadEngines(requestId), loadLocaleRules(requestId)]);
   }
 
+  let enginesLocale = null; // thị trường của danh sách giọng đang hiện
   async function loadEngines(requestId) {
     if (!ttsProviderSelect || !currentLocale) return;
     try {
@@ -362,21 +363,24 @@ document.addEventListener("DOMContentLoaded", () => {
         (e.modes || []).forEach((m) => {
           const opt = document.createElement("option");
           opt.value = `${e.id}:${m.id}`;
-          const usable = e.supported && e.ready;
-          opt.disabled = !usable;
-          opt.textContent = usable
-            ? m.label
-            : `${m.label} — ${e.supported ? `chưa sẵn sàng: ${e.notReadyReason}` : "không hỗ trợ ngôn ngữ này"}`;
+          // Server chỉ trả engine hỗ trợ ngôn ngữ của thị trường; engine thiếu cấu hình vẫn hiện (bị khoá) kèm lý do để biết cần điền gì.
+          opt.disabled = !e.ready;
+          opt.textContent = e.ready ? m.label : `${m.label} — chưa sẵn sàng: ${e.notReadyReason}`;
           ttsProviderSelect.appendChild(opt);
         });
       });
       const firstUsable = Array.from(ttsProviderSelect.options).find((o) => !o.disabled);
-      const keep = Array.from(ttsProviderSelect.options).find((o) => o.value === previous && !o.disabled);
+      // Đổi thị trường thì chọn lại mặc định của thị trường đó (không mang lựa chọn của thị trường trước sang); cùng thị trường thì giữ.
+      const sameMarket = enginesLocale === currentLocale;
+      enginesLocale = currentLocale;
+      const keep = sameMarket ? Array.from(ttsProviderSelect.options).find((o) => o.value === previous && !o.disabled) : undefined;
+      // Thị trường có thứ tự ưu tiên trong config (ja/en/th): chọn sẵn engine đầu tiên dùng được (Azure nếu có khoá, không thì Edge).
+      const preferred = data.defaultEngine && Array.from(ttsProviderSelect.options).find((o) => o.value.startsWith(`${data.defaultEngine}:`) && !o.disabled);
       if (keep) ttsProviderSelect.value = keep.value;
+      else if (preferred) ttsProviderSelect.value = preferred.value;
       else if (firstUsable) ttsProviderSelect.value = firstUsable.value;
 
-      const anySupported = enginesData.some((e) => e.supported);
-      if (!anySupported || !firstUsable) {
+      if (!enginesData.length || !firstUsable) {
         ttsNotice.textContent = data.message || "Chưa có giọng đọc nào sẵn sàng cho thị trường này.";
         ttsNotice.classList.remove("hidden");
       } else {
