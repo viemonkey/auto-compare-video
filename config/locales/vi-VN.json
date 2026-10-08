@@ -29,7 +29,8 @@
   "layout": {
     "lineBreak": {
       "mode": "space",
-      "kinsoku": false
+      "kinsoku": false,
+      "balance": false
     },
     "label": {
       "fontPx": 46,

@@ -93,8 +93,8 @@ function validateVideoBlocks(raw, repoRoot, need) {
     need(false, '"layout" phải là object { lineBreak, label, caption }');
     return;
   }
-  need(isObj(l.lineBreak) && LINE_BREAK_MODES.includes(l.lineBreak.mode) && typeof l.lineBreak.kinsoku === "boolean",
-    `"layout.lineBreak" phải là { mode: ${LINE_BREAK_MODES.map((m) => `"${m}"`).join(" | ")}, kinsoku: boolean }`);
+  need(isObj(l.lineBreak) && LINE_BREAK_MODES.includes(l.lineBreak.mode) && typeof l.lineBreak.kinsoku === "boolean" && typeof l.lineBreak.balance === "boolean",
+    `"layout.lineBreak" phải là { mode: ${LINE_BREAK_MODES.map((m) => `"${m}"`).join(" | ")}, kinsoku: boolean, balance: boolean }`);
   const fitBox = (name, box, extra) => {
     if (!isObj(box)) { need(false, `"layout.${name}" phải là object`); return; }
     for (const k of ["fontPx", "minFontPx", "stepPx", ...extra]) need(isPosInt(box[k]), `"layout.${name}.${k}" phải là số nguyên dương`);
@@ -109,6 +109,11 @@ function validateVideoBlocks(raw, repoRoot, need) {
     need(isStr(c.joiner) && (c.joiner === "" || c.joiner === " "), '"layout.caption.joiner" phải là "" hoặc " "');
     need(isNum(c.wordGapPx) && c.wordGapPx >= 0, '"layout.caption.wordGapPx" phải là số >= 0');
     need(isNum(c.activeScale) && c.activeScale >= 1 && c.activeScale <= 1.5, '"layout.caption.activeScale" phải trong 1..1.5');
+    if (c.weakStartPattern !== undefined) {
+      let okPattern = isNonEmptyStr(c.weakStartPattern);
+      if (okPattern) { try { new RegExp(c.weakStartPattern, "u"); } catch { okPattern = false; } }
+      need(okPattern, '"layout.caption.weakStartPattern" phải là regex hợp lệ (cờ u)');
+    }
   }
 }
 

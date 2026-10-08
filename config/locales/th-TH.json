@@ -31,7 +31,8 @@
   "layout": {
     "lineBreak": {
       "mode": "segmenter",
-      "kinsoku": false
+      "kinsoku": false,
+      "balance": true
     },
     "label": {
       "fontPx": 46,

@@ -31,7 +31,8 @@
   "layout": {
     "lineBreak": {
       "mode": "segmenter",
-      "kinsoku": true
+      "kinsoku": true,
+      "balance": true
     },
     "label": {
       "fontPx": 46,
@@ -51,7 +52,8 @@
       "clauseEnders": "、。！？，．：；,.!?",
       "joiner": "",
       "wordGapPx": 0,
-      "activeScale": 1.06
+      "activeScale": 1.06,
+      "weakStartPattern": "^[\\p{Script=Hiragana}ー]{1,3}[、。！？]?$"
     }
   },
   "tts": {
