@@ -144,6 +144,14 @@ export function calcImageCost(model, imageCount) {
 // Giọng đọc (TTS): tính theo SỐ KÝ TỰ gửi đi đọc. Engine miễn phí ghi 0 USD nhưng vẫn có dòng trong sổ (task "tts") để thống kê.
 // ---------------------------------------------------------------------------------------------
 export const TTS_PRICING = {
+  azure: {
+    unit: "USD / 1M ký tự",
+    usdPerMillionChars: 16,
+    freeCharsPerMonth: 500_000,
+    source: "https://azure.microsoft.com/pricing/details/cognitive-services/speech-services/ — mục Text to speech › Neural (pay-as-you-go, giọng Neural tiêu chuẩn; HD/Custom giá khác)",
+    lastUpdated: "2026-10-08",
+    note: "$16 / 1 triệu ký tự + miễn phí 0,5 triệu ký tự/tháng (bậc F0). LƯU Ý: trang giá chính thức tải giá bằng JS nên không đọc tự động được ngày 2026-10-08; con số lấy từ nguồn thứ cấp trùng khớp với bảng giá công khai nhiều năm — đối chiếu lại trên trang chính thức trước khi dùng để quyết toán. Chi phí ghi sổ tính THEO SỐ KÝ TỰ gửi đi, chưa trừ phần miễn phí hằng tháng.",
+  },
   edge: {
     unit: "USD / 1M ký tự",
     usdPerMillionChars: 0,
