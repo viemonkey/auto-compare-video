@@ -1,6 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import crypto from "node:crypto";
+import { buildErrorHint } from "../../public/shared/build-error-hints.mjs";
 
 export const BUILD_STAGES = Object.freeze([
   { id: "voice", label: "Sinh giọng" },
@@ -108,6 +109,43 @@ export function resetJobFromStart(job, now = Date.now) {
   return job;
 }
 
+/**
+ * Job còn "đang chạy"/"chờ" trên đĩa nhưng không có tiến trình nào giữ (server vừa khởi động lại hoặc bị tắt):
+ * chuyển thành lỗi INTERRUPTED ở khâu đang dở để người dùng bấm "Thử lại" chạy tiếp, không kẹt vĩnh viễn ở "đang chạy".
+ * `isRunning(id)` cho biết job có đang chạy trong tiến trình hiện tại không (bỏ qua những job đó).
+ */
+export function recoverInterruptedJobs(store, { isRunning = () => false, now = Date.now } = {}) {
+  const recovered = [];
+  for (const job of store.list()) {
+    if (job.status !== "running" && job.status !== "pending") continue;
+    if (isRunning(job.id)) continue;
+    const stage = job.stages.find((item) => item.status === "running") || job.stages.find((item) => item.status !== "done");
+    if (!stage) continue;
+    const message = "Quá trình dựng bị ngắt giữa chừng (server dừng hoặc khởi động lại).";
+    stage.status = "error";
+    stage.finishedAt = nowIso(now);
+    stage.error = { message, code: "INTERRUPTED", technical: "[INTERRUPTED] Job đang chạy khi server dừng." };
+    stage.error.hint = buildErrorHint(stage.id, stage.error);
+    job.status = "error";
+    job.activeStage = stage.id;
+    appendJobLog(job, `✖ ${message}`, now);
+    store.write(job);
+    recovered.push(job.id);
+  }
+  return recovered;
+}
+
+/** Job mới nhất của từng slug (list() đã sắp mới nhất trước) — để danh sách video biết video nào đang dựng/lỗi. */
+export function latestJobBySlug(store) {
+  const map = new Map();
+  for (const job of store.list()) if (!map.has(job.slug)) map.set(job.slug, job);
+  return map;
+}
+
+export function jobSummary(job) {
+  return { id: job.id, slug: job.slug, status: job.status, activeStage: job.activeStage, updatedAt: job.updatedAt };
+}
+
 export async function runBuildJob(jobId, { store, handlers, now = Date.now, onUpdate = () => {} }) {
   let job = store.read(jobId);
   if (!job) throw new Error(`Không tìm thấy job ${jobId}.`);
@@ -151,6 +189,7 @@ export async function runBuildJob(jobId, { store, handlers, now = Date.now, onUp
       stage.status = "error";
       stage.finishedAt = nowIso(now);
       stage.error = errorDetails(error);
+      stage.error.hint = buildErrorHint(stage.id, stage.error);
       job.status = "error";
       job.activeStage = stage.id;
       job.updatedAt = stage.finishedAt;

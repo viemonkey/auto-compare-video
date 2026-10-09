@@ -82,7 +82,7 @@ import { rewriteField, translateField, FieldEditError } from "./scripts/lib/fiel
 import { AbortedError } from "./scripts/lib/gemini-client.mjs";
 import { checkFfmpeg, extractPoseTimeline, setReelThumbnail } from "./scripts/lib/reel-thumbnail.mjs";
 import { checkMediaBinaries, describeSpawnError, mediaToolsErrorVi } from "./scripts/lib/media-binaries.mjs";
-import { FileBuildJobStore, createBuildJob, resetJobForRetry, runBuildJob } from "./scripts/lib/build-jobs.mjs";
+import { FileBuildJobStore, createBuildJob, resetJobForRetry, resetJobFromStart, runBuildJob } from "./scripts/lib/build-jobs.mjs";
 import { getLocale, listLocales, localeErrors, getDefaultLocale } from "./scripts/lib/locales.mjs";
 import {
   listEngines,
@@ -680,6 +680,13 @@ function buildStageHandlers(jobId) {
       error.technical = JSON.stringify(mediaTools, null, 2);
       throw error;
     }
+    if (stage === "voice") {
+      // Project dựng dở chưa có checkpoint scaffold thì không dùng lại được — xoá để dựng lại đúng slug của job (không đẻ ra "-2").
+      const projectDir = path.join(VIDEOS_DIR, job.slug);
+      if (fs.existsSync(projectDir) && !fs.existsSync(path.join(projectDir, ".build", "plan.json"))) {
+        fs.rmSync(projectDir, { recursive: true, force: true });
+      }
+    }
     const args = scaffoldStageArgs(job, stage);
     log(`▶ ${job.stages.find((item) => item.id === stage)?.label || stage}...`);
     const result = await runNode(args, { onLine: log });
@@ -823,7 +830,23 @@ app.post("/api/build-jobs/:id/retry", (req, res) => {
   if (runningBuildJobs.has(req.params.id)) return res.status(409).json({ error: "Job đang chạy." });
   const job = buildJobStore.read(req.params.id);
   if (!job) return res.status(404).json({ error: "Không tìm thấy job dựng video." });
+  if (job.status !== "error") return res.status(409).json({ error: "Job này không ở trạng thái lỗi nên không có gì để thử lại." });
   buildJobStore.write(resetJobForRetry(job));
+  res.status(202).json(buildJobStore.read(job.id));
+  startBuildJob(job.id);
+});
+
+// "Dựng lại từ đầu": bỏ project dựng dở + mọi checkpoint, chạy lại cả 5 khâu. Kịch bản (request) giữ nguyên, vẫn không gọi lại Gemini ở Bước 1.
+app.post("/api/build-jobs/:id/restart", (req, res) => {
+  if (runningBuildJobs.has(req.params.id)) return res.status(409).json({ error: "Job đang chạy." });
+  const job = buildJobStore.read(req.params.id);
+  if (!job) return res.status(404).json({ error: "Không tìm thấy job dựng video." });
+  try {
+    fs.rmSync(path.join(VIDEOS_DIR, job.slug), { recursive: true, force: true });
+  } catch (error) {
+    return res.status(500).json({ error: `Không dọn được thư mục videos/${job.slug}/: [${error.code || "UNKNOWN"}] ${error.message}. Đóng chương trình đang mở thư mục này rồi thử lại.` });
+  }
+  buildJobStore.write(resetJobFromStart(job));
   res.status(202).json(buildJobStore.read(job.id));
   startBuildJob(job.id);
 });

@@ -270,6 +270,27 @@
           <p>Hệ thống đang sinh giọng đọc TTS, tính nhịp GSAP, ghép ảnh card & hành động nhân vật, và chạy `npm run check`.</p>
         </div>
 
+        <!-- Danh sách khâu dựng + trạng thái từng khâu -->
+        <ol id="build-stages" class="build-stages" aria-label="Các khâu dựng video"></ol>
+        <p id="build-connection-note" class="build-connection-note hidden" role="status"></p>
+
+        <!-- Màn lỗi: thông báo dễ hiểu + gợi ý + log kỹ thuật gập lại + 3 hành động -->
+        <div id="build-error-card" class="build-error-card hidden" role="alert">
+          <h3 id="build-error-title"></h3>
+          <p id="build-error-message"></p>
+          <p id="build-error-hint" class="build-error-hint"></p>
+          <details class="build-error-tech">
+            <summary>Log kỹ thuật</summary>
+            <pre id="build-error-tech" tabindex="0"></pre>
+            <button type="button" id="btn-copy-build-log" class="btn btn-small btn-secondary">Sao chép log</button>
+          </details>
+          <div class="build-error-actions">
+            <button type="button" id="btn-build-retry" class="btn btn-primary">Thử lại từ khâu lỗi</button>
+            <button type="button" id="btn-build-back" class="btn btn-secondary">Quay lại Bước 2</button>
+            <button type="button" id="btn-build-restart" class="btn btn-secondary">Dựng lại từ đầu</button>
+          </div>
+        </div>
+
         <!-- Terminal Log Box -->
         <div class="terminal-box">
           <div class="terminal-header">

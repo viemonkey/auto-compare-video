@@ -1865,3 +1865,31 @@ textarea:disabled { cursor: not-allowed; }
   .bi-view-btn { min-height: 50px; justify-content: center; padding-inline: 6px; font-size: 11px; line-height: 1.3; text-align: center; }
   .point-item { border-radius: var(--radius-md); }
 }
+
+/* Bước 3: các khâu dựng + màn lỗi */
+.build-stages { list-style: none; display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: var(--space-2); margin: 0 0 var(--space-4); padding: 0; }
+.build-stage { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2) var(--space-3); border: 1px solid var(--panel-edge); border-radius: var(--radius-sm); background: var(--panel-raised); font-size: var(--text-sm); color: var(--fg-muted); min-width: 0; }
+.build-stage-mark { flex: none; width: 20px; height: 20px; display: inline-flex; align-items: center; justify-content: center; border-radius: 50%; font-size: var(--text-xs); font-weight: 800; border: 1px solid currentColor; }
+.build-stage-text { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+.build-stage-name { color: var(--fg); font-weight: 700; }
+.build-stage-state { font-size: var(--text-xs); }
+.build-stage[data-status="done"] { color: var(--success); border-color: rgba(74, 222, 176, 0.4); }
+.build-stage[data-status="running"] { color: var(--accent-cyan); border-color: var(--accent-cyan); }
+.build-stage[data-status="running"] .build-stage-mark { border-color: rgba(66, 232, 202, 0.3); border-top-color: var(--accent-cyan); animation: spin 0.8s linear infinite; }
+.build-stage[data-status="error"] { color: var(--danger); border-color: var(--danger); background: rgba(255, 107, 125, 0.08); }
+.build-connection-note { margin: 0 0 var(--space-3); font-size: var(--text-sm); color: var(--accent-yellow); }
+.build-error-card { border: 1px solid var(--danger); background: rgba(255, 107, 125, 0.07); border-radius: var(--radius-md); padding: var(--space-5); margin-bottom: var(--space-4); }
+.build-error-card h3 { margin: 0 0 var(--space-2); font-size: var(--text-lg); color: var(--danger); }
+.build-error-card p { margin: 0 0 var(--space-3); font-size: var(--text-base); line-height: 1.5; overflow-wrap: anywhere; }
+.build-error-hint { color: var(--fg-dim); }
+.build-error-tech { margin-bottom: var(--space-4); }
+.build-error-tech summary { cursor: pointer; font-size: var(--text-sm); color: var(--fg-dim); min-height: var(--control-height); display: flex; align-items: center; }
+.build-error-tech pre { max-height: 220px; overflow: auto; margin: var(--space-2) 0; padding: var(--space-3); background: #080612; border: 1px solid var(--panel-edge); border-radius: var(--radius-sm); font-family: 'Courier New', Courier, monospace; font-size: var(--text-sm); white-space: pre-wrap; overflow-wrap: anywhere; color: var(--fg-dim); }
+.build-error-actions { display: flex; flex-wrap: wrap; gap: var(--space-3); }
+.status-badge { font-size: var(--text-xs); font-weight: 800; letter-spacing: 0.5px; padding: 2px 7px; border-radius: var(--radius-sm); vertical-align: middle; }
+.status-badge.error { background: var(--danger); color: #1b1535; }
+.status-badge.building { background: var(--accent-cyan); color: #1b1535; }
+@media (max-width: 720px) {
+  .build-stages { grid-template-columns: 1fr; }
+  .build-error-actions .btn { flex: 1 1 100%; min-height: var(--control-height); }
+}

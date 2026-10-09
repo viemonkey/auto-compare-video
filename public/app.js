@@ -4,12 +4,13 @@ import { flattenContent, textOf, viOf } from "/shared/bilingual.mjs";
 import { createFieldEditor } from "/field-editor.js";
 import { slugify, baseSlugFromContent } from "/shared/slug-base.mjs";
 import { createLatestRunner, STALE } from "/shared/latest-request.mjs";
+import { buildErrorHint } from "/shared/build-error-hints.mjs";
 
 document.addEventListener("DOMContentLoaded", () => {
   // State
   let uploadedLeftPath = null;
   let uploadedRightPath = null;
-  let pendingContentSlug = null; // slug tạm gắn ở Bước 1 (/api/generate-content), đổi thành slug thật ở /api/create-video
+  let pendingContentSlug = null; // slug tạm gắn ở Bước 1 (/api/generate-content), đổi thành slug thật ở /api/build-jobs
   let actionCatalog = [];
   let currentEditingPointIndex = null;
   let pointsData = [];
@@ -634,7 +635,7 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
-  // Content for /api/create-video (and, later, drafts): bilingual markets send { text, vi } per line, flat markets unchanged.
+  // Content for /api/build-jobs (and, later, drafts): bilingual markets send { text, vi } per line, flat markets unchanged.
   function buildContentPayload() {
     return { ...contentFields(), ...(generatedBy ? { _meta: { generatedBy } } : {}) };
   }
@@ -1423,34 +1424,33 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const payloadContent = buildContentPayload();
 
-    gotoStep(3);
-    terminalLogs.textContent = "▶ Đang kết nối tới server để dựng video...\n";
-    buildSuccessCard.classList.add("hidden");
+    const { engine, modeId } = selectedEngine();
+    if (!engine) {
+      alert("Chưa có giọng đọc nào sẵn sàng cho thị trường này — không thể dựng video.");
+      return;
+    }
+    const ttsProvider = engine.id;
+    let vieneuVoice = null;
+    let vieneuRefPath = null;
+    let ttsVoice = null;
 
-    try {
-      const { engine, modeId } = selectedEngine();
-      if (!engine) {
-        alert("Chưa có giọng đọc nào sẵn sàng cho thị trường này — không thể dựng video.");
+    if (modeId === "clone") {
+      if (!uploadedRefAudioPath) {
+        alert("Bạn chọn nhái giọng nhưng chưa tải lên file audio 3-5 giây!");
         return;
       }
-      const ttsProvider = engine.id;
-      let vieneuVoice = null;
-      let vieneuRefPath = null;
-      let ttsVoice = null;
+      vieneuRefPath = uploadedRefAudioPath;
+    } else if (engine.voices && engine.voices.length) {
+      const voice = vieneuPresetSelect ? vieneuPresetSelect.value : engine.defaultVoice;
+      if (engine.id === "vieneu") vieneuVoice = voice;
+      else ttsVoice = voice;
+    }
 
-      if (modeId === "clone") {
-        if (!uploadedRefAudioPath) {
-          alert("Bạn chọn nhái giọng nhưng chưa tải lên file audio 3-5 giây!");
-          return;
-        }
-        vieneuRefPath = uploadedRefAudioPath;
-      } else if (engine.voices && engine.voices.length) {
-        const voice = vieneuPresetSelect ? vieneuPresetSelect.value : engine.defaultVoice;
-        if (engine.id === "vieneu") vieneuVoice = voice;
-        else ttsVoice = voice;
-      }
+    gotoStep(3);
+    resetBuildScreen("▶ Đang gửi yêu cầu dựng video tới server...\n");
 
-      const response = await fetch("/api/create-video", {
+    try {
+      const response = await fetch("/api/build-jobs", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -1470,43 +1470,203 @@ document.addEventListener("DOMContentLoaded", () => {
           locale: currentLocale,
         }),
       });
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder();
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        
-        const chunk = decoder.decode(value);
-        const lines = chunk.split("\n\n");
-
-        for (const line of lines) {
-          if (line.startsWith("data: ")) {
-            try {
-              const data = JSON.parse(line.substring(6));
-              
-              if (data.message) {
-                terminalLogs.textContent += `${data.message}\n`;
-                terminalLogs.scrollTop = terminalLogs.scrollHeight;
-              }
-
-              if (data.type === "success") {
-                buildSuccessCard.classList.remove("hidden");
-                btnOpenPreview.href = data.previewUrl;
-                document.getElementById("success-desc").textContent = 
-                  `Video "videos/${data.slug}/" đã được dựng thành công và sẵn sàng!`;
-              }
-            } catch {}
-          }
-        }
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        showBuildStartError(data.error || `Server trả lỗi ${response.status}.`);
+        return;
       }
+      watchBuildJob(data);
     } catch (err) {
-      terminalLogs.textContent += `\n✖ Lỗi kết nối: ${err.message}\n`;
+      showBuildStartError(`Không kết nối được tới server: ${err.message}. Kiểm tra server đang chạy rồi bấm dựng lại — kịch bản ở Bước 2 vẫn còn nguyên.`);
     }
   });
 
+  // -------------------------------------------------------------
+  // Bước 3: job dựng theo khâu (xem scripts/lib/build-jobs.mjs). Trình duyệt chỉ HỎI TRẠNG THÁI (poll) nên đóng tab, mất mạng
+  // hay tải lại trang đều không làm mất job; lỗi thì thử lại đúng khâu lỗi ngay tại màn này.
+  // -------------------------------------------------------------
+  const BUILD_JOB_KEY = "acv.activeBuildJob";
+  const BUILD_STATE_LABEL = { pending: "Chưa chạy", running: "Đang chạy", done: "Xong", error: "Lỗi" };
+  const BUILD_STATE_MARK = { pending: "", running: "", done: "✓", error: "!" };
+  const buildStagesList = document.getElementById("build-stages");
+  const buildConnectionNote = document.getElementById("build-connection-note");
+  const buildErrorCard = document.getElementById("build-error-card");
+  const buildErrorTitle = document.getElementById("build-error-title");
+  const buildErrorMessage = document.getElementById("build-error-message");
+  const buildErrorHintEl = document.getElementById("build-error-hint");
+  const buildErrorTech = document.getElementById("build-error-tech");
+  const btnBuildRetry = document.getElementById("btn-build-retry");
+  const btnBuildBack = document.getElementById("btn-build-back");
+  const btnBuildRestart = document.getElementById("btn-build-restart");
+  const btnCopyBuildLog = document.getElementById("btn-copy-build-log");
+  let watchedJob = null;
+  let buildPollTimer = null;
+  let buildActionBusy = false;
+
+  function rememberBuildJob(id) {
+    try {
+      if (id) localStorage.setItem(BUILD_JOB_KEY, id);
+      else localStorage.removeItem(BUILD_JOB_KEY);
+    } catch {
+      // localStorage bị chặn (cửa sổ riêng tư...) -> vẫn khôi phục được qua danh sách job đang chạy ở server
+    }
+  }
+  function rememberedBuildJob() {
+    try {
+      return localStorage.getItem(BUILD_JOB_KEY);
+    } catch {
+      return null;
+    }
+  }
+
+  function resetBuildScreen(logText) {
+    clearTimeout(buildPollTimer);
+    watchedJob = null;
+    terminalLogs.textContent = logText;
+    buildSuccessCard.classList.add("hidden");
+    buildErrorCard.classList.add("hidden");
+    buildConnectionNote.classList.add("hidden");
+    buildStagesList.innerHTML = "";
+  }
+
+  function showBuildStartError(message) {
+    resetBuildScreen(`✖ ${message}\n`);
+    buildErrorTitle.textContent = "Chưa bắt đầu dựng được";
+    buildErrorMessage.textContent = message;
+    buildErrorHintEl.textContent = "Kịch bản vẫn còn nguyên ở Bước 2. Sửa theo thông báo trên rồi bấm dựng lại.";
+    buildErrorTech.textContent = message;
+    btnBuildRetry.classList.add("hidden");
+    btnBuildRestart.classList.add("hidden");
+    buildErrorCard.classList.remove("hidden");
+  }
+
+  function renderBuildStages(job) {
+    buildStagesList.innerHTML = job.stages
+      .map(
+        (stage) => `<li class="build-stage" data-status="${escapeAttr(stage.status)}"${stage.status === "running" ? ' aria-current="step"' : ""}>
+          <span class="build-stage-mark" aria-hidden="true">${BUILD_STATE_MARK[stage.status] || ""}</span>
+          <span class="build-stage-text"><span class="build-stage-name">${escapeHtml(stage.label)}</span><span class="build-stage-state">${BUILD_STATE_LABEL[stage.status] || ""}</span></span>
+        </li>`,
+      )
+      .join("");
+  }
+
+  function jobLogText(job) {
+    return (job.log || []).map((line) => line.message).join("\n");
+  }
+
+  function renderBuildJob(job) {
+    watchedJob = job;
+    renderBuildStages(job);
+    const text = jobLogText(job) || "▶ Đang chờ khâu đầu tiên...";
+    if (terminalLogs.textContent !== `${text}\n`) {
+      terminalLogs.textContent = `${text}\n`;
+      terminalLogs.scrollTop = terminalLogs.scrollHeight;
+    }
+    buildSuccessCard.classList.toggle("hidden", job.status !== "success");
+    buildErrorCard.classList.toggle("hidden", job.status !== "error");
+    if (job.status === "success" && job.result) {
+      btnOpenPreview.href = job.result.previewUrl || job.result.compositionUrl || "#";
+      document.getElementById("success-desc").textContent = `Video "${job.result.slug}" đã được dựng và kiểm tra xong, sẵn sàng để xem.`;
+    }
+    if (job.status === "error") {
+      const failed = job.stages.find((stage) => stage.status === "error") || job.stages[0];
+      const error = failed.error || { message: "Lỗi không xác định." };
+      buildErrorTitle.textContent = `Lỗi ở khâu “${failed.label}”`;
+      buildErrorMessage.textContent = error.message;
+      buildErrorHintEl.textContent = error.hint || buildErrorHint(failed.id, error);
+      buildErrorTech.textContent = [error.technical || error.message, "", "--- Log dựng (200 dòng cuối) ---", ...(job.log || []).slice(-200).map((line) => `${line.at} ${line.message}`)].join("\n");
+      btnBuildRetry.classList.remove("hidden");
+      btnBuildRestart.classList.remove("hidden");
+      btnBuildRetry.textContent = `Thử lại từ khâu “${failed.label}”`;
+    }
+    for (const button of [btnBuildRetry, btnBuildBack, btnBuildRestart]) button.disabled = buildActionBusy;
+  }
+
+  async function pollBuildJob(id) {
+    clearTimeout(buildPollTimer);
+    try {
+      const res = await fetch(`/api/build-jobs/${encodeURIComponent(id)}`);
+      if (res.status === 404) {
+        rememberBuildJob(null);
+        showBuildStartError("Không còn tìm thấy job dựng video này trên server.");
+        return;
+      }
+      const job = await res.json();
+      buildConnectionNote.classList.add("hidden");
+      renderBuildJob(job);
+      if (job.status === "running" || job.status === "pending") buildPollTimer = setTimeout(() => pollBuildJob(id), 1000);
+    } catch {
+      // mất kết nối tạm thời: không bắt tải lại trang, tự thử lại
+      buildConnectionNote.textContent = "Mất kết nối tới server — đang tự thử lại, việc dựng (nếu đang chạy) không bị mất.";
+      buildConnectionNote.classList.remove("hidden");
+      buildPollTimer = setTimeout(() => pollBuildJob(id), 2000);
+    }
+  }
+
+  function watchBuildJob(job) {
+    rememberBuildJob(job.id);
+    gotoStep(3);
+    resetBuildScreen("");
+    renderBuildJob(job);
+    pollBuildJob(job.id);
+  }
+
+  async function buildJobAction(action) {
+    if (!watchedJob || buildActionBusy) return;
+    buildActionBusy = true;
+    for (const button of [btnBuildRetry, btnBuildBack, btnBuildRestart]) button.disabled = true;
+    try {
+      const res = await fetch(`/api/build-jobs/${encodeURIComponent(watchedJob.id)}/${action}`, { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `Server trả lỗi ${res.status}.`);
+      buildActionBusy = false;
+      renderBuildJob(data);
+      pollBuildJob(data.id);
+    } catch (err) {
+      buildActionBusy = false;
+      buildConnectionNote.textContent = `Chưa thực hiện được: ${err.message}`;
+      buildConnectionNote.classList.remove("hidden");
+      for (const button of [btnBuildRetry, btnBuildBack, btnBuildRestart]) button.disabled = false;
+    }
+  }
+
+  btnBuildRetry.addEventListener("click", () => buildJobAction("retry"));
+  btnBuildRestart.addEventListener("click", () => {
+    if (confirm("Dựng lại từ đầu sẽ xoá project dựng dở và sinh lại giọng đọc. Kịch bản giữ nguyên. Tiếp tục?")) buildJobAction("restart");
+  });
+  btnBuildBack.addEventListener("click", async () => {
+    const job = watchedJob;
+    if (!job) return gotoStep(2);
+    clearTimeout(buildPollTimer);
+    rememberBuildJob(null);
+    try {
+      // Còn nội dung trong Bước 2 (chưa tải lại trang) -> giữ nguyên; nếu không, mở lại từ bản lưu của job.
+      if (pointsData.length || (await loadRecordIntoStep2(job.slug))) gotoStep(2);
+      else gotoStep(3);
+    } catch (err) {
+      buildConnectionNote.textContent = `Không mở lại được kịch bản: ${err.message}`;
+      buildConnectionNote.classList.remove("hidden");
+    }
+  });
+  btnCopyBuildLog.addEventListener("click", async () => {
+    const text = buildErrorTech.textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const area = document.createElement("textarea");
+      area.value = text;
+      document.body.appendChild(area);
+      area.select();
+      document.execCommand("copy");
+      document.body.removeChild(area);
+    }
+    btnCopyBuildLog.textContent = "Đã sao chép";
+    setTimeout(() => { btnCopyBuildLog.textContent = "Sao chép log"; }, 1800);
+  });
+
   btnCreateAnother.addEventListener("click", () => {
+    rememberBuildJob(null);
     gotoStep(1);
   });
 
