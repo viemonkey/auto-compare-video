@@ -879,11 +879,20 @@ document.addEventListener("DOMContentLoaded", () => {
     }
     list.forEach((v) => {
       const draft = v.status === "draft";
+      const failed = v.status === "error";
+      const building = v.status === "building";
       const card = document.createElement("div");
       card.className = "video-card";
-      const actions = draft
-        ? `<button type="button" class="btn btn-small btn-primary btn-open-draft" data-slug="${escapeAttr(v.slug)}">Mở để sửa</button>`
-        : `<a href="${v.previewUrl}" target="_blank" class="btn btn-small btn-primary">${v.hasIndex ? "Xem trước" : "Xem MP4"}</a>
+      const statusBadge = failed
+        ? ' <span class="status-badge error">Lỗi</span>'
+        : building
+          ? ' <span class="status-badge building">Đang dựng</span>'
+          : "";
+      const actions = v.buildJob && (failed || building)
+        ? `<button type="button" class="btn btn-small btn-primary btn-open-job" data-job="${escapeAttr(v.buildJob.id)}">${failed ? "Mở lại để xử lý" : "Xem tiến trình"}</button>`
+        : failed || draft
+          ? `<button type="button" class="btn btn-small btn-primary btn-open-draft" data-slug="${escapeAttr(v.slug)}">Mở để sửa</button>`
+          : `<a href="${v.previewUrl}" target="_blank" class="btn btn-small btn-primary">${v.hasIndex ? "Xem trước" : "Xem MP4"}</a>
             ${v.renderFile && v.renderFile !== v.previewUrl ? `<a href="${v.renderFile}" target="_blank" class="btn btn-small btn-secondary">Tải MP4</a>` : ""}`;
       const versionBtn = v.canMakeVersion
         ? `<button type="button" class="btn btn-small btn-secondary btn-make-version" data-slug="${escapeAttr(v.slug)}" title="Dùng lại 2 ảnh, gợi ý và góc độ để viết nội dung cho thị trường khác">Tạo bản cho thị trường khác</button>`
@@ -892,10 +901,10 @@ document.addEventListener("DOMContentLoaded", () => {
         <div>
           ${
             v.title && v.title.vi
-              ? `<h4>${flagBadgeHtml(v)} ${escapeHtml(v.title.text)}${draft ? ' <span class="draft-badge">Bản nháp</span>' : ""}</h4>
+              ? `<h4>${flagBadgeHtml(v)} ${escapeHtml(v.title.text)}${draft ? ' <span class="draft-badge">Bản nháp</span>' : ""}${statusBadge}</h4>
           <div class="video-title-vi">${escapeHtml(v.title.vi)}</div>
           <div class="video-slug-dim">${escapeHtml(v.slug)} · ${escapeHtml(v.location || `videos/${v.slug}/`)}</div>`
-              : `<h4>${flagBadgeHtml(v)} ${escapeHtml(v.name)}${draft ? ' <span class="draft-badge">Bản nháp</span>' : ""}</h4>
+              : `<h4>${flagBadgeHtml(v)} ${escapeHtml(v.name)}${draft ? ' <span class="draft-badge">Bản nháp</span>' : ""}${statusBadge}</h4>
           <span style="font-size: 11px; color: var(--accent-cyan); font-family: monospace;">${escapeHtml(v.location || `videos/${v.slug}/`)}</span>`
           }
           ${v.derivedFrom ? `<div style="font-size: 11px; color: var(--fg-dim); margin-top: 2px;">Phiên bản của ${escapeHtml(v.derivedFrom)}</div>` : ""}
@@ -911,7 +920,21 @@ document.addEventListener("DOMContentLoaded", () => {
   videosListGrid.addEventListener("click", async (e) => {
     const open = e.target.closest(".btn-open-draft");
     const make = e.target.closest(".btn-make-version");
-    if (open) {
+    const openJob = e.target.closest(".btn-open-job");
+    if (openJob) {
+      openJob.disabled = true;
+      try {
+        const res = await fetch(`/api/build-jobs/${encodeURIComponent(openJob.dataset.job)}`);
+        const job = await res.json();
+        if (!res.ok) throw new Error(job.error || "Không mở được job dựng video.");
+        videosModal.classList.add("hidden");
+        watchBuildJob(job);
+      } catch (err) {
+        alert(err.message);
+      } finally {
+        openJob.disabled = false;
+      }
+    } else if (open) {
       open.disabled = true;
       try {
         if (await loadRecordIntoStep2(open.dataset.slug)) videosModal.classList.add("hidden");
@@ -2236,6 +2259,27 @@ document.addEventListener("DOMContentLoaded", () => {
   costStatsModal.addEventListener("click", (e) => {
     if (e.target === costStatsModal) costStatsModal.classList.add("hidden");
   });
+
+  // Tải lại trang giữa lúc đang dựng / đang lỗi: nối lại đúng job (id nhớ ở localStorage; không có thì lấy job đang chạy từ server).
+  async function restoreBuildJob() {
+    try {
+      let id = rememberedBuildJob();
+      if (!id) {
+        const jobs = await (await fetch("/api/build-jobs")).json();
+        id = (jobs.find((job) => job.status === "running" || job.status === "pending") || {}).id;
+      }
+      if (!id) return;
+      const res = await fetch(`/api/build-jobs/${encodeURIComponent(id)}`);
+      if (!res.ok) {
+        rememberBuildJob(null);
+        return;
+      }
+      watchBuildJob(await res.json());
+    } catch {
+      // server chưa sẵn sàng: bỏ qua, người dùng vẫn mở được job từ "Danh sách video đã dựng"
+    }
+  }
+  restoreBuildJob();
 
   // Helper
   function escapeHtml(str) {

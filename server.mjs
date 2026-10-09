@@ -82,7 +82,7 @@ import { rewriteField, translateField, FieldEditError } from "./scripts/lib/fiel
 import { AbortedError } from "./scripts/lib/gemini-client.mjs";
 import { checkFfmpeg, extractPoseTimeline, setReelThumbnail } from "./scripts/lib/reel-thumbnail.mjs";
 import { checkMediaBinaries, describeSpawnError, mediaToolsEnv, mediaToolsErrorVi } from "./scripts/lib/media-binaries.mjs";
-import { FileBuildJobStore, createBuildJob, resetJobForRetry, resetJobFromStart, runBuildJob } from "./scripts/lib/build-jobs.mjs";
+import { FileBuildJobStore, createBuildJob, jobSummary, latestJobBySlug, recoverInterruptedJobs, resetJobForRetry, resetJobFromStart, runBuildJob } from "./scripts/lib/build-jobs.mjs";
 import { getLocale, listLocales, localeErrors, getDefaultLocale } from "./scripts/lib/locales.mjs";
 import {
   listEngines,
@@ -593,7 +593,9 @@ function ensureUniqueSlug(baseSlug) {
 function buildStageError(stage, result, fallback) {
   const extracted = geminiFailureMessage(result?.out || "");
   const spawnText = result?.errorText || (result?.error ? describeSpawnError(result.error) : "");
-  const error = new Error(extracted || spawnText || fallback || `Khâu ${stage} thất bại.`);
+  // Nguyên nhân thật thường nằm ở dòng "Error: ..." của script con; dòng cuối "THẤT BẠI: ... (exit 1)" chỉ nói chung chung.
+  const cause = [...String(result?.out || "").matchAll(/^Error: (.+)$/gm)].pop()?.[1]?.trim();
+  const error = new Error(cause || extracted || spawnText || fallback || `Khâu ${stage} thất bại.`);
   error.userMessage = error.message;
   error.code = result?.error?.code || (Number.isInteger(result?.code) ? `EXIT_${result.code}` : "BUILD_FAILED");
   error.technical = [spawnText, result?.out].filter(Boolean).join("\n").trim();
@@ -808,6 +810,17 @@ async function prepareBuildJob(body) {
   buildJobStore.write(job);
   return job;
 }
+
+// Server vừa (khởi động lại) mà còn job đang dở trên đĩa -> đánh dấu lỗi "bị ngắt" để người dùng thử lại, không kẹt ở "đang chạy".
+for (const id of recoverInterruptedJobs(buildJobStore, { isRunning: (jobId) => runningBuildJobs.has(jobId) })) {
+  const job = buildJobStore.read(id);
+  if (job) updateContentRecordStatus(job, "error");
+  console.warn(`[build] Job ${id} bị ngắt khi server dừng — đã đánh dấu lỗi để thử lại.`);
+}
+
+app.get("/api/build-jobs", (_req, res) => {
+  res.json(buildJobStore.list().slice(0, 50).map(jobSummary));
+});
 
 app.post("/api/build-jobs", async (req, res) => {
   try {
@@ -1275,6 +1288,33 @@ app.get("/api/videos", (_req, res) => {
   }
   const listed = new Set(out.map((v) => v.slug));
   for (const d of marketApi.listDrafts()) if (!listed.has(d.slug)) out.push(d);
+
+  // 2c. Job dựng chưa xong (đang chạy / lỗi): gắn buildJob để giao diện hiện "Đang dựng"/"Lỗi" và mở lại được; project đã bị
+  //     dọn thì vẫn liệt kê để video lỗi không biến mất khỏi danh sách.
+  const jobs = latestJobBySlug(buildJobStore);
+  for (const v of out) {
+    const job = jobs.get(v.slug);
+    if (!job || job.status === "success") continue;
+    v.buildJob = jobSummary(job);
+    v.status = job.status === "error" ? "error" : "building";
+  }
+  const listedNow = new Set(out.map((v) => v.slug));
+  for (const job of jobs.values()) {
+    if (job.status === "success" || listedNow.has(job.slug)) continue;
+    out.push({
+      slug: job.slug,
+      name: job.slug,
+      hasIndex: false,
+      hasBrief: false,
+      renderFile: null,
+      previewUrl: null,
+      location: `videos/${job.slug}/`,
+      ...marketApi.recordInfo(job.slug),
+      status: job.status === "error" ? "error" : "building",
+      canMakeVersion: false,
+      buildJob: jobSummary(job),
+    });
+  }
 
   // 3. Trạng thái đăng Facebook (data/social-queue.json) — gắn thêm, không thay đổi field cũ.
   const social = socialStatusBySlug();
