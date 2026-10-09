@@ -1,6 +1,7 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { checkMediaBinaries, describeSpawnError, mediaToolsErrorVi, resolveMediaBinaries } from "../scripts/lib/media-binaries.mjs";
+import path from "node:path";
+import { checkMediaBinaries, describeSpawnError, mediaToolsEnv, mediaToolsErrorVi, resolveMediaBinaries } from "../scripts/lib/media-binaries.mjs";
 
 test("media binaries: cấu hình thắng binary đóng gói; mặc định có ffmpeg-static và ffprobe-static", () => {
   assert.deepEqual(
@@ -46,4 +47,13 @@ test("spawn error: không biến thành object rỗng, luôn có command + mã l
   const error = Object.assign(new Error("spawn ffprobe ENOENT"), { code: "ENOENT", path: "ffprobe" });
   assert.equal(describeSpawnError(error), "Không chạy được ffprobe [ENOENT]: spawn ffprobe ENOENT");
   assert.match(describeSpawnError({}), /UNKNOWN/);
+});
+
+test("mediaToolsEnv: thư mục ffmpeg/ffprobe đóng gói đứng đầu PATH để hyperframes render tìm thấy", () => {
+  const env = mediaToolsEnv({ PATH: "/usr/bin" }, { ffmpeg: "/bundle/ffmpeg/ffmpeg", ffprobe: "/bundle/ffprobe/ffprobe" });
+  assert.equal(env.PATH, ["/bundle/ffmpeg", "/bundle/ffprobe", "/usr/bin"].join(path.delimiter));
+  const same = mediaToolsEnv({ PATH: "/usr/bin" }, { ffmpeg: "/bundle/ffmpeg", ffprobe: "/bundle/ffprobe" });
+  assert.equal(same.PATH, ["/bundle", "/usr/bin"].join(path.delimiter), "trùng thư mục chỉ thêm một lần");
+  const byName = mediaToolsEnv({ PATH: "/usr/bin" }, { ffmpeg: "ffmpeg", ffprobe: "ffprobe" });
+  assert.equal(byName.PATH, "/usr/bin", "tên trần (đã có trong PATH) thì không đổi");
 });

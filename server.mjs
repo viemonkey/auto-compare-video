@@ -81,7 +81,7 @@ import { copySourceImages, readRecord, writeRecord } from "./scripts/lib/content
 import { rewriteField, translateField, FieldEditError } from "./scripts/lib/field-edit.mjs";
 import { AbortedError } from "./scripts/lib/gemini-client.mjs";
 import { checkFfmpeg, extractPoseTimeline, setReelThumbnail } from "./scripts/lib/reel-thumbnail.mjs";
-import { checkMediaBinaries, describeSpawnError, mediaToolsErrorVi } from "./scripts/lib/media-binaries.mjs";
+import { checkMediaBinaries, describeSpawnError, mediaToolsEnv, mediaToolsErrorVi } from "./scripts/lib/media-binaries.mjs";
 import { FileBuildJobStore, createBuildJob, resetJobForRetry, resetJobFromStart, runBuildJob } from "./scripts/lib/build-jobs.mjs";
 import { getLocale, listLocales, localeErrors, getDefaultLocale } from "./scripts/lib/locales.mjs";
 import {
@@ -375,7 +375,7 @@ app.get("/api/content-angles", (_req, res) => {
 // ------------------------------------------------------------------
 function runNode(args, { onLine } = {}) {
   return new Promise((resolve) => {
-    const child = spawn(process.execPath, args, { cwd: __dirname });
+    const child = spawn(process.execPath, args, { cwd: __dirname, env: mediaToolsEnv() });
     let out = "";
     let tail = "";
 
@@ -401,7 +401,7 @@ function runNode(args, { onLine } = {}) {
 
 function runCommand(command, args, { cwd = __dirname, onLine } = {}) {
   return new Promise((resolve) => {
-    const child = spawn(command, args, { cwd, windowsHide: true });
+    const child = spawn(command, args, { cwd, windowsHide: true, env: mediaToolsEnv() });
     let out = "";
     let tail = "";
     const feed = (buf) => {
@@ -702,7 +702,7 @@ function buildStageHandlers(jobId) {
       log("▶ Đang render MP4...");
       const result = await renderQueue.enqueue(() => {
         const npmRender = npmCommand("npm", ["run", "render"]);
-        return runRenderJob({ command: npmRender.command, args: npmRender.args, cwd: target, slug: job.slug, logDir: RENDER_LOG_DIR, onLine: log });
+        return runRenderJob({ command: npmRender.command, args: npmRender.args, cwd: target, env: mediaToolsEnv(), slug: job.slug, logDir: RENDER_LOG_DIR, onLine: log });
       }, { onWait: (ahead) => log(`⏳ Có ${ahead} video đang chờ trước job này.`) });
       pruneLogs(RENDER_LOG_DIR, 50);
       if (result.code !== 0 || !latestRender(job.slug)) {
@@ -1042,6 +1042,7 @@ app.post("/api/create-video", async (req, res) => {
             command: npmRender.command,
             args: npmRender.args,
             cwd: target,
+            env: mediaToolsEnv(),
             slug,
             logDir: RENDER_LOG_DIR,
             // log render rất ồn (mỗi frame 1 dòng, các dòng [INFO]) — chỉ đẩy dòng có ý nghĩa lên màn hình; TOÀN BỘ vẫn nằm trong file log

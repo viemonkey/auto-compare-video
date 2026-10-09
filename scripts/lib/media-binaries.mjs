@@ -1,4 +1,5 @@
 import fs from "node:fs";
+import path from "node:path";
 import { spawnSync } from "node:child_process";
 import ffmpegStatic from "ffmpeg-static";
 import ffprobeStatic from "ffprobe-static";
@@ -13,6 +14,17 @@ export function resolveMediaBinaries(env = process.env, bundled = bundledDefault
     ffmpeg: String(env.FFMPEG_PATH || bundled.ffmpeg || "ffmpeg"),
     ffprobe: String(env.FFPROBE_PATH || bundled.ffprobe || "ffprobe"),
   };
+}
+
+/**
+ * env cho tiến trình con (hyperframes render/check, scaffold...): các công cụ đó tự gọi `ffmpeg`/`ffprobe` theo tên qua PATH,
+ * nên thêm thư mục chứa bản đóng gói (hoặc FFMPEG_PATH/FFPROBE_PATH) lên ĐẦU PATH. Máy đã có ffmpeg hệ thống vẫn chạy bình thường.
+ */
+export function mediaToolsEnv(env = process.env, bundled = bundledDefaults) {
+  const paths = resolveMediaBinaries(env, bundled);
+  const dirs = [...new Set([paths.ffmpeg, paths.ffprobe].filter((bin) => path.isAbsolute(bin)).map((bin) => path.dirname(bin)))];
+  const key = Object.keys(env).find((name) => name.toLowerCase() === "path") || "PATH";
+  return { ...env, [key]: [...dirs, env[key]].filter(Boolean).join(path.delimiter) };
 }
 
 export function describeSpawnError(error, fallbackCommand = "tiến trình") {

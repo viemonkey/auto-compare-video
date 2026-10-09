@@ -69,7 +69,7 @@ export function pruneLogs(dir, keep = 50) {
  * Chạy lệnh render, ghi log đầy đủ.
  * @returns {Promise<{code:number|null, signal:string|null, logFile:string, tail:string[], error?:string}>}
  */
-export function runRenderJob({ command, args, cwd, slug, logDir, tailLines = 15, onLine, spawnFn = spawn, now = () => new Date() }) {
+export function runRenderJob({ command, args, cwd, env, slug, logDir, tailLines = 15, onLine, spawnFn = spawn, now = () => new Date() }) {
   fs.mkdirSync(logDir, { recursive: true });
   const stamp = now().toISOString().replace(/[:.]/g, "-");
   const logFile = path.join(logDir, `${slug}_${stamp}.render.log`);
@@ -104,7 +104,7 @@ export function runRenderJob({ command, args, cwd, slug, logDir, tailLines = 15,
       out.end(() => resolve({ code, signal: signal ?? null, logFile, tail: recent.slice(-tailLines), ...(error ? { error } : {}) }));
     };
     try {
-      child = spawnFn(command, args, { cwd });
+      child = spawnFn(command, args, env ? { cwd, env } : { cwd });
     } catch (e) {
       finish(-1, null, e.message);
       return;
