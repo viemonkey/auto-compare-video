@@ -487,25 +487,53 @@
         capRefs[n] = { lineEl, phrases };
       }
 
+      // When caption line n fades out. A line pops in 0.1s BEFORE its first word, so line n must be fully
+      // invisible before the next caption line appears — otherwise the two lines overlap for a few frames
+      // (tight speech, esp. Japanese). Pure function (no tl/DOM) so test/caption-window.test.mjs can run it.
+      /* captionWindow:start */
+      function captionWindow(n, vo, captions) {
+        const FADE = 0.18, LINGER = 0.75, SAFE = 0.02, LEAD = 0.1;
+        const base = vo[n].start;
+        const words = captions[n];
+        const lastAbs = base + words[words.length - 1][1];
+        const nextBeatStart = vo[n + 1] ? vo[n + 1].start : base + vo[n].dur + 0.6;
+        const nextCap = Object.keys(captions).map(Number).sort((a, b) => a - b).find((k) => k > n);
+        const nextAppear = nextCap === undefined ? Infinity : vo[nextCap].start + captions[nextCap][0][1] - LEAD;
+        const hideBy = Math.min(nextBeatStart + FADE - 0.05, nextAppear - SAFE);
+        const fadeStart = Math.max(lastAbs, Math.min(lastAbs + LINGER, hideBy - FADE));
+        const fadeDur = Math.min(FADE, hideBy - fadeStart);
+        // not enough room to fade: hard cut at hideBy (a truncated last word beats two lines on screen)
+        return fadeDur >= 0.02 ? { fadeStart, fadeDur, hideAt: fadeStart + fadeDur } : { fadeStart: hideBy, fadeDur: 0, hideAt: hideBy };
+      }
+
+      // Mốc hiện/ẩn của cụm chữ pi trong 1 câu. Cụm cũ phải ẩn CÙNG LÚC (không muộn hơn) cụm mới hiện, nếu không có
+      // khoảng ~10ms cả hai cùng hiện và 1 khung hình rơi trúng đó thì thấy chữ chồng nhau.
+      function phraseTimes(base, starts, pi, lineHideAt) {
+        const hasNext = starts[pi + 1] !== undefined;
+        const phEnd = hasNext ? base + starts[pi + 1] : lineHideAt + 0.03;
+        return { phStart: base + starts[pi], phEnd, showAt: base + starts[pi] - 0.04, hideAt: phEnd - (hasNext ? 0.04 : 0.03) };
+      }
+      /* captionWindow:end */
+
       function showCaption(n) {
         const { lineEl, phrases } = capRefs[n];
         const base = VO[n].start;
         const words = CAPTIONS[n];
         const firstAbs = base + words[0][1];
-        const nextLineStart = VO[n + 1] ? VO[n + 1].start : base + VO[n].dur + 0.6;
-        const lineEnd = Math.min(base + words[words.length - 1][1] + 0.75, nextLineStart - 0.05);
+        const { fadeStart, fadeDur, hideAt } = captionWindow(n, VO, CAPTIONS);
 
         tl.set(lineEl, { opacity: 1 }, firstAbs - 0.1);
-        tl.to(lineEl, { opacity: 0, duration: 0.18, ease: "power2.in" }, lineEnd);
+        if (fadeDur > 0) tl.to(lineEl, { opacity: 0, duration: fadeDur, ease: "power2.in" }, fadeStart);
+        else tl.set(lineEl, { opacity: 0 }, fadeStart);
 
+        const starts = phrases.map((ph) => ph.wds[0].at);
         phrases.forEach((ph, pi) => {
-          const phStart = base + ph.wds[0].at;
-          const phEnd = phrases[pi + 1] ? base + phrases[pi + 1].wds[0].at : lineEnd + 0.18;
+          const { phEnd, showAt, hideAt: phHideAt } = phraseTimes(base, starts, pi, hideAt);
           // CapCut-style hard swap: one phrase on screen at a time, no crossfade
           // (the word highlight carries the motion). A small pop-in on the group.
-          tl.set(ph.el, { visibility: "visible", opacity: 1 }, phStart - 0.04);
-          tl.fromTo(ph.el, { y: 12 }, { y: 0, duration: 0.16, ease: "power3.out" }, phStart - 0.04);
-          tl.set(ph.el, { visibility: "hidden", opacity: 0 }, phEnd - 0.03);
+          tl.set(ph.el, { visibility: "visible", opacity: 1 }, showAt);
+          tl.fromTo(ph.el, { y: 12 }, { y: 0, duration: 0.16, ease: "power3.out" }, showAt);
+          tl.set(ph.el, { visibility: "hidden", opacity: 0 }, phHideAt);
           ph.wds.forEach((wd, wi) => {
             const on = base + wd.at;
             const off = ph.wds[wi + 1] ? base + ph.wds[wi + 1].at : phEnd - 0.03;
