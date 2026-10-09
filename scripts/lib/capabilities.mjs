@@ -149,6 +149,18 @@ export const enginesForLanguage = (language, engines = listEngines()) => engines
 export const themeSupportsScript = (theme, script) => theme.scripts.includes(script);
 export const themeSupportsLanguage = (theme, language) => theme.languages.includes(language);
 
+// ISO 15924 là dữ liệu cấu hình nội bộ. Thông báo cho người dùng phải dùng tên dễ hiểu;
+// locale mới/chưa biết vẫn có câu dự phòng thay vì lộ mã kỹ thuật như "Jpan".
+const SCRIPT_NAMES_VI = Object.freeze({
+  Latn: "chữ La-tinh",
+  Jpan: "chữ Nhật",
+  Thai: "chữ Thái",
+  Hans: "chữ Hán giản thể",
+  Hant: "chữ Hán phồn thể",
+  Kore: "chữ Hàn",
+});
+export const scriptNameVi = (script) => SCRIPT_NAMES_VI[script] || "hệ chữ của thị trường này";
+
 /** Engine đã sẵn sàng chạy chưa (đủ biến môi trường / thư mục cài đặt)? Khai báo trong engine.requires. */
 export function engineReadiness(engine, { env = process.env, repoRoot = REPO_ROOT } = {}) {
   const req = engine.requires || {};
@@ -177,7 +189,7 @@ export function checkRenderability(locale, { themeId, engines = listEngines(), t
     blockers.push({ kind: "theme", message: "Không có giao diện video nào được cấu hình." });
   } else {
     if (!themeSupportsScript(theme, locale.script)) {
-      blockers.push({ kind: "theme", message: `Giao diện "${theme.name}" chưa hỗ trợ chữ ${locale.script} của ${locale.displayName} (thiếu font).` });
+      blockers.push({ kind: "theme", message: `Giao diện "${theme.name}" chưa hỗ trợ ${scriptNameVi(locale.script)} của ${locale.displayName} (thiếu font).` });
     }
     if (!themeSupportsLanguage(theme, locale.language)) {
       blockers.push({ kind: "pipeline", message: `Pipeline dựng video chưa hỗ trợ ${locale.displayName}.` });

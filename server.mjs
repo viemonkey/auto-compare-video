@@ -92,6 +92,7 @@ import {
   engineReadiness,
   checkRenderability,
   capabilityErrors,
+  scriptNameVi,
 } from "./scripts/lib/capabilities.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -345,7 +346,7 @@ app.get("/api/themes", (req, res) => {
   if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
   const themes = listThemes().map((t) => {
     const reasons = [];
-    if (!themeSupportsScript(t, locale.script)) reasons.push(`chưa hỗ trợ chữ ${locale.script} (thiếu font)`);
+    if (!themeSupportsScript(t, locale.script)) reasons.push(`chưa hỗ trợ ${scriptNameVi(locale.script)} (thiếu font)`);
     if (!themeSupportsLanguage(t, locale.language)) reasons.push(`pipeline dựng video chưa hỗ trợ ${locale.displayName}`);
     return { id: t.id, name: t.name, label: t.label, scripts: t.scripts, languages: t.languages, supported: reasons.length === 0, reason: reasons.join("; ") };
   });

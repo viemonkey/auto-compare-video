@@ -6,7 +6,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import {
   validateEngine, validateTheme, loadEngines, loadThemes, listEngines, listThemes,
-  enginesForLanguage, themeSupportsScript, themeSupportsLanguage, engineReadiness, checkRenderability, getDefaultTheme, defaultVoiceFor,
+  enginesForLanguage, themeSupportsScript, themeSupportsLanguage, engineReadiness, checkRenderability, getDefaultTheme, defaultVoiceFor, scriptNameVi,
 } from "../scripts/lib/capabilities.mjs";
 import { listLocales, defaultLocaleCode, getLocale, glossaryEntries } from "../scripts/lib/locales.mjs";
 import { buildComparePrompt, buildResponseSchema, schemaMaxLength } from "../scripts/lib/compare-prompt.mjs";
@@ -84,7 +84,8 @@ test("renderable = engine hỗ trợ ngôn ngữ VÀ theme hỗ trợ script VÀ
   r = checkRenderability(loc, { engines, themes, themeId: "u" });
   assert.equal(r.renderable, false);
   assert.deepEqual(r.blockers.map((b) => b.kind), ["theme"]);
-  assert.match(r.blockers[0].message, /Zzzz/);
+  assert.match(r.blockers[0].message, /hệ chữ của thị trường này/);
+  assert.doesNotMatch(r.blockers[0].message, /Zzzz/);
 
   r = checkRenderability(loc, { engines, themes, themeId: "w" });
   assert.equal(r.renderable, false);
@@ -100,6 +101,13 @@ test("renderable = engine hỗ trợ ngôn ngữ VÀ theme hỗ trợ script VÀ
 
   assert.equal(checkRenderability(loc, { engines, themes: [] }).renderable, false);
   assert.doesNotThrow(() => checkRenderability(loc, { engines, themes, themeId: "khong-co" }));
+});
+
+test("thông báo cho người dùng dùng tên hệ chữ tiếng Việt, không lộ mã ISO 15924", () => {
+  assert.equal(scriptNameVi("Latn"), "chữ La-tinh");
+  assert.equal(scriptNameVi("Jpan"), "chữ Nhật");
+  assert.equal(scriptNameVi("Thai"), "chữ Thái");
+  assert.equal(scriptNameVi("Zzzz"), "hệ chữ của thị trường này");
 });
 
 test("renderable không phụ thuộc cờ cứng: đổi khai báo engine/theme thì kết quả đổi theo", () => {
