@@ -39,3 +39,11 @@ test("focus bàn phím, lỗi tràn chữ và nút sửa luôn nhận biết đ�
   assert.match(css, /\.bi-vi-actions \.bi-btn[^}]*opacity:\s*0\.62/);
   assert.match(editor, /btnRe\.classList\.toggle\("hidden", !\(gloss && text\.trim\(\) !== ""\)\)/);
 });
+
+test("hộp thoại thống kê chi phí rộng hơn hộp thường và slug dài bị cắt bằng … (không đẩy bảng ra ngoài)", () => {
+  const html = fs.readFileSync(path.join(ROOT, "public", "index.html"), "utf8");
+  assert.match(html, /id="cost-stats-modal"[\s\S]*?class="modal-dialog wide cost-dialog"/);
+  assert.match(css, /\.modal-dialog\.wide\.cost-dialog \{\s*max-width: min\(1240px, 100%\);/);
+  assert.match(css, /\.cost-td-slug \{[^}]*max-width: clamp\([^}]*text-overflow: ellipsis/);
+  assert.match(app, /class="cost-td-slug" title="\$\{escapeAttr\(v\.slug\)\}"/);
+});

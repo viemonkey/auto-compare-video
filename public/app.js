@@ -2040,7 +2040,7 @@ document.addEventListener("DOMContentLoaded", () => {
       const tr = document.createElement("tr");
       const createdAt = v.createdAt ? new Date(v.createdAt).toLocaleString("vi-VN") : "—";
       tr.innerHTML = `
-        <td class="cost-td-slug">${escapeHtml(v.slug)}</td>
+        <td class="cost-td-slug" title="${escapeAttr(v.slug)}">${escapeHtml(v.slug)}</td>
         <td>${flagBadgeHtml(v)}</td>
         <td>${escapeHtml(createdAt)}</td>
         <td class="cost-td-content">${formatUsd(v.contentCost)}</td>
