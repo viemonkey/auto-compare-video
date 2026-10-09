@@ -18,6 +18,8 @@
 //                         phải truyền — chỉ bỏ qua bước GỌI GEMINI, ảnh vẫn được copy vào card.
 //   --topic-hint <text>  Gợi ý ngữ cảnh thêm cho Gemini (bỏ qua nếu dùng --content)
 //   --skip-check         Không tự chạy `npm run check` sau khi dựng xong
+//   --stage <id>         Chỉ chạy 1 khâu: voice | timing | scene | check
+//   --resume             Dùng lại đúng project/artefact đã có, không tạo slug mới
 //
 // Ví dụ:
 //   node scripts/scaffold-compare-video.mjs test-images/nhan-vang.jpg test-images/nhan-kim-cuong.jpg \
@@ -68,13 +70,15 @@ function fail(msg) {
 // ============================================================
 function parseArgs(argv) {
   const positional = [];
-  const opts = { slug: null, contentPath: null, topicHint: null, skipCheck: false, ttsProvider: null, vieneuVoice: null, edgeVoice: null, ttsVoice: null };
+  const opts = { slug: null, contentPath: null, topicHint: null, skipCheck: false, stage: null, resume: false, ttsProvider: null, vieneuVoice: null, edgeVoice: null, ttsVoice: null };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === "--slug") opts.slug = argv[++i];
     else if (a === "--content") opts.contentPath = argv[++i];
     else if (a === "--topic-hint") opts.topicHint = argv[++i];
     else if (a === "--skip-check") opts.skipCheck = true;
+    else if (a === "--stage") opts.stage = argv[++i];
+    else if (a === "--resume") opts.resume = true;
     else if (a === "--tts-provider") opts.ttsProvider = argv[++i];
     else if (a === "--vieneu-voice") opts.vieneuVoice = argv[++i];
     else if (a === "--edge-voice") opts.edgeVoice = argv[++i];
@@ -101,6 +105,10 @@ function parseArgs(argv) {
         " Nếu slug do code sinh ra: nhớ .normalize(\"NFD\") + bỏ dấu tổ hợp TRƯỚC khi lọc [^a-z0-9].",
     );
   }
+  if (opts.stage && !["voice", "timing", "scene", "check"].includes(opts.stage)) {
+    fail(`--stage "${opts.stage}" không hợp lệ — dùng voice | timing | scene | check.`);
+  }
+  if (opts.resume && !opts.slug) fail("--resume cần đi cùng --slug để mở đúng project đang dựng dở.");
   return opts;
 }
 
@@ -573,7 +581,10 @@ async function main() {
   validateContent(content, catalog);
 
   const requestedSlug = opts.slug || genUniqueSlug(content);
-  const slug = opts.slug ? ensureUniqueSlugDir(requestedSlug) : requestedSlug;
+  const requestedTarget = path.join(REPO_ROOT, "videos", requestedSlug);
+  const slug = opts.resume && fs.existsSync(requestedTarget)
+    ? requestedSlug
+    : opts.slug ? ensureUniqueSlugDir(requestedSlug) : requestedSlug;
   if (slug !== requestedSlug) {
     console.log(`ℹ videos/${requestedSlug}/ đã tồn tại — dùng "${slug}" thay thế.`);
   }
@@ -584,6 +595,9 @@ async function main() {
     }
   }
   const target = path.join(REPO_ROOT, "videos", slug);
+  const buildDir = path.join(target, ".build");
+  const planPath = path.join(buildDir, "plan.json");
+  const timingPath = path.join(buildDir, "timing.json");
 
   console.log(`\nSlug: ${slug}`);
   console.log(`Chủ đề: ${content.label_left} vs ${content.label_right}`);
@@ -591,91 +605,101 @@ async function main() {
   const contextImageWanted = content.points.filter((p) => p.needs_context_image).length;
   console.log(`Ảnh minh hoạ ngữ cảnh cần sinh: ${contextImageWanted}${contextImageCorrections.length ? ` (đã cắt bớt ${contextImageCorrections.length} theo giới hạn cứng)` : ""}`);
 
-  // 1. scaffold cơ học (hyperframes init + wiring), tái dùng script có sẵn
-  runScaffoldMjs(slug);
-  patchCheckTimeout(target);
-  overrideGenerateVo(target);
-  overrideSyncChannel(target);
-  patchRenderWorkers(target);
+  const readPlan = () => {
+    if (!fs.existsSync(planPath)) fail(`Project chưa xong khâu sinh giọng (thiếu ${planPath}).`);
+    return JSON.parse(fs.readFileSync(planPath, "utf8"));
+  };
+  const stages = opts.stage ? [opts.stage] : ["voice", "timing", "scene", ...(opts.skipCheck ? [] : ["check"] )];
 
-  // 2. copy 2 ảnh gốc vào card + backdrop #root dùng chung
-  const cardExts = copyCardImages(target, opts.left, opts.right);
-  copyBackground(target);
-  const copiedFonts = copyFontsToVideo(target, familiesOfLocale(contentLocale));
-  console.log(`Font (local, OFL): ${copiedFonts.filter((f) => f.endsWith(".woff2")).join(", ")}`);
+  for (const stage of stages) {
+    console.log(`\n▶ KHÂU ${stage.toUpperCase()}`);
+    if (stage === "voice") {
+      if (opts.resume && fs.existsSync(planPath)) {
+        readPlan();
+        console.log("ℹ Dùng lại scaffold và kế hoạch đã lưu; không gọi lại Gemini/ảnh ngữ cảnh.");
+      } else {
+        if (opts.resume && fs.existsSync(target)) {
+          fail("Project dựng dở chưa có checkpoint scaffold. Hãy chọn “Dựng lại từ đầu” để tạo lại an toàn.");
+        }
+        runScaffoldMjs(slug);
+        patchCheckTimeout(target);
+        overrideGenerateVo(target);
+        overrideSyncChannel(target);
+        patchRenderWorkers(target);
 
-  // 3. dựng danh sách dòng thoại + pose
-  const lines = buildLines(content, contentLocale);
+        const cardExts = copyCardImages(target, opts.left, opts.right);
+        copyBackground(target);
+        const copiedFonts = copyFontsToVideo(target, familiesOfLocale(contentLocale));
+        console.log(`Font (local, OFL): ${copiedFonts.filter((f) => f.endsWith(".woff2")).join(", ")}`);
 
-  // 3b. Giai đoạn 1 — sinh ảnh minh hoạ ngữ cảnh cho point nào cần (tối đa MAX_CONTEXT_IMAGES/
-  // video, đã ép ở enforceContextImageLimits). Lỗi ở đây KHÔNG chặn build — line.contextImageFile
-  // ở lại null.
-  console.log("\n▶ Bước 3b: generateContextImages() ...");
-  await generateContextImages(target, lines, slug);
+        const lines = buildLines(content, contentLocale);
+        console.log("\n▶ Chuẩn bị ảnh minh hoạ ngữ cảnh...");
+        await generateContextImages(target, lines, slug);
+        const usedActions = copyUsedActions(target, lines);
+        console.log(`Action dùng: ${usedActions.join(", ")}`);
+        patchGenerateVoLines(target, lines);
 
-  // 4. copy action SVG thực sự dùng tới + actions.json tham chiếu
-  const usedActions = copyUsedActions(target, lines);
-  console.log(`Action dùng: ${usedActions.join(", ")}`);
+        const localEnvLines = [`VIDEO_LOCALE=${contentLocale.code}`];
+        if (opts.ttsProvider) localEnvLines.push(`TTS_PROVIDER=${opts.ttsProvider}`);
+        if (opts.vieneuVoice) localEnvLines.push(`VIENEU_VOICE=${opts.vieneuVoice}`);
+        if (opts.edgeVoice) localEnvLines.push(`EDGE_VOICE=${opts.edgeVoice}`);
+        if (opts.ttsVoice) localEnvLines.push(`TTS_VOICE=${opts.ttsVoice}`);
+        fs.writeFileSync(path.join(target, ".env"), localEnvLines.join("\n") + "\n");
 
-  // 5. patch LINES trong generate-vo.mjs đã copy sẵn
-  patchGenerateVoLines(target, lines);
+        const plan = { version: 1, slug, localeCode: contentLocale.code, content, lines, cardExts, sourceImages, corrections, contextImageCorrections };
+        fs.mkdirSync(buildDir, { recursive: true });
+        fs.writeFileSync(planPath, `${JSON.stringify(plan, null, 2)}\n`);
+      }
 
-  // 5b. Ghi .env cục bộ cho video nếu truyền ttsProvider / vieneuVoice
-  // VIDEO_LOCALE luôn được ghi: generate-vo.mjs dựa vào đó để chọn giọng/ngôn ngữ (không phụ thuộc DEFAULT_LOCALE của máy).
-  const localEnvLines = [`VIDEO_LOCALE=${contentLocale.code}`];
-  if (opts.ttsProvider) localEnvLines.push(`TTS_PROVIDER=${opts.ttsProvider}`);
-  if (opts.vieneuVoice) localEnvLines.push(`VIENEU_VOICE=${opts.vieneuVoice}`);
-  if (opts.edgeVoice) localEnvLines.push(`EDGE_VOICE=${opts.edgeVoice}`);
-  if (opts.ttsVoice) localEnvLines.push(`TTS_VOICE=${opts.ttsVoice}`);
-  fs.writeFileSync(path.join(target, ".env"), localEnvLines.join("\n") + "\n");
-
-  // 6. cài dependency (edge-tts-universal) rồi sinh VO thật
-  // --ignore-scripts: bare `npm install` here must NOT run the project's lifecycle hooks —
-  // npm treats the (deprecated) "prepublish" script as an alias of "prepare" and fires it on
-  // plain install, which runs sync-channel.mjs against index.html — but index.html is still
-  // hyperframes init's blank example at this point (ours isn't written until step 8, after
-  // real VO timing exists), so sync-channel.mjs's "#eyebrow not found" check throws. None of
-  // dev/check/render/publish are being invoked here, so skipping hooks is safe and correct.
-  const npmInstall = npmCommand("npm", ["install", "--ignore-scripts"]);
-  run(npmInstall.command, npmInstall.args, target, "npm install");
-  run(process.execPath, ["scripts/generate-vo.mjs"], target, "generate-vo.mjs");
-
-  // 7. đọc durations thật, tính timing
-  const durationsPath = path.join(target, "assets", "vo", "durations.json");
-  if (!fs.existsSync(durationsPath)) fail(`Không thấy ${durationsPath} sau khi chạy generate-vo.mjs.`);
-  const durations = JSON.parse(fs.readFileSync(durationsPath, "utf8"));
-  const timingResult = computeTiming(lines, durations);
-  console.log(`ROOT_DURATION: ${timingResult.ROOT_DURATION}s`);
-
-  // 8. kế hoạch chữ (nhãn + cụm caption) đo bằng font thật, rồi dựng index.html từ template
-  const words = readWords(lines, target);
-  const textPlan = await planVideoText(
-    {
-      left: content.label_left,
-      right: content.label_right,
-      lines: lines.map((l) => ({ n: l.n, tokens: words[l.id].map((w) => String(w.t)) })),
-    },
-    contentLocale,
-  );
-  console.log(`Chữ vừa khung: đo bằng ${textPlan.measuredBy === "chrome" ? "Chrome + font thật" : "ƯỚC LƯỢNG (không có Chrome)"}; nhãn ${textPlan.label.fontPx}px.`);
-  if (!textPlan.ok) {
-    fail(`Chữ không vừa khung, không dựng để tránh video bị tràn chữ:\n${textPlan.issues.map((i) => `  - ${i.where}: ${i.message}`).join("\n")}`);
+      if (!fs.existsSync(path.join(target, "node_modules"))) {
+        const npmInstall = npmCommand("npm", ["install", "--ignore-scripts"]);
+        run(npmInstall.command, npmInstall.args, target, "npm install");
+      } else {
+        console.log("ℹ Dùng lại node_modules của scaffold.");
+      }
+      run(process.execPath, ["scripts/generate-vo.mjs"], target, "generate-vo.mjs");
+      console.log("✔ Khâu sinh giọng hoàn tất.");
+    } else if (stage === "timing") {
+      const plan = readPlan();
+      const durationsPath = path.join(target, "assets", "vo", "durations.json");
+      if (!fs.existsSync(durationsPath)) fail(`Không thấy ${durationsPath}; hãy thử lại từ khâu sinh giọng.`);
+      const durations = JSON.parse(fs.readFileSync(durationsPath, "utf8"));
+      const timingResult = computeTiming(plan.lines, durations);
+      fs.writeFileSync(timingPath, `${JSON.stringify(timingResult, null, 2)}\n`);
+      console.log(`ROOT_DURATION: ${timingResult.ROOT_DURATION}s`);
+      console.log("✔ Khâu tính nhịp hoàn tất.");
+    } else if (stage === "scene") {
+      const plan = readPlan();
+      if (!fs.existsSync(timingPath)) fail(`Project chưa xong khâu tính nhịp (thiếu ${timingPath}).`);
+      const timingResult = JSON.parse(fs.readFileSync(timingPath, "utf8"));
+      const locale = resolveLocale(plan.localeCode);
+      const words = readWords(plan.lines, target);
+      const textPlan = await planVideoText(
+        {
+          left: plan.content.label_left,
+          right: plan.content.label_right,
+          lines: plan.lines.map((l) => ({ n: l.n, tokens: words[l.id].map((w) => String(w.t)) })),
+        },
+        locale,
+      );
+      console.log(`Chữ vừa khung: đo bằng ${textPlan.measuredBy === "chrome" ? "Chrome + font thật" : "ƯỚC LƯỢNG (không có Chrome)"}; nhãn ${textPlan.label.fontPx}px.`);
+      if (!textPlan.ok) {
+        fail(`Chữ không vừa khung, không dựng để tránh video bị tràn chữ:\n${textPlan.issues.map((i) => `  - ${i.where}: ${i.message}`).join("\n")}`);
+      }
+      buildIndexHtml(target, plan.content, plan.lines, timingResult, plan.cardExts, locale, words, textPlan);
+      writeBrief(target, plan.content, plan.sourceImages, plan.corrections, plan.contextImageCorrections, plan.lines);
+      console.log("✔ Khâu dựng cảnh hoàn tất.");
+    } else if (stage === "check") {
+      const npmCheck = npmCommand("npm", ["run", "check"]);
+      run(npmCheck.command, npmCheck.args, target, "npm run check");
+      console.log("✔ Khâu kiểm tra hoàn tất.");
+    }
   }
-  buildIndexHtml(target, content, lines, timingResult, cardExts, contentLocale, words, textPlan);
 
-  // 9. BRIEF.md
-  writeBrief(target, content, sourceImages, corrections, contextImageCorrections, lines);
-
-  // 10. check
-  if (!opts.skipCheck) {
-    const npmCheck = npmCommand("npm", ["run", "check"]);
-    run(npmCheck.command, npmCheck.args, target, "npm run check");
-  } else {
-    console.log("\n(--skip-check) Bỏ qua npm run check — chạy tay: cd " + `videos/${slug} && npm run check`);
+  if (!opts.stage) {
+    console.log(`\n✔ videos/${slug}/ đã dựng xong.`);
+    console.log(`  Render thử: cd videos/${slug} && npm run render`);
   }
-
-  console.log(`\n✔ videos/${slug}/ đã dựng xong.`);
-  console.log(`  Render thử: cd videos/${slug} && npm run render`);
 }
 
 main().catch((err) => {

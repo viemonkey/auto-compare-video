@@ -82,6 +82,7 @@ import { rewriteField, translateField, FieldEditError } from "./scripts/lib/fiel
 import { AbortedError } from "./scripts/lib/gemini-client.mjs";
 import { checkFfmpeg, extractPoseTimeline, setReelThumbnail } from "./scripts/lib/reel-thumbnail.mjs";
 import { checkMediaBinaries, describeSpawnError, mediaToolsErrorVi } from "./scripts/lib/media-binaries.mjs";
+import { FileBuildJobStore, createBuildJob, resetJobForRetry, runBuildJob } from "./scripts/lib/build-jobs.mjs";
 import { getLocale, listLocales, localeErrors, getDefaultLocale } from "./scripts/lib/locales.mjs";
 import {
   listEngines,
@@ -137,8 +138,10 @@ const CONTENT_ARCHIVE_DIR = path.join(OUTPUT_DIR, "content");
 // scripts/lib/social-queue.mjs. Riêng ngoài output/ vì đây là trạng thái vận hành đang chạy
 // (không phải thành phẩm/log), cần sống sót qua restart server.
 const DATA_DIR = path.join(__dirname, "data");
+const BUILD_JOB_DIR = path.join(DATA_DIR, "build-jobs");
+const BUILD_JOB_INPUT_DIR = path.join(BUILD_JOB_DIR, "inputs");
 
-for (const d of [UPLOAD_DIR, TEMP_DIR, OUTPUT_DIR, LOG_DIR, CONTENT_ARCHIVE_DIR, DATA_DIR]) fs.mkdirSync(d, { recursive: true });
+for (const d of [UPLOAD_DIR, TEMP_DIR, OUTPUT_DIR, LOG_DIR, CONTENT_ARCHIVE_DIR, DATA_DIR, BUILD_JOB_DIR, BUILD_JOB_INPUT_DIR]) fs.mkdirSync(d, { recursive: true });
 
 const mediaTools = checkMediaBinaries();
 if (mediaTools.ok) {
@@ -146,6 +149,8 @@ if (mediaTools.ok) {
 } else {
   console.error(`[media] LỖI: ${mediaToolsErrorVi(mediaTools)}`);
 }
+const buildJobStore = new FileBuildJobStore(BUILD_JOB_DIR);
+const runningBuildJobs = new Map();
 
 // videos/<slug>/ chưa dọn được sau render (EPERM...) -> data/pending-cleanup.json, thử lại mỗi tick + lúc khởi động (xem scripts/lib/pending-cleanup.mjs).
 const cleanupQueue = createCleanupQueue({
@@ -394,6 +399,30 @@ function runNode(args, { onLine } = {}) {
   });
 }
 
+function runCommand(command, args, { cwd = __dirname, onLine } = {}) {
+  return new Promise((resolve) => {
+    const child = spawn(command, args, { cwd, windowsHide: true });
+    let out = "";
+    let tail = "";
+    const feed = (buf) => {
+      const text = buf.toString();
+      out += text;
+      if (!onLine) return;
+      tail += text;
+      const lines = tail.split(/\r?\n/);
+      tail = lines.pop() ?? "";
+      for (const line of lines) if (line.trim()) onLine(line);
+    };
+    child.stdout.on("data", feed);
+    child.stderr.on("data", feed);
+    child.on("error", (error) => resolve({ code: -1, out, error, errorText: describeSpawnError(error, command) }));
+    child.on("close", (code, signal) => {
+      if (tail && onLine) onLine(tail);
+      resolve({ code, signal, out, error: null, errorText: null });
+    });
+  });
+}
+
 // ------------------------------------------------------------------
 // Gemini content
 // ------------------------------------------------------------------
@@ -560,6 +589,244 @@ function ensureUniqueSlug(baseSlug) {
   }
   return slug;
 }
+
+function buildStageError(stage, result, fallback) {
+  const extracted = geminiFailureMessage(result?.out || "");
+  const spawnText = result?.errorText || (result?.error ? describeSpawnError(result.error) : "");
+  const error = new Error(extracted || spawnText || fallback || `Khâu ${stage} thất bại.`);
+  error.userMessage = error.message;
+  error.code = result?.error?.code || (Number.isInteger(result?.code) ? `EXIT_${result.code}` : "BUILD_FAILED");
+  error.technical = [spawnText, result?.out].filter(Boolean).join("\n").trim();
+  return error;
+}
+
+function scaffoldStageArgs(job, stage) {
+  const request = job.request;
+  const args = [
+    path.join(SCRIPTS_DIR, "scaffold-compare-video.mjs"),
+    request.leftPath,
+    request.rightPath,
+    "--content", request.contentPath,
+    "--slug", job.slug,
+    "--stage", stage,
+  ];
+  const checkpoint = path.join(VIDEOS_DIR, job.slug, ".build", "plan.json");
+  if (stage !== "voice" || fs.existsSync(checkpoint)) args.push("--resume");
+  if (request.topicHint) args.push("--topic-hint", request.topicHint);
+  if (request.ttsProvider) args.push("--tts-provider", request.ttsProvider);
+  if (request.ttsVoice) args.push("--tts-voice", request.ttsVoice);
+  if (request.vieneuRefPath) args.push("--vieneu-voice", request.vieneuRefPath);
+  else if (request.vieneuVoice) args.push("--vieneu-voice", request.vieneuVoice);
+  return args;
+}
+
+async function finalizeBuildJob(job, log) {
+  const target = path.join(VIDEOS_DIR, job.slug);
+  const request = job.request;
+  const briefSrc = path.join(target, "BRIEF.md");
+  if (fs.existsSync(briefSrc)) fs.copyFileSync(briefSrc, path.join(CONTENT_ARCHIVE_DIR, `${job.slug}.BRIEF.md`));
+  try {
+    const indexHtml = fs.readFileSync(path.join(target, "index.html"), "utf8");
+    const poseTimeline = extractPoseTimeline(indexHtml);
+    if (poseTimeline) fs.writeFileSync(path.join(CONTENT_ARCHIVE_DIR, `${job.slug}.pose-timeline.json`), JSON.stringify(poseTimeline, null, 2));
+  } catch (error) {
+    log(`⚠ Không lưu được timeline pose: ${error.message}`);
+  }
+
+  let renderUrl = latestRender(job.slug);
+  if (!renderUrl) throw new Error("Render đã chạy nhưng không tìm thấy file MP4 thành phẩm.");
+  const keepProject = request.keepProject === true || process.env.KEEP_PROJECT === "1";
+  if (!keepProject) renderUrl = await archiveAndCleanup(job.slug, renderUrl, log);
+
+  const locale = localeFromCode(request.locale || request.content?.locale);
+  const record = readRecord(CONTENT_ARCHIVE_DIR, job.slug);
+  if (record && locale) {
+    writeRecord(CONTENT_ARCHIVE_DIR, job.slug, buildRecord({
+      content: request.content,
+      locale,
+      hashtagPlan: request.hashtags,
+      status: "built",
+      source: record._meta?.source || null,
+      derivedFrom: record._meta?.derivedFrom || null,
+    }));
+  }
+
+  if (renderUrl && isAutoPostEnabled() && locale) {
+    const absoluteVideoPath = path.join(__dirname, renderUrl.replace(/^\//, ""));
+    if (fs.existsSync(absoluteVideoPath)) {
+      const displayName = readMetaName(job.slug) || job.slug;
+      const { title: caption, hashtags } = resolveSocialPost(job.slug, displayName, request.hashtags, locale.code);
+      tryEnqueueVideo(
+        { slug: job.slug, videoPath: absoluteVideoPath, caption, hashtags, locale: locale.code },
+        { pages: getConfiguredPages(), defaultCode: getDefaultLocale().code },
+      );
+    }
+  }
+
+  return {
+    slug: job.slug,
+    previewUrl: renderUrl,
+    renderUrl,
+    compositionUrl: fs.existsSync(path.join(target, "index.html")) ? `/videos/${job.slug}/index.html` : null,
+  };
+}
+
+function buildStageHandlers(jobId) {
+  const runScaffoldStage = (stage) => async ({ job, log }) => {
+    if (stage === "voice" && !mediaTools.ok) {
+      const error = new Error(mediaToolsErrorVi(mediaTools));
+      error.code = "MEDIA_TOOLS_MISSING";
+      error.userMessage = error.message;
+      error.technical = JSON.stringify(mediaTools, null, 2);
+      throw error;
+    }
+    const args = scaffoldStageArgs(job, stage);
+    log(`▶ ${job.stages.find((item) => item.id === stage)?.label || stage}...`);
+    const result = await runNode(args, { onLine: log });
+    if (result.code !== 0) throw buildStageError(stage, result, `Khâu ${stage} thất bại với mã ${result.code}.`);
+  };
+
+  return {
+    voice: runScaffoldStage("voice"),
+    timing: runScaffoldStage("timing"),
+    scene: runScaffoldStage("scene"),
+    render: async ({ job, log }) => {
+      const target = path.join(VIDEOS_DIR, job.slug);
+      log("▶ Đang render MP4...");
+      const result = await renderQueue.enqueue(() => {
+        const npmRender = npmCommand("npm", ["run", "render"]);
+        return runRenderJob({ command: npmRender.command, args: npmRender.args, cwd: target, slug: job.slug, logDir: RENDER_LOG_DIR, onLine: log });
+      }, { onWait: (ahead) => log(`⏳ Có ${ahead} video đang chờ trước job này.`) });
+      pruneLogs(RENDER_LOG_DIR, 50);
+      if (result.code !== 0 || !latestRender(job.slug)) {
+        const error = new Error(renderFailureMessage({ slug: job.slug, code: result.code, signal: result.signal, tail: result.tail, logFile: result.logFile, error: result.error }));
+        error.code = result.error?.code || `EXIT_${result.code}`;
+        error.userMessage = error.message;
+        error.technical = result.tail || result.error?.message || "Render không có log.";
+        throw error;
+      }
+    },
+    check: async ({ job, log }) => {
+      const target = path.join(VIDEOS_DIR, job.slug);
+      log("▶ Đang kiểm tra video sau render...");
+      const npmCheck = npmCommand("npm", ["run", "check"]);
+      const result = await runCommand(npmCheck.command, npmCheck.args, { cwd: target, onLine: log });
+      if (result.code !== 0) throw buildStageError("check", result, "Khâu kiểm tra video thất bại.");
+      const latest = buildJobStore.read(jobId);
+      return finalizeBuildJob(latest, log);
+    },
+  };
+}
+
+function updateContentRecordStatus(job, status) {
+  const locale = localeFromCode(job.request.locale || job.request.content?.locale);
+  const previous = readRecord(CONTENT_ARCHIVE_DIR, job.slug);
+  if (!locale || !previous) return;
+  writeRecord(CONTENT_ARCHIVE_DIR, job.slug, buildRecord({
+    content: job.request.content,
+    locale,
+    hashtagPlan: job.request.hashtags,
+    status,
+    source: previous._meta?.source || null,
+    derivedFrom: previous._meta?.derivedFrom || null,
+  }));
+}
+
+function startBuildJob(jobId) {
+  if (runningBuildJobs.has(jobId)) return runningBuildJobs.get(jobId);
+  const task = runBuildJob(jobId, { store: buildJobStore, handlers: buildStageHandlers(jobId) })
+    .then((job) => {
+      updateContentRecordStatus(job, job.status === "success" ? "built" : "error");
+      const name = `${job.slug}-${Date.now()}.log`;
+      writeRunLog(name, (job.log || []).map((line) => `${line.at} ${line.message}`).join("\n"));
+      return job;
+    })
+    .finally(() => runningBuildJobs.delete(jobId));
+  runningBuildJobs.set(jobId, task);
+  return task;
+}
+
+async function prepareBuildJob(body) {
+  const leftPath = assertInsideUploads(body?.leftPath, "leftPath");
+  const rightPath = assertInsideUploads(body?.rightPath, "rightPath");
+  const content = body?.content;
+  const rawSlug = String(body?.slug || "");
+  if (!SLUG_RE.test(rawSlug)) throw new Error(`Slug "${rawSlug}" không hợp lệ — chỉ dùng a-z, 0-9 và dấu gạch ngang.`);
+  if (!content || !Array.isArray(content.points) || content.points.length === 0) throw new Error("Thiếu nội dung kịch bản.");
+  const locale = localeFromCode(content.locale || body?.locale);
+  if (!locale) throw new Error("Thị trường không tồn tại hoặc đang bị tắt.");
+  const renderability = checkRenderability(locale);
+  if (!renderability.renderable) throw new Error(`Thị trường ${locale.displayName} chưa dựng được video: ${renderability.blockers.map((item) => item.message).join(" ")}`);
+  await assertFitsForBuild(content, locale);
+  const suffix = effectiveSlugSuffix(locale);
+  if (!hasLocaleSuffix(rawSlug, locale)) throw new Error(`Slug phải kết thúc bằng "-${suffix}".`);
+  const slug = suffix
+    ? uniqueSlugForLocale(stripLocaleSuffix(rawSlug, locale), locale, (candidate) => fs.existsSync(path.join(VIDEOS_DIR, candidate)))
+    : ensureUniqueSlug(rawSlug);
+
+  const hashtagCfg = loadHashtagConfig(locale);
+  const planned = planHashtags(content, hashtagCfg);
+  const hashtagPlan = sanitizePlan(body?.hashtags, hashtagCfg) ?? planned.plan;
+  const request = {
+    leftPath,
+    rightPath,
+    content,
+    hashtags: hashtagPlan,
+    topicHint: String(body?.topicHint || ""),
+    contentAngleId: String(body?.contentAngleId || "auto"),
+    customAngleText: String(body?.customAngleText || ""),
+    ttsProvider: body?.ttsProvider || null,
+    ttsVoice: body?.ttsVoice || null,
+    vieneuVoice: body?.vieneuVoice || null,
+    vieneuRefPath: body?.vieneuRefPath ? assertInsideUploads(body.vieneuRefPath, "vieneuRefPath") : null,
+    locale: locale.code,
+    keepProject: body?.keepProject === true,
+  };
+  const job = createBuildJob({ slug, request });
+  request.contentPath = path.join(BUILD_JOB_INPUT_DIR, `${job.id}.json`);
+  fs.writeFileSync(request.contentPath, `${JSON.stringify(content, null, 2)}\n`);
+  job.request = request;
+
+  let source = null;
+  try {
+    source = {
+      ...copySourceImages(CONTENT_ARCHIVE_DIR, slug, leftPath, rightPath),
+      topicHint: request.topicHint,
+      contentAngleId: request.contentAngleId,
+      customAngleText: request.customAngleText,
+    };
+  } catch {}
+  writeRecord(CONTENT_ARCHIVE_DIR, slug, buildRecord({ content, locale, hashtagPlan, status: "building", source }));
+  if (body?.pendingSlug) renameCostLedgerSlug(body.pendingSlug, slug);
+  buildJobStore.write(job);
+  return job;
+}
+
+app.post("/api/build-jobs", async (req, res) => {
+  try {
+    const job = await prepareBuildJob(req.body || {});
+    res.status(202).json(job);
+    startBuildJob(job.id);
+  } catch (error) {
+    const message = error instanceof FitBlockedError ? error.userMessage : error.message;
+    res.status(400).json({ error: message });
+  }
+});
+
+app.get("/api/build-jobs/:id", (req, res) => {
+  const job = buildJobStore.read(req.params.id);
+  if (!job) return res.status(404).json({ error: "Không tìm thấy job dựng video." });
+  res.json(job);
+});
+
+app.post("/api/build-jobs/:id/retry", (req, res) => {
+  if (runningBuildJobs.has(req.params.id)) return res.status(409).json({ error: "Job đang chạy." });
+  const job = buildJobStore.read(req.params.id);
+  if (!job) return res.status(404).json({ error: "Không tìm thấy job dựng video." });
+  buildJobStore.write(resetJobForRetry(job));
+  res.status(202).json(buildJobStore.read(job.id));
+  startBuildJob(job.id);
+});
 
 app.post("/api/create-video", async (req, res) => {
   res.writeHead(200, {
