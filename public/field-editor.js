@@ -63,9 +63,11 @@ export function createFieldEditor(o) {
   const btnEdit = el("button", "bi-btn", "✎");
   btnEdit.type = "button";
   btnEdit.title = "Sửa ý bằng tiếng Việt rồi nhờ AI viết lại";
+  btnEdit.setAttribute("aria-label", btnEdit.title);
   const btnRe = el("button", "bi-btn", "↻");
   btnRe.type = "button";
   btnRe.title = "Dịch lại nghĩa tiếng Việt cho dòng này";
+  btnRe.setAttribute("aria-label", btnRe.title);
   viActions.append(stale, reading, btnEdit, btnRe);
   viLine.append(viLabel, viText, editText, viActions);
 
@@ -204,7 +206,9 @@ export function createFieldEditor(o) {
     viText.classList.toggle("is-stale", staleNow);
     card.classList.toggle("is-stale", staleNow);
     stale.classList.toggle("hidden", !staleNow);
-    btnRe.classList.toggle("hidden", !(staleNow || (gloss && text.trim() !== "" && !o.state.vi)));
+    // Hai thao tác ✎/↻ luôn hiện mờ khi có nội dung: người dùng không cần rê chuột mới biết
+    // có thể viết lại câu hoặc chủ động làm mới bản dịch, kể cả khi nghĩa hiện tại chưa stale.
+    btnRe.classList.toggle("hidden", !(gloss && text.trim() !== ""));
     rewriteLabel();
     editHint.textContent = `Nhập ý bằng tiếng Việt — AI sẽ viết lại câu ${rules.languageName || "ngôn ngữ đích"} theo văn phong bản xứ`;
 

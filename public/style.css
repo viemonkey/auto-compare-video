@@ -2,22 +2,73 @@
  * Auto Compare Video Web UI - Design Tokens (DESIGN.md)
  * ------------------------------------------------------------- */
 :root {
-  --bg: #0d0a1a;
-  --panel: #17122c;
-  --panel-hover: #1f193a;
-  --panel-edge: #2b2350;
-  --fg: #f3f1ff;
-  --fg-dim: #9089b0;
-  --accent-pink: #ff4fa3;
-  --accent-cyan: #37e6c4;
+  /* Màu ngữ nghĩa */
+  --bg: #0b0914;
+  --panel: #161126;
+  --panel-raised: #1d1732;
+  --panel-hover: #241c3b;
+  --panel-edge: #3a3158;
+  --fg: #f7f5ff;
+  --fg-dim: #b6afcb;
+  --fg-muted: #948baa;
+  --accent-pink: #f84d9b;
+  --accent-cyan: #42e8ca;
   --accent-yellow: #ffd166;
-  --danger: #ff4d4d;
-  --radius-lg: 16px;
-  --radius-md: 10px;
-  --radius-sm: 6px;
+  --success: #4adeb0;
+  --danger: #ff6b7d;
+  --focus: #8aefff;
+  --overlay: rgba(4, 3, 10, 0.84);
+
+  /* Thang khoảng cách 4px */
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+  --space-8: 32px;
+  --space-10: 40px;
+
+  /* Cỡ chữ */
+  --text-xs: 11px;
+  --text-sm: 13px;
+  --text-base: 15px;
+  --text-lg: 18px;
+  --text-xl: 22px;
+
+  /* Hình khối */
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-sm: 8px;
+  --radius-pill: 999px;
+  --control-height: 44px;
   --font-family: 'Be Vietnam Pro', system-ui, -apple-system, sans-serif;
-  --shadow-glow-pink: 0 0 25px rgba(255, 79, 163, 0.35);
-  --shadow-glow-cyan: 0 0 25px rgba(55, 230, 196, 0.35);
+  --font-japanese: 'Noto Sans JP UI', 'Hiragino Sans', 'Yu Gothic', sans-serif;
+  --font-thai: 'Noto Sans Thai UI', Tahoma, sans-serif;
+  --shadow-card: 0 18px 45px rgba(0, 0, 0, 0.28);
+  --shadow-modal: 0 28px 80px rgba(0, 0, 0, 0.6);
+  --shadow-glow-pink: 0 0 0 1px rgba(248, 77, 155, 0.18), 0 10px 30px rgba(248, 77, 155, 0.22);
+  --shadow-glow-cyan: 0 0 0 1px rgba(66, 232, 202, 0.16), 0 10px 28px rgba(66, 232, 202, 0.16);
+  --gloss-fg: #d8d2eb;
+  --bi-radius: var(--radius-md);
+  --bi-pad: var(--space-4);
+  --bi-ease: 0.18s ease;
+}
+
+@font-face {
+  font-family: 'Noto Sans JP UI';
+  src: url('/assets/fonts/noto-sans-jp/NotoSansJP-Black-subset.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 100 900;
+}
+
+@font-face {
+  font-family: 'Noto Sans Thai UI';
+  src: url('/assets/fonts/noto-sans-thai/NotoSansThai-Black.woff2') format('woff2');
+  font-display: swap;
+  font-style: normal;
+  font-weight: 100 900;
 }
 
 .icon-sprite {
@@ -91,7 +142,7 @@ body {
   font-family: var(--font-family);
   line-height: 1.5;
   min-height: 100vh;
-  padding: 24px 16px;
+  padding: var(--space-6) var(--space-4) var(--space-10);
 }
 
 .app-container {
@@ -106,9 +157,9 @@ body {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 24px;
-  padding-bottom: 16px;
-  border-bottom: 1 frame solid var(--panel-edge);
+  margin-bottom: var(--space-6);
+  padding-bottom: var(--space-4);
+  border-bottom: 1px solid var(--panel-edge);
 }
 
 .logo-group {
@@ -158,8 +209,9 @@ body {
   background: var(--panel);
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius-lg);
-  padding: 14px 24px;
-  margin-bottom: 28px;
+  padding: 14px var(--space-6);
+  margin-bottom: var(--space-6);
+  box-shadow: var(--shadow-card);
 }
 
 .step-item {
@@ -238,8 +290,8 @@ body {
   background: var(--panel);
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius-lg);
-  padding: 28px;
-  box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+  padding: var(--space-8);
+  box-shadow: var(--shadow-card);
 }
 
 .card-header {
@@ -247,7 +299,7 @@ body {
 }
 
 .card-header h2 {
-  font-size: 20px;
+  font-size: var(--text-xl);
   font-weight: 800;
   color: #fff;
   margin-bottom: 6px;
@@ -262,7 +314,8 @@ body {
 
 .card-header p {
   color: var(--fg-dim);
-  font-size: 13px;
+  font-size: var(--text-sm);
+  max-width: 78ch;
 }
 
 /* -------------------------------------------------------------
@@ -406,7 +459,8 @@ body {
   background: var(--bg);
   border: 1px solid var(--panel-edge);
   border-radius: var(--radius-md);
-  padding: 12px 16px;
+  min-height: var(--control-height);
+  padding: 10px 14px;
   color: #fff;
   font-size: 14px;
   font-family: var(--font-family);
@@ -414,9 +468,13 @@ body {
   transition: border-color 0.2s ease;
 }
 
-.input-text:focus {
-  border-color: var(--accent-pink);
-  box-shadow: 0 0 10px rgba(255, 79, 163, 0.2);
+.input-text:hover:not(:disabled) {
+  border-color: #584a79;
+}
+
+.input-text:focus-visible {
+  border-color: var(--focus);
+  box-shadow: 0 0 0 3px rgba(138, 239, 255, 0.18);
 }
 
 .input-highlight {
@@ -433,8 +491,9 @@ body {
   font-size: 12px;
   font-weight: 700;
   color: var(--fg-dim);
-  text-transform: uppercase;
-  margin-bottom: 6px;
+  text-transform: none;
+  letter-spacing: 0.02em;
+  margin-bottom: var(--space-2);
 }
 
 .card-footer {
@@ -459,7 +518,8 @@ body {
   border-radius: var(--radius-md);
   border: none;
   cursor: pointer;
-  padding: 10px 20px;
+  min-height: var(--control-height);
+  padding: 10px 18px;
   font-size: 14px;
   transition: all 0.2s ease;
   text-decoration: none;
@@ -477,12 +537,14 @@ body {
 }
 
 .btn-secondary {
-  background: var(--panel-edge);
+  background: #2d254b;
   color: var(--fg);
+  border: 1px solid #443967;
 }
 
 .btn-secondary:hover {
-  background: #392f66;
+  background: #3a2e5f;
+  border-color: #65528c;
 }
 
 .btn-large {
@@ -496,15 +558,21 @@ body {
 }
 
 .btn-small {
-  padding: 6px 12px;
+  min-height: 38px;
+  padding: 7px 12px;
   font-size: 12px;
 }
 
 .btn:disabled {
-  opacity: 0.4;
+  opacity: 0.52;
   cursor: not-allowed;
   transform: none;
   box-shadow: none;
+}
+
+:where(button, a, input, select, textarea, summary, [tabindex]):focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
 }
 
 /* -------------------------------------------------------------
@@ -784,6 +852,9 @@ body {
   cursor: pointer;
   transition: all 0.2s ease;
   position: relative;
+  color: var(--fg);
+  font: inherit;
+  text-align: inherit;
 }
 
 .action-card:hover {
@@ -1401,7 +1472,6 @@ body {
    Card: padding 16, radius 12, các card cách nhau 12. Trong card: [badge #n · pose · xoá] / câu đích (15px, 500, ô sửa được) /
    dòng nghĩa (13px, 400) + ✎ ↻ / footer "▸ Nhãn & dòng phụ". Bấm ✎: dòng nghĩa thành ô nhập tại chỗ + hướng dẫn + nút.
    Cảnh báo = viền card vàng/đỏ + 1 dòng chữ nhỏ; nghĩa cũ = vạch vàng bên trái dòng nghĩa. */
-:root { --gloss-fg: #cfc9ee; --bi-radius: 12px; --bi-pad: 16px; --bi-ease: 0.18s ease; } /* --gloss-fg ≈ 12:1 trên nền card (WCAG AA ≥ 4.5:1) */
 .points-list { gap: 12px; }
 .point-item, .bi-card:not(.no-gloss) {
   background: var(--bg); border: 1px solid var(--panel-edge); border-radius: var(--bi-radius); padding: var(--bi-pad);
@@ -1444,7 +1514,7 @@ body {
 .bi-vi-actions { flex: none; margin-left: auto; display: inline-flex; align-items: center; gap: 6px; font-size: 11px; color: var(--fg-dim); white-space: nowrap; }
 .bi-card.no-gloss .bi-vi-actions { position: absolute; top: 50%; right: 12px; transform: translateY(-50%); }
 .bi-stale { color: var(--accent-yellow); font-weight: 700; font-size: 11px; }
-.bi-vi-actions .bi-btn { min-width: 24px; height: 22px; font-size: 11px; opacity: 0; }
+.bi-vi-actions .bi-btn { min-width: 30px; height: 30px; font-size: 13px; opacity: 0.62; }
 .bi-card:hover .bi-vi-actions .bi-btn, .bi-card:focus-within .bi-vi-actions .bi-btn, .bi-vi-actions .bi-btn:focus-visible { opacity: 1; }
 .bi-vi-actions .bi-btn:disabled { opacity: 0.55; }
 @media (hover: none) { .bi-vi-actions .bi-btn { opacity: 1; } }
@@ -1543,4 +1613,255 @@ body {
   color: #b6b0c9;
   background: #302a43;
   border: 1px solid #4c4561;
+}
+
+/* -------------------------------------------------------------
+ * Hoàn thiện hệ thống thiết kế, trạng thái và responsive
+ * ------------------------------------------------------------- */
+html { color-scheme: dark; }
+
+button,
+input,
+select,
+textarea { font: inherit; }
+
+button:disabled,
+input:disabled,
+select:disabled,
+textarea:disabled { cursor: not-allowed; }
+
+.btn:not(:disabled):active,
+.locale-btn:not(:disabled):active,
+.action-badge-btn:not(:disabled):active { transform: translateY(1px); }
+
+.step-item { min-width: 0; }
+.step-label { min-width: 0; }
+.step-title { color: var(--fg); }
+.step-item:not(.active):not(.completed) .step-title { color: var(--fg-dim); }
+.step-item.completed { opacity: 0.78; }
+
+.section-card,
+.modal-dialog,
+.video-card,
+.cost-summary-card,
+.point-item { border-color: var(--panel-edge); }
+
+.dropzone-box {
+  background: rgba(8, 6, 18, 0.56);
+  transition: border-color 0.2s ease, background 0.2s ease, transform 0.2s ease;
+}
+.dropzone-box:focus-within,
+.dropzone-box:hover,
+.dropzone-box.dragover { transform: translateY(-1px); }
+.file-input:focus-visible { outline: none; }
+.dropzone-box:has(.file-input:focus-visible) { outline: 3px solid var(--focus); outline-offset: 3px; }
+
+.locale-btn {
+  min-height: var(--control-height);
+  background: #1b1530;
+  transition: color 0.18s ease, border-color 0.18s ease, background 0.18s ease, box-shadow 0.18s ease;
+}
+.locale-btn:hover { border-color: #5f527e; }
+.locale-btn[aria-checked="true"] {
+  color: #fff;
+  background: rgba(66, 232, 202, 0.08);
+}
+.locale-style-line { color: var(--fg-dim); line-height: 1.55; }
+.locale-render-note {
+  background: rgba(255, 209, 102, 0.08);
+  border-color: rgba(255, 209, 102, 0.6);
+}
+
+.studio-grid { gap: var(--space-5); }
+.bi-view-mode {
+  width: fit-content;
+  padding: var(--space-1);
+  border: 1px solid var(--panel-edge);
+  border-radius: var(--radius-md);
+  background: rgba(9, 7, 18, 0.55);
+}
+.bi-view-btn { min-height: 36px; border-color: transparent; background: transparent; }
+.bi-view-btn[aria-checked="true"] { background: #2c2448; box-shadow: none; }
+
+.points-header { gap: var(--space-3); }
+.points-header h3 { font-size: var(--text-lg); }
+.point-item { box-shadow: inset 0 1px rgba(255, 255, 255, 0.025); }
+.point-row { margin-bottom: var(--space-3); }
+.point-num { min-height: 28px; display: inline-flex; align-items: center; }
+.action-badge-btn {
+  min-height: 38px;
+  padding: 5px 12px;
+  background: #211a38;
+  border-color: #4a3d6a;
+}
+.action-badge-btn:focus-visible { outline-color: var(--focus); }
+.btn-del-point { width: 38px; height: 38px; }
+.bi-card .bi-main.input-text {
+  font-size: 16px;
+  line-height: 1.55;
+  min-height: 46px;
+}
+.bi-gloss { color: var(--gloss-fg); line-height: 1.65; }
+.bi-reading {
+  padding: 3px 7px;
+  color: var(--fg-dim);
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: var(--radius-pill);
+  font-variant-numeric: tabular-nums;
+}
+.bi-card.has-danger,
+.point-item:has(.bi-card.has-danger) {
+  border: 2px solid var(--danger);
+  box-shadow: 0 0 0 3px rgba(255, 107, 125, 0.12);
+}
+.bi-warn-line.bi-warn-danger {
+  margin-top: var(--space-1);
+  padding: var(--space-2) var(--space-3);
+  color: #ffd9df;
+  background: rgba(255, 107, 125, 0.12);
+  border-radius: var(--radius-sm);
+}
+
+.bi-main:lang(ja),
+.locale-btn:lang(ja) {
+  font-family: var(--font-japanese);
+  line-height: 1.7;
+}
+.bi-main:lang(th),
+.locale-btn:lang(th) {
+  font-family: var(--font-thai);
+  line-height: 1.85;
+}
+
+.modal-backdrop { background: var(--overlay); }
+.modal-dialog {
+  box-shadow: var(--shadow-modal);
+  background: var(--panel-raised);
+}
+.modal-header { min-height: 60px; }
+.modal-header h3 { color: var(--fg); letter-spacing: 0.02em; }
+.modal-close {
+  width: 44px;
+  height: 44px;
+  display: inline-grid;
+  place-items: center;
+  border-radius: var(--radius-sm);
+}
+.modal-close:hover { background: rgba(255, 255, 255, 0.07); }
+
+.cost-summary-card,
+.cost-chart-wrap,
+.cost-state-msg { background: rgba(9, 7, 18, 0.68); }
+.cost-table th { color: var(--fg-dim); }
+.cost-table tbody tr:focus-within,
+.cost-table tbody tr:hover { background: rgba(255, 255, 255, 0.045); }
+.cost-table-wrap { border: 1px solid var(--panel-edge); border-radius: var(--radius-md); }
+.cost-table th:first-child,
+.cost-table td:first-child { padding-left: var(--space-4); }
+
+.video-card {
+  min-width: 0;
+  background: rgba(9, 7, 18, 0.68);
+  box-shadow: inset 0 1px rgba(255, 255, 255, 0.025);
+}
+.video-card h4 { overflow-wrap: anywhere; }
+.video-card-actions .btn { flex: 1 1 auto; }
+
+.spinner { flex: none; }
+.btn[aria-busy="true"] { cursor: progress; }
+
+@media (max-width: 760px) {
+  body { padding: var(--space-4) var(--space-3) var(--space-8); }
+
+  .main-header {
+    align-items: stretch;
+    flex-direction: column;
+    gap: var(--space-4);
+  }
+  .logo-group { justify-content: center; }
+  .logo-text h1 { font-size: 20px; }
+  .header-actions { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-2); }
+  .header-actions .btn { min-width: 0; padding-inline: var(--space-2); font-size: 12px; }
+
+  .stepper-bar { padding: var(--space-3); gap: var(--space-2); }
+  .step-item { flex: 1 1 0; flex-direction: column; gap: var(--space-1); text-align: center; }
+  .step-badge { width: 30px; height: 30px; }
+  .step-title { font-size: 11px; line-height: 1.3; }
+  .step-desc,
+  .step-divider { display: none; }
+
+  .section-card { padding: var(--space-5); }
+  .card-header { margin-bottom: var(--space-5); }
+  .card-header h2 { align-items: flex-start; font-size: 20px; line-height: 1.35; }
+
+  .dropzone-grid,
+  .studio-row-2 { grid-template-columns: 1fr; }
+  .dropzone-box { min-height: 190px; }
+  .preview-wrapper { height: 170px; }
+
+  .locale-buttons { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .locale-btn { justify-content: flex-start; min-width: 0; padding-inline: 10px; font-size: 13px; }
+  .locale-btn .locale-lock { display: block; }
+
+  .hashtag-add-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+  .hashtag-add-row .input-text { grid-column: 1 / -1; }
+  .hashtag-action { justify-content: center; }
+
+  .points-header { align-items: flex-start; }
+  .points-header h3 { font-size: 16px; }
+  .points-header .btn { flex: none; }
+  .point-item { padding: var(--space-3); }
+  .point-row { flex-wrap: wrap; }
+  .point-row-spacer { display: none; }
+  .action-badge-btn { margin-left: auto; max-width: calc(100% - 82px); }
+  .bi-gloss { display: grid; grid-template-columns: auto 1fr; }
+  .bi-vi-actions { grid-column: 1 / -1; margin: var(--space-1) 0 0; justify-content: flex-end; }
+  .bi-card.no-gloss .bi-vi-actions { top: auto; bottom: 8px; }
+  .bi-card.no-gloss .bi-main.input-text { padding-right: 74px; }
+  .bi-kbd-hint { display: none; }
+
+  .card-footer,
+  .card-footer.space-between,
+  .success-actions { flex-direction: column; align-items: stretch; }
+  .card-footer .btn,
+  .success-actions .btn { width: 100%; }
+  .card-footer .approve-action { order: -1; flex-basis: auto; width: 100%; }
+  .approve-lock-reason { text-align: center; }
+
+  .modal-backdrop { padding: var(--space-3); align-items: flex-end; }
+  .modal-dialog,
+  .modal-dialog.wide { max-height: calc(100dvh - 24px); border-radius: var(--radius-lg) var(--radius-lg) 0 0; }
+  .modal-header { padding: var(--space-3) var(--space-4); }
+  .modal-header h3 { font-size: 15px; }
+  .modal-body { padding: var(--space-4); }
+  .modal-subtitle { line-height: 1.55; }
+  .action-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-2); }
+  .videos-grid { grid-template-columns: 1fr; }
+  .videos-filter-row { align-items: stretch; flex-direction: column; }
+  .videos-filter-row select { max-width: none; }
+
+  .cost-filter-row,
+  .cost-filter-group { align-items: stretch; flex-direction: column; }
+  .select-wrap,
+  .cost-range-select,
+  .cost-filter-row > .btn { width: 100%; }
+  .cost-summary-grid { grid-template-columns: 1fr; }
+  .cost-table-header-row { align-items: flex-start; flex-direction: column; gap: var(--space-2); }
+  .cost-table-wrap { margin-inline: 0; }
+
+  .terminal-body { height: 360px; }
+}
+
+@media (max-width: 420px) {
+  .logo-group { justify-content: flex-start; }
+  .logo-icon { width: 42px; height: 42px; }
+  .sub-logo { font-size: 10px; line-height: 1.5; }
+  .header-actions { grid-template-columns: 1fr; }
+  .section-card { padding: var(--space-4); }
+  .bi-view-mode { width: 100%; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .bi-view-btn { min-height: 50px; justify-content: center; padding-inline: 6px; font-size: 11px; line-height: 1.3; text-align: center; }
+  .point-item { border-radius: var(--radius-md); }
 }

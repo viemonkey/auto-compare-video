@@ -95,7 +95,7 @@
           <!-- Left Image Dropzone -->
           <div class="dropzone-box" id="dropzone-left">
             <div class="zone-tag tag-cyan">CARD BÊN TRÁI (ĐỐI TƯỢNG A)</div>
-            <input type="file" id="file-left" accept="image/*" class="file-input" />
+            <input type="file" id="file-left" accept="image/*" class="file-input" aria-label="Chọn ảnh đối tượng bên trái" />
             <div class="dropzone-placeholder" id="ph-left">
               <svg class="upload-icon ui-icon" aria-hidden="true"><use href="#icon-image"></use></svg>
               <p class="upload-title">Kéo thả hoặc click để chọn ảnh trái</p>
@@ -110,7 +110,7 @@
           <!-- Right Image Dropzone -->
           <div class="dropzone-box" id="dropzone-right">
             <div class="zone-tag tag-pink">CARD BÊN PHẢI (ĐỐI TƯỢNG B)</div>
-            <input type="file" id="file-right" accept="image/*" class="file-input" />
+            <input type="file" id="file-right" accept="image/*" class="file-input" aria-label="Chọn ảnh đối tượng bên phải" />
             <div class="dropzone-placeholder" id="ph-right">
               <svg class="upload-icon ui-icon" aria-hidden="true"><use href="#icon-image"></use></svg>
               <p class="upload-title">Kéo thả hoặc click để chọn ảnh phải</p>
@@ -423,13 +423,13 @@
             <table class="cost-table">
               <thead>
                 <tr>
-                  <th data-sort="slug">Video / Slug<span class="sort-arrow"></span></th>
-                  <th data-sort="locale">Thị trường<span class="sort-arrow"></span></th>
-                  <th data-sort="createdAt">Ngày tạo<span class="sort-arrow"></span></th>
-                  <th data-sort="contentCost">Chi phí kịch bản<span class="sort-arrow"></span></th>
-                  <th data-sort="imageCost">Chi phí ảnh<span class="sort-arrow"></span></th>
-                  <th data-sort="imagesGenerated">Số ảnh đã sinh<span class="sort-arrow"></span></th>
-                  <th data-sort="totalCost">Tổng<span class="sort-arrow"></span></th>
+                  <th data-sort="slug" tabindex="0" role="button">Video / Slug<span class="sort-arrow"></span></th>
+                  <th data-sort="locale" tabindex="0" role="button">Thị trường<span class="sort-arrow"></span></th>
+                  <th data-sort="createdAt" tabindex="0" role="button">Ngày tạo<span class="sort-arrow"></span></th>
+                  <th data-sort="contentCost" tabindex="0" role="button">Chi phí kịch bản<span class="sort-arrow"></span></th>
+                  <th data-sort="imageCost" tabindex="0" role="button">Chi phí ảnh<span class="sort-arrow"></span></th>
+                  <th data-sort="imagesGenerated" tabindex="0" role="button">Số ảnh đã sinh<span class="sort-arrow"></span></th>
+                  <th data-sort="totalCost" tabindex="0" role="button">Tổng<span class="sort-arrow"></span></th>
                 </tr>
               </thead>
               <tbody id="cost-videos-tbody">

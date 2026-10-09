@@ -258,6 +258,7 @@ document.addEventListener("DOMContentLoaded", () => {
       btn.setAttribute("role", "radio");
       btn.setAttribute("aria-checked", String(l.code === currentLocale));
       btn.dataset.code = l.code;
+      btn.lang = l.language;
       btn.title = l.renderable ? l.styleSummary : l.blockers.map((b) => b.message).join(" ");
       // Flag: bundled SVG (public/flags, declared as flagIcon in the locale file); emoji only as fallback.
       if (l.flagIcon) {
@@ -557,6 +558,12 @@ document.addEventListener("DOMContentLoaded", () => {
     });
   }
 
+  function applyTargetLanguage() {
+    const language = currentLocaleInfo()?.language || "vi";
+    step2.dataset.targetLanguage = language;
+    for (const input of [scriptTitle, scriptLabelLeft, scriptLabelRight]) input.lang = language;
+  }
+
   function renderViewModeBar() {
     biViewModeBox.innerHTML = "";
     biViewModeBox.classList.toggle("hidden", !isGloss());
@@ -589,6 +596,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   // (Re)build every editor widget: called when the market's rules arrive, after content is generated, and on reset.
   function refreshBiEditors() {
+    applyTargetLanguage();
     mountStaticEditors();
     renderPointsList();
     renderViewModeBar();
@@ -1062,8 +1070,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
     try {
       btnGenerateContent.disabled = true;
+      btnGenerateContent.setAttribute("aria-busy", "true");
       spinGen.classList.remove("hidden");
-      btnGenerateContent.querySelector(".btn-text").textContent = "ĐANG TẢI VÀ GỌI GEMINI AI...";
+      btnGenerateContent.querySelector(".btn-text").textContent = "Đang tải ảnh…";
 
       // 1. Upload images
       const formData = new FormData();
@@ -1078,7 +1087,7 @@ document.addEventListener("DOMContentLoaded", () => {
       uploadedLeftPath = uploadData.leftPath;
       uploadedRightPath = uploadData.rightPath;
 
-      btnGenerateContent.querySelector(".btn-text").textContent = "GEMINI ĐANG PHÂN TÍCH VÀ SO SÁNH (30s)...";
+      btnGenerateContent.querySelector(".btn-text").textContent = "Gemini đang phân tích…";
 
       // 2. Call Gemini Content Generation API
       const genRes = await fetch("/api/generate-content", {
@@ -1107,6 +1116,7 @@ document.addEventListener("DOMContentLoaded", () => {
       alert(`Lỗi: ${err.message}`);
     } finally {
       btnGenerateContent.disabled = false;
+      btnGenerateContent.removeAttribute("aria-busy");
       spinGen.classList.add("hidden");
       btnGenerateContent.querySelector(".btn-text").textContent = "Tạo nội dung với Gemini AI";
     }
@@ -1223,11 +1233,11 @@ document.addEventListener("DOMContentLoaded", () => {
       row.innerHTML = `
         <div class="point-num">#${idx + 1}</div>
         <span class="point-row-spacer"></span>
-        <button type="button" class="action-badge-btn" data-idx="${idx}">
+        <button type="button" class="action-badge-btn" data-idx="${idx}" title="Chọn tư thế cho điểm ${idx + 1}" aria-label="Chọn tư thế cho điểm ${idx + 1}; hiện tại ${actionObj.id}">
           <img src="/assets/actions/${actionObj.file}" class="action-badge-img" alt="${actionObj.id}" />
           <span>${actionObj.id}</span>
         </button>
-        <button type="button" class="btn-del-point" data-idx="${idx}" title="Xóa điểm này">✕</button>
+        <button type="button" class="btn-del-point" data-idx="${idx}" title="Xóa điểm này" aria-label="Xóa điểm so sánh ${idx + 1}">✕</button>
       `;
 
       // Số thứ tự, pose, xoá nằm ở hàng đầu của card; ô chữ đích + nghĩa ngay dưới
@@ -1236,6 +1246,8 @@ document.addEventListener("DOMContentLoaded", () => {
       input.className = "input-text point-text-input";
       input.value = p.text;
       input.dataset.idx = String(idx);
+      input.lang = currentLocaleInfo()?.language || "vi";
+      input.setAttribute("aria-label", `Nội dung điểm so sánh ${idx + 1}`);
       input.addEventListener("input", (e) => {
         pointsData[idx].text = e.target.value;
       });
@@ -1299,6 +1311,8 @@ document.addEventListener("DOMContentLoaded", () => {
           field.type = "text";
           field.className = "input-text";
           field.value = p[kind] || "";
+          field.lang = currentLocaleInfo()?.language || "vi";
+          field.setAttribute("aria-label", `${label}, điểm ${idx + 1}`);
           field.addEventListener("input", (e) => {
             pointsData[idx][kind] = e.target.value;
           });
@@ -1342,11 +1356,12 @@ document.addEventListener("DOMContentLoaded", () => {
     actionGrid.innerHTML = "";
 
     actionCatalog.forEach((act) => {
-      const card = document.createElement("div");
+      const card = document.createElement("button");
+      card.type = "button";
       card.className = `action-card ${act.id === selectedId ? "selected" : ""}`;
-      
       const propBadge = act.prop === "jewelry" ? `<span class="prop-badge">JEWELRY</span>` : "";
       const firstTag = act.tags && act.tags[0] ? act.tags[0] : "";
+      card.setAttribute("aria-label", `Chọn tư thế ${act.id}${firstTag ? `, ${firstTag}` : ""}`);
 
       card.innerHTML = `
         ${propBadge}
@@ -1992,6 +2007,12 @@ document.addEventListener("DOMContentLoaded", () => {
       }
       costPage = 1;
       renderCostStats();
+    });
+    th.addEventListener("keydown", (event) => {
+      if (event.key === "Enter" || event.key === " ") {
+        event.preventDefault();
+        th.click();
+      }
     });
   });
 
