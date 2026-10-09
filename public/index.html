@@ -13,12 +13,26 @@
   <link rel="stylesheet" href="style.css" />
 </head>
 <body>
+  <!-- Bộ icon SVG nội tuyến dùng thống nhất toàn giao diện; không phụ thuộc CDN/font emoji. -->
+  <svg class="icon-sprite" aria-hidden="true">
+    <symbol id="icon-bolt" viewBox="0 0 24 24"><path d="M13 2 4.5 13H11l-1 9 8.5-12H12l1-8Z"/></symbol>
+    <symbol id="icon-chart" viewBox="0 0 24 24"><path d="M4 20V10m8 10V4m8 16v-7M2 20h20"/></symbol>
+    <symbol id="icon-folder" viewBox="0 0 24 24"><path d="M3 6.5h7l2 2h9v10.5H3V6.5Z"/></symbol>
+    <symbol id="icon-image" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m5 18 5-5 3 3 2-2 4 4"/></symbol>
+    <symbol id="icon-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18"/></symbol>
+    <symbol id="icon-spark" viewBox="0 0 24 24"><path d="m12 2 1.7 5.3L19 9l-5.3 1.7L12 16l-1.7-5.3L5 9l5.3-1.7L12 2Zm7 13 .8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15Z"/></symbol>
+    <symbol id="icon-mic" viewBox="0 0 24 24"><rect x="8" y="3" width="8" height="12" rx="4"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3M8 21h8"/></symbol>
+    <symbol id="icon-save" viewBox="0 0 24 24"><path d="M4 3h13l3 3v15H4V3Z"/><path d="M8 3v6h8V3M8 21v-7h8v7"/></symbol>
+    <symbol id="icon-rocket" viewBox="0 0 24 24"><path d="M14 5c2-2 4.5-2.5 7-2-1 5-3 8-7 10l-3-3c.7-1.8 1.7-3.5 3-5Z"/><path d="m10 11-4 1-3 3 6 1 1 5 3-3 1-5"/><circle cx="16" cy="8" r="1.5"/></symbol>
+    <symbol id="icon-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="icon-refresh" viewBox="0 0 24 24"><path d="M20 6v5h-5M4 18v-5h5M18 9a7 7 0 0 0-12-2L4 11M6 15a7 7 0 0 0 12 2l2-4"/></symbol>
+  </svg>
   <div class="app-container">
     
     <!-- Top Header -->
     <header class="main-header">
       <div class="logo-group">
-        <div class="logo-icon">⚡</div>
+        <div class="logo-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-bolt"></use></svg></div>
         <div class="logo-text">
           <h1>AUTO COMPARE VIDEO</h1>
           <span class="sub-logo">HyperFrames Engine + Gemini AI Vision</span>
@@ -26,10 +40,10 @@
       </div>
       <div class="header-actions">
         <button id="btn-cost-stats" class="btn btn-secondary">
-          <span class="icon">💰</span> Thống kê chi phí
+          <svg class="ui-icon" aria-hidden="true"><use href="#icon-chart"></use></svg> Thống kê chi phí
         </button>
         <button id="btn-existing-videos" class="btn btn-secondary">
-          <span class="icon">📁</span> Danh sách video đã dựng
+          <svg class="ui-icon" aria-hidden="true"><use href="#icon-folder"></use></svg> Danh sách video đã dựng
         </button>
       </div>
     </header>
@@ -39,24 +53,24 @@
       <div class="step-item active" id="step-nav-1">
         <div class="step-badge">1</div>
         <div class="step-label">
-          <span class="step-title">Tải 2 Ảnh So Sánh</span>
-          <span class="step-desc">Đối tượng A & B</span>
+          <span class="step-title">Chọn ảnh so sánh</span>
+          <span class="step-desc">Đối tượng A và B</span>
         </div>
       </div>
       <div class="step-divider"></div>
       <div class="step-item" id="step-nav-2">
         <div class="step-badge">2</div>
         <div class="step-label">
-          <span class="step-title">Studio Kịch Bản & Pose</span>
-          <span class="step-desc">Gemini AI & Hành động Mascot</span>
+          <span class="step-title">Biên tập kịch bản</span>
+          <span class="step-desc">Nội dung và tư thế</span>
         </div>
       </div>
       <div class="step-divider"></div>
       <div class="step-item" id="step-nav-3">
         <div class="step-badge">3</div>
         <div class="step-label">
-          <span class="step-title">Duyệt & Tạo Video</span>
-          <span class="step-desc">Tự động dựng & Kiểm tra</span>
+          <span class="step-title">Duyệt và dựng video</span>
+          <span class="step-desc">Dựng và kiểm tra</span>
         </div>
       </div>
     </nav>
@@ -65,13 +79,13 @@
     <section class="step-section active" id="step-1">
       <div class="section-card">
         <div class="card-header">
-          <h2>📷 Bước 1: Chọn 2 Ảnh So Sánh Kiến Thức</h2>
-          <p>Tải lên 2 hình ảnh minh họa cho 2 khái niệm/vật thể bạn muốn so sánh (ví dụ: Kim Cương vs Than Đá, Dev vs DevOps, Nhẫn Vàng vs Nhẫn Kim Cương).</p>
+          <h2><svg class="ui-icon" aria-hidden="true"><use href="#icon-image"></use></svg> Bước 1: Chọn hai ảnh so sánh</h2>
+          <p>Tải hai ảnh minh họa cho cặp kiến thức cần so sánh, ví dụ: kim cương tự nhiên và kim cương nhân tạo, vàng 18K và vàng 24K.</p>
         </div>
 
         <!-- Target market (locale) — buttons built from GET /api/locales -->
         <div class="form-group" id="locale-picker-group" style="margin-bottom: 16px;">
-          <label id="locale-label">🌏 Thị trường mục tiêu:</label>
+          <label id="locale-label"><svg class="ui-icon" aria-hidden="true"><use href="#icon-globe"></use></svg> Thị trường mục tiêu</label>
           <div id="locale-buttons" class="locale-buttons" role="radiogroup" aria-labelledby="locale-label"></div>
           <div id="locale-style-line" class="locale-style-line"></div>
           <div id="locale-render-note" class="locale-render-note hidden"></div>
@@ -83,7 +97,7 @@
             <div class="zone-tag tag-cyan">CARD BÊN TRÁI (ĐỐI TƯỢNG A)</div>
             <input type="file" id="file-left" accept="image/*" class="file-input" />
             <div class="dropzone-placeholder" id="ph-left">
-              <div class="upload-icon">🖼️</div>
+              <svg class="upload-icon ui-icon" aria-hidden="true"><use href="#icon-image"></use></svg>
               <p class="upload-title">Kéo thả hoặc click để chọn ảnh trái</p>
               <span class="upload-hint">PNG, JPG, WEBP (Tối đa 15MB)</span>
             </div>
@@ -98,7 +112,7 @@
             <div class="zone-tag tag-pink">CARD BÊN PHẢI (ĐỐI TƯỢNG B)</div>
             <input type="file" id="file-right" accept="image/*" class="file-input" />
             <div class="dropzone-placeholder" id="ph-right">
-              <div class="upload-icon">🖼️</div>
+              <svg class="upload-icon ui-icon" aria-hidden="true"><use href="#icon-image"></use></svg>
               <p class="upload-title">Kéo thả hoặc click để chọn ảnh phải</p>
               <span class="upload-hint">PNG, JPG, WEBP (Tối đa 15MB)</span>
             </div>
@@ -111,14 +125,14 @@
 
         <!-- Optional Topic Hint -->
         <div class="topic-hint-group">
-          <label for="topic-hint">💡 Gợi ý ngữ cảnh thêm cho Gemini AI (không bắt buộc):</label>
+          <label for="topic-hint">Gợi ý ngữ cảnh cho Gemini <span class="label-optional">Không bắt buộc</span></label>
           <input type="text" id="topic-hint" class="input-text" placeholder="Nên ghi rõ tên 2 đối tượng, vd: ảnh trái là aquamarine, ảnh phải là sapphire" aria-describedby="topic-hint-help" />
           <small id="topic-hint-help" class="field-help">Ghi rõ tên 2 đối tượng giúp Gemini không nhận dạng nhầm ảnh (vd gọi đá aquamarine là &quot;kim cương xanh&quot;). Các phiên bản thị trường khác sẽ giữ đúng 2 đối tượng bạn đã duyệt ở bản gốc.</small>
         </div>
 
         <!-- Content Angle Selector -->
         <div class="form-group" style="margin-bottom: 16px;">
-          <label for="content-angle">🎯 Chọn góc độ nội dung (để tạo nhiều video khác góc độ từ cùng 1 cặp ảnh):</label>
+          <label for="content-angle">Góc độ nội dung</label>
           <select id="content-angle" class="input-text" style="font-weight: 700; background-color: var(--panel);">
             <!-- Loaded dynamically from /api/content-angles, wrapped with "auto" + "custom" -->
           </select>
@@ -126,7 +140,7 @@
 
         <!-- Custom Content Angle Description (shown only when "Khác" is selected) -->
         <div id="content-angle-custom-container" class="topic-hint-group hidden">
-          <label for="content-angle-custom-text">✏️ Mô tả góc độ nội dung riêng của bạn:</label>
+          <label for="content-angle-custom-text">Mô tả góc độ riêng</label>
           <textarea id="content-angle-custom-text" class="input-text" rows="3" placeholder="Ví dụ: So sánh theo giá trị đầu tư lâu dài, hoặc theo cảm nhận khi đeo trên tay..."></textarea>
         </div>
 
@@ -136,7 +150,7 @@
 
         <!-- TTS Voice Engine Selector -->
         <div class="form-group" style="margin-bottom: 16px;">
-          <label for="tts-provider">🎙️ Giọng Đọc Voiceover:</label>
+          <label for="tts-provider"><svg class="ui-icon" aria-hidden="true"><use href="#icon-mic"></use></svg> Công cụ giọng đọc</label>
           <select id="tts-provider" class="input-text" style="font-weight: 700; background-color: var(--panel);">
             <!-- Loaded dynamically from /api/tts-engines?locale= -->
           </select>
@@ -145,7 +159,7 @@
 
         <!-- VieNeu Preset Voice Selection -->
         <div id="vieneu-preset-container" class="form-group" style="margin-bottom: 16px;">
-          <label for="vieneu-preset-select" id="voice-select-label">🗣️ Chọn giọng:</label>
+          <label for="vieneu-preset-select" id="voice-select-label">Chọn giọng</label>
           <select id="vieneu-preset-select" class="input-text" style="font-weight: 600; background-color: var(--panel);">
             <!-- Loaded dynamically from /api/tts-engines?locale= (voices of the selected engine) -->
           </select>
@@ -153,17 +167,17 @@
 
         <!-- VieNeu Voice Cloning Audio Upload -->
         <div id="vieneu-clone-container" class="form-group hidden" style="margin-bottom: 16px;">
-          <label for="vieneu-ref-file">🎵 Tải lên Audio Mẫu 3-5 giây (WAV/MP3/M4A) để Nhái Giọng:</label>
+          <label for="vieneu-ref-file">Tệp âm thanh mẫu 3–5 giây (WAV/MP3/M4A)</label>
           <input type="file" id="vieneu-ref-file" accept="audio/*" class="input-text" style="padding: 8px;" />
           <div id="vieneu-ref-status" class="upload-hint" style="margin-top: 6px; font-weight: 500;">
-            💡 Tải lên file ghi âm 3–5 giây tiếng nói rõ ràng để VieNeu clone đúng chất giọng đó cho video.
+            Dùng đoạn ghi âm có tiếng nói rõ ràng để VieNeu mô phỏng đúng chất giọng cho video.
           </div>
         </div>
 
         <!-- Submit Button -->
         <div class="card-footer">
           <button id="btn-generate-content" class="btn btn-primary btn-large">
-            <span class="btn-text">✨ TẠO NỘI DUNG VỚI GEMINI AI</span>
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-spark"></use></svg><span class="btn-text">Tạo nội dung với Gemini AI</span>
             <div class="spinner hidden" id="spin-gen"></div>
           </button>
         </div>
@@ -174,10 +188,10 @@
     <section class="step-section" id="step-2">
       <div class="section-card">
         <div class="card-header">
-          <h2>🤖 Bước 2: Studio Chỉnh Sửa Kịch Bản & Chọn Tư Thế Nhân Vật</h2>
+          <h2><svg class="ui-icon" aria-hidden="true"><use href="#icon-spark"></use></svg> Bước 2: Biên tập kịch bản</h2>
           <div id="gen-model-badge" class="model-badge hidden"></div>
           <div id="fact-note" class="fact-note hidden"></div>
-          <p>Gemini Vision AI đã sinh kịch bản bên dưới. Bạn có thể tự do chỉnh sửa câu từ và <strong>chọn tư thế biểu cảm của nhân vật host (`assets/actions/`)</strong> cho từng điểm so sánh.</p>
+          <p>Kiểm tra câu chữ, nghĩa tiếng Việt và tư thế nhân vật cho từng điểm so sánh trước khi dựng.</p>
         </div>
 
         <div class="studio-grid">
@@ -187,40 +201,40 @@
           <!-- Metadata Fields -->
           <div class="studio-row-2">
             <div class="form-group">
-              <label>🏷️ Tên Khái Niệm Trái (Label Left)</label>
-              <input type="text" id="script-label-left" class="input-text" placeholder="Ví dụ: Dev" />
+              <label for="script-label-left">Tên đối tượng bên trái</label>
+              <input type="text" id="script-label-left" class="input-text" placeholder="Ví dụ: Kim cương tự nhiên" />
             </div>
             <div class="form-group">
-              <label>🏷️ Tên Khái Niệm Phải (Label Right)</label>
-              <input type="text" id="script-label-right" class="input-text" placeholder="Ví dụ: DevOps" />
+              <label for="script-label-right">Tên đối tượng bên phải</label>
+              <input type="text" id="script-label-right" class="input-text" placeholder="Ví dụ: Kim cương nhân tạo" />
             </div>
           </div>
 
           <div class="form-group">
-            <label>❓ Câu Hỏi Mở Đầu (Title / Question Beat)</label>
+            <label for="script-title">Câu hỏi mở đầu</label>
             <input type="text" id="script-title" class="input-text input-highlight" placeholder="Câu hỏi mở đầu gây tò mò..." />
           </div>
 
           <div class="form-group">
-            <label>#️⃣ Hashtag dự kiến (caption Reel)</label>
+            <label for="hashtag-add-input">Hashtag cho bài đăng</label>
             <div id="hashtag-chips" class="hashtag-chips"></div>
             <div class="hashtag-add-row">
               <input type="text" id="hashtag-add-input" class="input-text" placeholder="Thêm hashtag, ví dụ: thạch anh tím" />
-              <button type="button" id="btn-add-hashtag" class="btn-secondary">+ Thêm</button>
-              <button type="button" id="btn-refresh-hashtags" class="btn-secondary" title="Tính lại tag theo label hiện tại (giữ tag thêm tay)">↻ Cập nhật tag</button>
+              <button type="button" id="btn-add-hashtag" class="btn btn-secondary hashtag-action"><svg class="ui-icon" aria-hidden="true"><use href="#icon-plus"></use></svg> Thêm</button>
+              <button type="button" id="btn-refresh-hashtags" class="btn btn-secondary hashtag-action" title="Tính lại hashtag từ tên đối tượng, vẫn giữ hashtag thêm thủ công"><svg class="ui-icon" aria-hidden="true"><use href="#icon-refresh"></use></svg> Cập nhật</button>
             </div>
             <div id="hashtag-note" class="hashtag-note"></div>
           </div>
 
           <div class="form-group">
-            <label>📁 Tên thư mục video (Slug ID)</label>
-            <input type="text" id="script-slug" class="input-text" placeholder="Tự sinh nếu để rỗng, ví dụ: dev-vs-devops" />
+            <label for="script-slug">Mã thư mục video</label>
+            <input type="text" id="script-slug" class="input-text" placeholder="Tự sinh nếu để trống, ví dụ: vang-18k-vs-vang-24k" />
           </div>
 
-          <!-- Comparison Points List -->
+          <!-- Danh sách điểm so sánh -->
           <div class="points-header">
-            <h3>📝 Các Điểm So Sánh (Comparison Points)</h3>
-            <button id="btn-add-point" class="btn btn-small btn-secondary">+ Thêm điểm so sánh</button>
+            <h3>Các điểm so sánh</h3>
+            <button id="btn-add-point" class="btn btn-small btn-secondary"><svg class="ui-icon" aria-hidden="true"><use href="#icon-plus"></use></svg> Thêm điểm</button>
           </div>
 
           <div id="points-container" class="points-list">
@@ -228,7 +242,6 @@
           </div>
         </div>
 
-        <div id="render-lock-note" class="locale-render-note hidden"></div>
         <div id="draft-note" class="draft-note hidden"></div>
 
         <!-- Step 2 Footer -->
@@ -236,12 +249,15 @@
           <button id="btn-back-step1" class="btn btn-secondary">
             ← Chọn lại ảnh
           </button>
-          <button id="btn-save-draft" class="btn btn-secondary" title="Lưu kịch bản (kể cả khi thị trường chưa dựng được video) để mở lại sau">
-            💾 Lưu nháp
+          <button id="btn-save-draft" class="btn btn-secondary" title="Lưu kịch bản để mở lại sau">
+            <svg class="ui-icon" aria-hidden="true"><use href="#icon-save"></use></svg> Lưu nháp
           </button>
-          <button id="btn-approve-build" class="btn btn-primary btn-large glow-pink">
-            <span class="btn-text">🚀 DUYỆT KỊCH BẢN & TẠO VIDEO</span>
-          </button>
+          <div class="approve-action">
+            <button id="btn-approve-build" class="btn btn-primary btn-large glow-pink" aria-describedby="approve-lock-reason">
+              <svg class="ui-icon" aria-hidden="true"><use href="#icon-rocket"></use></svg><span class="btn-text">Duyệt và tạo video</span>
+            </button>
+            <small id="approve-lock-reason" class="approve-lock-reason hidden" role="status"></small>
+          </div>
         </div>
       </div>
     </section>
@@ -250,7 +266,7 @@
     <section class="step-section" id="step-3">
       <div class="section-card">
         <div class="card-header">
-          <h2>🚀 Bước 3: Tiến Trình Dựng Video Theo Thời Gian Thực</h2>
+          <h2><svg class="ui-icon" aria-hidden="true"><use href="#icon-rocket"></use></svg> Bước 3: Dựng video</h2>
           <p>Hệ thống đang sinh giọng đọc TTS, tính nhịp GSAP, ghép ảnh card & hành động nhân vật, và chạy `npm run check`.</p>
         </div>
 
@@ -271,16 +287,16 @@
 
         <!-- Completion Success Deck -->
         <div id="build-success-card" class="success-card hidden">
-          <div class="success-icon">🎉</div>
+          <div class="success-icon"><svg class="ui-icon" aria-hidden="true"><use href="#icon-spark"></use></svg></div>
           <h3>ĐÃ DỰNG VIDEO THÀNH CÔNG!</h3>
           <p id="success-desc">Video của bạn đã được kiểm tra và sẵn sàng để xem trước hoặc xuất ra file MP4.</p>
           
           <div class="success-actions">
             <a id="btn-open-preview" href="#" target="_blank" class="btn btn-primary btn-large">
-              🎬 MỞ XEM TRƯỚC (PREVIEW PAGE)
+              Mở bản xem trước
             </a>
             <button id="btn-create-another" class="btn btn-secondary">
-              ➕ Tạo Video Mới
+              Tạo video mới
             </button>
           </div>
         </div>
@@ -352,7 +368,7 @@
             </div>
           </div>
           <button id="btn-export-csv" class="btn btn-small btn-secondary" disabled>
-            ⬇ Xuất CSV
+            Xuất CSV
           </button>
         </div>
 
@@ -410,8 +426,8 @@
                   <th data-sort="slug">Video / Slug<span class="sort-arrow"></span></th>
                   <th data-sort="locale">Thị trường<span class="sort-arrow"></span></th>
                   <th data-sort="createdAt">Ngày tạo<span class="sort-arrow"></span></th>
-                  <th data-sort="contentCost"><span class="cost-badge cost-badge-content">📝</span> Chi phí kịch bản<span class="sort-arrow"></span></th>
-                  <th data-sort="imageCost"><span class="cost-badge cost-badge-image">🖼️</span> Chi phí ảnh<span class="sort-arrow"></span></th>
+                  <th data-sort="contentCost">Chi phí kịch bản<span class="sort-arrow"></span></th>
+                  <th data-sort="imageCost">Chi phí ảnh<span class="sort-arrow"></span></th>
                   <th data-sort="imagesGenerated">Số ảnh đã sinh<span class="sort-arrow"></span></th>
                   <th data-sort="totalCost">Tổng<span class="sort-arrow"></span></th>
                 </tr>
@@ -432,9 +448,9 @@
           </div>
 
           <div class="cost-pagination">
-            <button id="cost-page-prev" class="btn btn-small btn-secondary">← Trước</button>
+            <button id="cost-page-prev" class="btn btn-small btn-secondary">Trang trước</button>
             <span id="cost-page-label" class="cost-page-label">Trang 1/1</span>
-            <button id="cost-page-next" class="btn btn-small btn-secondary">Sau →</button>
+            <button id="cost-page-next" class="btn btn-small btn-secondary">Trang sau</button>
           </div>
         </div>
       </div>
@@ -466,7 +482,7 @@
       <div class="modal-body">
         <div id="social-alerts"></div>
         <div class="videos-filter-row">
-          <label for="videos-locale-filter">🌏 Thị trường:</label>
+          <label for="videos-locale-filter">Thị trường</label>
           <select id="videos-locale-filter" class="input-text"></select>
         </div>
         <div id="videos-list-grid" class="videos-grid">

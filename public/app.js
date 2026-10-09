@@ -284,7 +284,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (!l.renderable) {
         const lock = document.createElement("span");
         lock.className = "locale-lock";
-        lock.textContent = "🔒 chưa dựng được";
+        lock.textContent = "Chưa hỗ trợ";
         btn.appendChild(lock);
       }
       btn.addEventListener("click", () => selectLocale(l.code));
@@ -293,9 +293,7 @@ document.addEventListener("DOMContentLoaded", () => {
     const info = currentLocaleInfo();
     localeStyleLine.textContent = info ? `Văn phong: ${info.styleSummary}` : "";
     if (info && !info.renderable) {
-      localeRenderNote.textContent =
-        "Thị trường này chưa dựng được video — vẫn tạo/sửa/lưu nháp kịch bản bình thường. Lý do: " +
-        info.blockers.map((b) => b.message).join(" ");
+      localeRenderNote.textContent = `Chưa thể dựng video: ${info.blockers.map((b) => b.message).join(" ")}`;
       localeRenderNote.classList.remove("hidden");
     } else {
       localeRenderNote.classList.add("hidden");
@@ -413,7 +411,7 @@ document.addEventListener("DOMContentLoaded", () => {
       if (v.id === engine.defaultVoice) opt.selected = true;
       vieneuPresetSelect.appendChild(opt);
     });
-    if (voiceSelectLabel) voiceSelectLabel.textContent = engine ? `🗣️ Chọn giọng ${engine.label}:` : "🗣️ Chọn giọng:";
+    if (voiceSelectLabel) voiceSelectLabel.textContent = engine ? `Chọn giọng ${engine.label}` : "Chọn giọng";
   }
 
   // -------------------------------------------------------------
@@ -427,7 +425,7 @@ document.addEventListener("DOMContentLoaded", () => {
     { id: "vi", label: "Chỉ tiếng Việt" },
   ];
   const biViewModeBox = document.getElementById("bi-view-mode");
-  const renderLockNote = document.getElementById("render-lock-note");
+  const approveLockReason = document.getElementById("approve-lock-reason");
   let localeRules = null; // GET /api/locale-rules cho thị trường đang chọn
   let biViewMode = "both";
   try {
@@ -458,17 +456,19 @@ document.addEventListener("DOMContentLoaded", () => {
     const busyNow = busyCount > 0;
     const fitBlocked = !locked && fitIssues.length > 0;
     btnApproveBuild.disabled = locked || busyNow || fitBlocked;
+    btnApproveBuild.setAttribute("aria-disabled", String(btnApproveBuild.disabled));
     if (btnSaveDraft) btnSaveDraft.disabled = busyNow; // nội dung đang được AI sửa -> chưa lưu bản nửa vời
     btnApproveBuild.title = locked ? "Thị trường này chưa dựng được video" : busyNow ? "Đang chờ AI sửa dòng…" : fitBlocked ? "Có dòng chữ không vừa khung video" : "";
+    let reason = "";
     if (locked) {
-      renderLockNote.textContent = `🔒 Chưa dựng được video cho ${info.displayName}: ${info.blockers.map((b) => b.message).join(" ")} Bạn vẫn xem và sửa kịch bản bình thường.`;
+      reason = `${info.displayName} chưa thể dựng video: ${info.blockers.map((b) => b.message).join(" ")}`;
     } else if (busyNow) {
-      renderLockNote.textContent = "⏳ Đang chờ AI sửa dòng — nút dựng video tạm khoá để không gửi nội dung chưa xong.";
+      reason = "Đang chờ AI hoàn tất chỉnh sửa. Nút sẽ tự mở khi nội dung sẵn sàng.";
+    } else if (fitBlocked) {
+      reason = `Có ${fitIssues.length} dòng bị tràn khung. Hãy rút gọn các dòng viền đỏ rồi thử lại.`;
     }
-    else if (fitBlocked) {
-      renderLockNote.textContent = `🔒 Có ${fitIssues.length} chỗ chữ không vừa khung video (đánh dấu đỏ ở trên) — rút gọn rồi mới dựng được, để video không bị tràn chữ.`;
-    }
-    renderLockNote.classList.toggle("hidden", !(locked || busyNow || fitBlocked));
+    approveLockReason.textContent = reason;
+    approveLockReason.classList.toggle("hidden", !reason);
   }
 
   // Kiểm tra chữ vừa khung video: gọi server (đo bằng Chrome + font thật), debounce, chỉ nhận kết quả mới nhất.
@@ -873,11 +873,11 @@ document.addEventListener("DOMContentLoaded", () => {
       const card = document.createElement("div");
       card.className = "video-card";
       const actions = draft
-        ? `<button type="button" class="btn btn-small btn-primary btn-open-draft" data-slug="${escapeAttr(v.slug)}">✏ Mở để sửa</button>`
-        : `<a href="${v.previewUrl}" target="_blank" class="btn btn-small btn-primary">${v.hasIndex ? "🎬 Xem Trước" : "▶ Xem MP4"}</a>
-            ${v.renderFile && v.renderFile !== v.previewUrl ? `<a href="${v.renderFile}" target="_blank" class="btn btn-small btn-secondary">⬇ Tải MP4</a>` : ""}`;
+        ? `<button type="button" class="btn btn-small btn-primary btn-open-draft" data-slug="${escapeAttr(v.slug)}">Mở để sửa</button>`
+        : `<a href="${v.previewUrl}" target="_blank" class="btn btn-small btn-primary">${v.hasIndex ? "Xem trước" : "Xem MP4"}</a>
+            ${v.renderFile && v.renderFile !== v.previewUrl ? `<a href="${v.renderFile}" target="_blank" class="btn btn-small btn-secondary">Tải MP4</a>` : ""}`;
       const versionBtn = v.canMakeVersion
-        ? `<button type="button" class="btn btn-small btn-secondary btn-make-version" data-slug="${escapeAttr(v.slug)}" title="Dùng lại 2 ảnh + gợi ý + góc độ để viết nội dung cho thị trường khác">🌏 Tạo phiên bản cho thị trường khác</button>`
+        ? `<button type="button" class="btn btn-small btn-secondary btn-make-version" data-slug="${escapeAttr(v.slug)}" title="Dùng lại 2 ảnh, gợi ý và góc độ để viết nội dung cho thị trường khác">Tạo bản cho thị trường khác</button>`
         : "";
       card.innerHTML = `
         <div>
@@ -933,7 +933,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const autoOpt = document.createElement("option");
     autoOpt.value = "auto";
-    autoOpt.textContent = "🤖 Tự động (để AI chọn)";
+    autoOpt.textContent = "Tự động (để AI chọn)";
     autoOpt.selected = true;
     contentAngleSelect.appendChild(autoOpt);
 
@@ -946,7 +946,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
     const customOpt = document.createElement("option");
     customOpt.value = "custom";
-    customOpt.textContent = "✏️ Khác (tự mô tả ở bên dưới)";
+    customOpt.textContent = "Góc độ khác (tự mô tả)";
     contentAngleSelect.appendChild(customOpt);
   }
 
@@ -1108,7 +1108,7 @@ document.addEventListener("DOMContentLoaded", () => {
     } finally {
       btnGenerateContent.disabled = false;
       spinGen.classList.add("hidden");
-      btnGenerateContent.querySelector(".btn-text").textContent = "✨ TẠO NỘI DUNG VỚI GEMINI AI";
+      btnGenerateContent.querySelector(".btn-text").textContent = "Tạo nội dung với Gemini AI";
     }
   });
 

@@ -20,6 +20,27 @@
   --shadow-glow-cyan: 0 0 25px rgba(55, 230, 196, 0.35);
 }
 
+.icon-sprite {
+  position: absolute;
+  width: 0;
+  height: 0;
+  overflow: hidden;
+}
+
+.ui-icon {
+  width: 1.15em;
+  height: 1.15em;
+  flex: none;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+#icon-bolt,
+#icon-spark { fill: currentColor; stroke: none; }
+
 * {
   box-sizing: border-box;
   margin: 0;
@@ -107,6 +128,8 @@ body {
   font-size: 24px;
   box-shadow: var(--shadow-glow-pink);
 }
+
+.logo-icon .ui-icon { width: 26px; height: 26px; }
 
 .logo-text h1 {
   font-size: 22px;
@@ -230,6 +253,13 @@ body {
   margin-bottom: 6px;
 }
 
+.card-header h2,
+#locale-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .card-header p {
   color: var(--fg-dim);
   font-size: 13px;
@@ -300,8 +330,10 @@ body {
 }
 
 .upload-icon {
-  font-size: 42px;
+  width: 42px;
+  height: 42px;
   margin-bottom: 10px;
+  color: var(--accent-cyan);
 }
 
 .upload-title {
@@ -357,6 +389,13 @@ body {
   font-weight: 600;
   margin-bottom: 8px;
   color: var(--fg);
+}
+
+.label-optional {
+  margin-left: 6px;
+  color: var(--fg-dim);
+  font-size: 11px;
+  font-weight: 500;
 }
 
 /* -------------------------------------------------------------
@@ -1260,6 +1299,12 @@ body {
 .hashtag-chip button:hover { color: var(--danger, #ff5c7a); }
 .hashtag-add-row { display: flex; gap: 8px; }
 .hashtag-add-row .input-text { flex: 1; }
+.hashtag-add-row .hashtag-action {
+  min-height: 44px;
+  padding-inline: 14px;
+  border: 1px solid var(--panel-edge);
+  white-space: nowrap;
+}
 .hashtag-note { margin-top: 6px; font-size: 11px; color: var(--fg-dim); }
 
 /* Target market (locale) picker — Step 1 */
@@ -1477,3 +1522,25 @@ body {
 /* Danh sách video: bản ngoại ngữ — tiêu đề chữ đích là tên chính, nghĩa tiếng Việt nhỏ bên dưới, slug mờ hơn */
 .video-title-vi { font-size: 12.5px; color: var(--gloss-fg, #cfc9ee); margin-top: 2px; }
 .video-slug-dim { font-size: 11px; color: var(--fg-dim); font-family: monospace; margin-top: 2px; opacity: 0.8; }
+
+.approve-action {
+  display: flex;
+  flex: 0 1 390px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 7px;
+}
+
+.approve-lock-reason {
+  color: var(--accent-yellow);
+  font-size: 12px;
+  line-height: 1.45;
+  text-align: left;
+}
+
+.approve-action .btn:disabled {
+  opacity: 1;
+  color: #b6b0c9;
+  background: #302a43;
+  border: 1px solid #4c4561;
+}
