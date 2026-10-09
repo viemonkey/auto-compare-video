@@ -26,9 +26,10 @@ test("focusSpans: không bao giờ có span âm/ngược dù mốc cuối vượ
   assert.deepEqual(focusSpans([], 38), []);
 });
 
-test("template: mỗi card có .card-ring, focus() chỉ ghi nhận rồi flushFocus chạy sau khi biết thời lượng", () => {
-  assert.equal((html.match(/class="card-ring"/g) || []).length, 2);
-  assert.match(html, /\.card-ring \{[\s\S]*var\(--accent-yellow\)/);
+test("template: khung nhấn là outline mảnh lơ lửng trên .card, focus() chỉ ghi nhận rồi flushFocus chạy sau khi biết thời lượng", () => {
+  assert.match(html, /\.card \{[\s\S]*?outline: 3px solid rgba\(255, 230, 0, 0\);[\s\S]*?outline-offset: 16px;/);
+  assert.match(html, /outlineColor: st\.outline, outlineOffset/);
+  assert.doesNotMatch(html, /card-ring/, "viền dày cũ đã bỏ");
   assert.match(html, /function focus\(side, at\) \{\s*FOCUS_EVENTS\.push/);
   assert.ok(html.indexOf("flushFocus(ROOT_DURATION)") > html.indexOf("/*TIMELINE_BEATS*/"), "flushFocus phải chạy SAU các lời gọi focus() do scaffold sinh");
   assert.ok(html.indexOf("flushFocus(ROOT_DURATION)") < html.indexOf('window.__timelines["main"]'), "và TRƯỚC khi đăng ký timeline");
@@ -39,7 +40,8 @@ test("template: không hạ opacity của .card (chỉ veil), scale bên đượ
   const idle = Number(html.match(/IDLE = \{ card: ([\d.]+)/)[1]);
   assert.ok(active > 1 && idle < 1);
   assert.doesNotMatch(html, /tl\.to\(card, \{[^}]*opacity/);
-  // phình tối đa mỗi bên (active - 1) * 420 / 2 px, phải nhỏ hơn nửa khe 48px (không chạm card kia)
-  assert.ok(((active - 1) * 420) / 2 + ((1 - idle) * 420) / 2 < 48);
+  // phình tối đa mỗi bên (active - 1) * 420 / 2 px + khung outline (offset + 3px), phải nhỏ hơn khe 48px (không chạm card kia)
+  const offset = Number(html.match(/ACTIVE = \{[^}]*offset: (\d+)/)[1]);
+  assert.ok(((active - 1) * 420) / 2 + offset + 3 + ((1 - idle) * 420) / 2 < 48);
   assert.match(html, /left: 96px;/);
 });
