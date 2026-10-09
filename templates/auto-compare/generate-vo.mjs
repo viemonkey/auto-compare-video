@@ -114,11 +114,8 @@ const TL_GAP = 0.14;           // flat timeline gap. Word-boundary trim keeps
 const TL_OUTRO = 1.2;          // hold after the last clip
 
 async function ffprobeDuration(filePath) {
-  const { stdout } = await execFileAsync("ffprobe", [
-    "-v", "error", "-show_entries", "format=duration",
-    "-of", "default=noprint_wrappers=1:nokey=1", filePath,
-  ]);
-  return parseFloat(stdout.trim());
+  const { probeDuration } = await lib("tts", "audio-tools.mjs");
+  return probeDuration(filePath);
 }
 
 // ============================================================

@@ -10,7 +10,7 @@ import { TtsHttpError, ttsErrorMessage, isPermanent } from "../scripts/lib/tts/m
 import { resolveVoice, resolveSpeed, planEngines, defaultEngineId, DEFAULT_SPEED } from "../scripts/lib/tts/select.mjs";
 import { createEdgeEngine, speedToRate } from "../scripts/lib/tts/edge.mjs";
 import { runVoiceover, estimateWordTimings, EngineFailure, TRIM_LEAD, TRIM_TRAIL } from "../scripts/lib/tts/voiceover.mjs";
-import { parseSilenceDetect } from "../scripts/lib/tts/audio-tools.mjs";
+import { parseFfmpegProgressDuration, parseSilenceDetect, probeDuration, resolveMediaBinaries } from "../scripts/lib/tts/audio-tools.mjs";
 import { appendCostEntry } from "../scripts/lib/cost-ledger.mjs";
 import { listEngines, engineReadiness } from "../scripts/lib/capabilities.mjs";
 import { resolveLocale } from "../scripts/lib/locales.mjs";
@@ -404,6 +404,37 @@ test("parseSilenceDetect: lặng đầu + lặng cuối", () => {
   assert.deepEqual(parseSilenceDetect(log, 3.4), { start: 0.31, end: 2.5 });
   assert.deepEqual(parseSilenceDetect("", 3.4), { start: 0, end: 3.4 });
   assert.deepEqual(parseSilenceDetect("silence_start: 1.0\nsilence_end: 1.2 | silence_duration: 0.2\n", 3.4), { start: 0, end: 3.4 });
+});
+
+test("audio tools: ưu tiên cấu hình binary và dùng ffmpeg-static khi PATH không có ffmpeg", () => {
+  assert.deepEqual(
+    resolveMediaBinaries({ FFMPEG_PATH: "/custom/ffmpeg", FFPROBE_PATH: "/custom/ffprobe" }, "/bundle/ffmpeg"),
+    { ffmpeg: "/custom/ffmpeg", ffprobe: "/custom/ffprobe" },
+  );
+  assert.deepEqual(resolveMediaBinaries({}, "/bundle/ffmpeg"), { ffmpeg: "/bundle/ffmpeg", ffprobe: "ffprobe" });
+});
+
+test("audio tools: thiếu ffprobe thì đo thời lượng bằng progress của ffmpeg", async () => {
+  const calls = [];
+  const duration = await probeDuration("voice.mp3", {
+    env: {},
+    staticPath: "/bundle/ffmpeg",
+    exec: async (bin, args) => {
+      calls.push({ bin, args });
+      if (bin === "ffprobe") throw Object.assign(new Error("spawn ffprobe ENOENT"), { code: "ENOENT" });
+      return { stdout: "out_time_us=0\nprogress=continue\nout_time_us=2512000\nprogress=end\n" };
+    },
+  });
+  assert.equal(duration, 2.512);
+  assert.equal(calls[0].bin, "ffprobe");
+  assert.equal(calls[1].bin, "/bundle/ffmpeg");
+  assert.ok(calls[1].args.includes("-progress"));
+});
+
+test("audio tools: parser lấy mốc progress lớn nhất và hỗ trợ định dạng đồng hồ", () => {
+  assert.equal(parseFfmpegProgressDuration("out_time_ms=500000\nout_time_ms=1750000\n"), 1.75);
+  assert.equal(parseFfmpegProgressDuration("out_time=00:00:01.250000\nout_time=00:01:02.500000\n"), 62.5);
+  assert.ok(Number.isNaN(parseFfmpegProgressDuration("progress=end\n")));
 });
 
 // ---------------------------------------------------------------------------------------------
