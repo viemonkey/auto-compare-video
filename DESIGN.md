@@ -186,13 +186,14 @@ with no `top`/`left` adapt automatically.
     crossfade, full-bleed frame) predating this pipeline — not documented here as a reusable
     pattern.
 - **Active-side emphasis (spotlight)**: whenever the narration is about ONE side, that side
-  is unmistakable but the treatment stays restrained. Active card: scale 1.04 (soft `back.out`),
-  a 3px `--accent-yellow` outline floating 7px off the photo (CSS `outline` on `.card`, drawn
-  outside the box), deeper soft shadow, photo pushes in slowly (1 → 1.08) while the side stays
-  active, its title scales 1.05. Inactive card: scale 0.95, 55% saturation, `.card-veil` 32%,
-  title at 55%. `side:"both"` = neutral (no frame, gentle shared push-in). Never lower `.card`
-  opacity — use the veil. Implemented in `focus()` / `flushFocus()` (`templates/auto-compare/index.html`);
-  layout boxes (seam 48px, margins 96px) are unchanged — scale + frame stay within ~28px of the card edge.
+  is unmistakable using SIZE + BRIGHTNESS only — deliberately no coloured frame, so it works
+  whatever colours the two photos have (a gold ring photo would swallow a yellow border). Active
+  card: scale 1.08 (soft `back.out`), deeper shadow, photo pushes in slowly (1 → 1.08) while the
+  side stays active, its title scales 1.05. Inactive card: scale 0.92, 60% saturation,
+  `.card-veil` 32%, title at 55%. `side:"both"` = neutral (gentle shared push-in). Never lower
+  `.card` opacity — use the veil. Implemented in `focus()` / `flushFocus()`
+  (`templates/auto-compare/index.html`); layout boxes (seam 48px, margins 96px) are unchanged — the
+  two cards still keep >= 12px between them at maximum grow/shrink.
 
 ## Rhythm
 

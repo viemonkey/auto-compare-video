@@ -84,11 +84,9 @@
         height: 372px;
         overflow: hidden;
         background: #000;
-        /* soft drop shadow + a thin accent outline that floats off the photo (outline is drawn OUTSIDE the
-           box, so overflow:hidden doesn't clip it). Both are tweened by focus(); outline starts transparent. */
+        /* soft drop shadow, deepened on the active card by focus(). The emphasis is size + brightness only
+           (no coloured frame), so it works whatever colours the two photos have. */
         box-shadow: rgba(0, 0, 0, 0.3) 0px 14px 32px 0px;
-        outline: 3px solid rgba(255, 230, 0, 0);
-        outline-offset: 16px;
       }
       #card-left {
         left: 96px;
@@ -551,9 +549,9 @@
       void setCardImage;
 
       // Panel focus — make it unmistakable WHICH side the host is talking about.
-      //   active   : card lifts (scale 1.04) with a thin accent frame floating 7px off the photo, its photo slowly pushes in
+      //   active   : card lifts (scale 1.08) with a deeper shadow, its photo slowly pushes in
       //              (Ken Burns) for as long as the side is active, its title scales up
-      //   inactive : card recedes (0.95), photo slightly desaturated + dimmed by .card-veil, title dims
+      //   inactive : card recedes (0.92), photo slightly desaturated + dimmed by .card-veil, title dims
       //   both     : everything neutral, photos drift in gently together
       // focus() only RECORDS the change; flushFocus() (end of script) builds the tweens once the end of
       // each span is known, so the push-in lasts exactly as long as the side stays active.
@@ -572,18 +570,16 @@
 
       function flushFocus(endAt) {
         const POP = 0.55; // seconds for the pop / settle transition
-        const ACCENT = "rgba(255, 230, 0, 1)";
-        // active: gentle lift + floating accent frame; idle: recede (smaller, slightly faded) — restrained on purpose
-        const ACTIVE = { card: 1.04, veil: 0, outline: ACCENT, offset: 7, label: 1.05, labelOpacity: 1, shadow: "rgba(0, 0, 0, 0.42) 0px 24px 48px 0px", sat: 1, push: 1.08 };
-        const IDLE = { card: 0.95, veil: 0.32, outline: "rgba(255, 230, 0, 0)", offset: 16, label: 0.95, labelOpacity: 0.55, shadow: "rgba(0, 0, 0, 0.2) 0px 8px 20px 0px", sat: 0.55, push: 1 };
-        const NEUTRAL = { card: 1, veil: 0, outline: "rgba(255, 230, 0, 0)", offset: 16, label: 1, labelOpacity: 1, shadow: "rgba(0, 0, 0, 0.3) 0px 14px 32px 0px", sat: 1, push: 1.04 };
+        // active: lifts and grows; idle: recedes (smaller, slightly faded). Size + brightness only — no coloured frame.
+        const ACTIVE = { card: 1.08, veil: 0, label: 1.05, labelOpacity: 1, shadow: "rgba(0, 0, 0, 0.45) 0px 28px 56px 0px", sat: 1, push: 1.08 };
+        const IDLE = { card: 0.92, veil: 0.32, label: 0.95, labelOpacity: 0.55, shadow: "rgba(0, 0, 0, 0.18) 0px 6px 16px 0px", sat: 0.6, push: 1 };
+        const NEUTRAL = { card: 1, veil: 0, label: 1, labelOpacity: 1, shadow: "rgba(0, 0, 0, 0.3) 0px 14px 32px 0px", sat: 1, push: 1.04 };
         focusSpans(FOCUS_EVENTS, endAt).forEach(({ side, at, end }) => {
           ["left", "right"].forEach((s) => {
             const st = side === "both" ? NEUTRAL : side === s ? ACTIVE : IDLE;
             const card = "#card-" + s;
             const img = card + " .card-image";
             tl.to(card, { scale: st.card, boxShadow: st.shadow, duration: POP, ease: st === ACTIVE ? "back.out(1.3)" : "power3.out" }, at);
-            tl.to(card, { outlineColor: st.outline, outlineOffset: st.offset + "px", duration: POP, ease: "power2.out" }, at);
             tl.to(card + " .card-veil", { opacity: st.veil, duration: POP, ease: "power2.out" }, at);
             tl.to("#lb-fixed .lb-" + s + " .lb-1", { scale: st.label, opacity: st.labelOpacity, duration: POP, ease: "power3.out" }, at);
             tl.to(img, { filter: "saturate(" + st.sat + ")", duration: POP, ease: "power2.out" }, at);
