@@ -81,6 +81,7 @@ import { copySourceImages, readRecord, writeRecord } from "./scripts/lib/content
 import { rewriteField, translateField, FieldEditError } from "./scripts/lib/field-edit.mjs";
 import { AbortedError } from "./scripts/lib/gemini-client.mjs";
 import { checkFfmpeg, extractPoseTimeline, setReelThumbnail } from "./scripts/lib/reel-thumbnail.mjs";
+import { checkMediaBinaries, describeSpawnError, mediaToolsErrorVi } from "./scripts/lib/media-binaries.mjs";
 import { getLocale, listLocales, localeErrors, getDefaultLocale } from "./scripts/lib/locales.mjs";
 import {
   listEngines,
@@ -138,6 +139,13 @@ const CONTENT_ARCHIVE_DIR = path.join(OUTPUT_DIR, "content");
 const DATA_DIR = path.join(__dirname, "data");
 
 for (const d of [UPLOAD_DIR, TEMP_DIR, OUTPUT_DIR, LOG_DIR, CONTENT_ARCHIVE_DIR, DATA_DIR]) fs.mkdirSync(d, { recursive: true });
+
+const mediaTools = checkMediaBinaries();
+if (mediaTools.ok) {
+  console.log(`[media] FFmpeg và FFprobe sẵn sàng (${process.platform}).`);
+} else {
+  console.error(`[media] LỖI: ${mediaToolsErrorVi(mediaTools)}`);
+}
 
 // videos/<slug>/ chưa dọn được sau render (EPERM...) -> data/pending-cleanup.json, thử lại mỗi tick + lúc khởi động (xem scripts/lib/pending-cleanup.mjs).
 const cleanupQueue = createCleanupQueue({
@@ -378,7 +386,7 @@ function runNode(args, { onLine } = {}) {
 
     child.stdout.on("data", feed);
     child.stderr.on("data", feed);
-    child.on("error", (e) => resolve({ code: -1, out: `${out}\n${e.message}` }));
+    child.on("error", (e) => resolve({ code: -1, out: `${out}\n${describeSpawnError(e, process.execPath)}`, error: e }));
     child.on("close", (code) => {
       if (tail && onLine) onLine(tail);
       resolve({ code, out });

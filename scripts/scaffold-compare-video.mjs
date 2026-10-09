@@ -39,6 +39,7 @@ import { copyFontsToVideo, familiesOfLocale } from "./lib/fonts.mjs";
 import { flattenContent } from "../public/shared/bilingual.mjs";
 import { planVideoText } from "./lib/fit-check.mjs";
 import { buildLines, computeTiming, buildIndexHtml } from "./lib/compose.mjs";
+import { describeSpawnError } from "./lib/media-binaries.mjs";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const REPO_ROOT = path.resolve(__dirname, "..");
@@ -132,7 +133,7 @@ function genUniqueSlug(content) {
 function run(command, args, cwd, label) {
   console.log(`\n[${label}] ${command} ${args.join(" ")}  (cwd: ${cwd})`);
   const res = spawnSync(command, args, { cwd, stdio: "inherit" });
-  if (res.error) fail(`${label} không chạy được: ${res.error.message}`);
+  if (res.error) fail(`${label}: ${describeSpawnError(res.error, command)}`);
   if (res.status !== 0) {
     fail(`${label} thất bại (exit ${res.status}).`);
   }

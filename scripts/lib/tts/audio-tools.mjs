@@ -1,47 +1,15 @@
-// Công cụ âm thanh dùng ffmpeg/ffprobe. Ưu tiên biến môi trường, sau đó dùng
-// ffmpeg-static đã cài cùng repo; ffprobe không có thì đo thời lượng bằng
-// progress output của ffmpeg. Tách riêng để voiceover.mjs test được bằng bản giả.
+// Công cụ âm thanh dùng binary đa nền tảng đã đóng gói cùng repo
+// (ffmpeg-static + ffprobe-static), vẫn cho phép ghi đè bằng biến môi trường.
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
-import ffmpegStatic from "ffmpeg-static";
+import { resolveMediaBinaries } from "../media-binaries.mjs";
 
 const execFileAsync = promisify(execFile);
-export function resolveMediaBinaries(env = process.env, staticPath = ffmpegStatic) {
-  return {
-    ffmpeg: env.FFMPEG_PATH || staticPath || "ffmpeg",
-    ffprobe: env.FFPROBE_PATH || "ffprobe",
-  };
-}
 
-/** Đọc mốc cuối cùng từ `ffmpeg -progress pipe:1` (microsecond). */
-export function parseFfmpegProgressDuration(stdout) {
-  const text = String(stdout || "");
-  const micros = [...text.matchAll(/^out_time_(?:us|ms)=(\d+)$/gm)].map((m) => Number(m[1])).filter(Number.isFinite);
-  if (micros.length) return Math.max(...micros) / 1e6;
-
-  const clocks = [...text.matchAll(/^out_time=(\d+):(\d+):(\d+(?:\.\d+)?)$/gm)];
-  if (!clocks.length) return NaN;
-  return Math.max(...clocks.map((m) => Number(m[1]) * 3600 + Number(m[2]) * 60 + Number(m[3])));
-}
-
-export async function probeDuration(file, { exec = execFileAsync, env = process.env, staticPath = ffmpegStatic } = {}) {
-  const { ffmpeg, ffprobe } = resolveMediaBinaries(env, staticPath);
-  try {
-    const { stdout } = await exec(ffprobe, ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", file]);
-    return parseFloat(stdout.trim());
-  } catch (error) {
-    if (error?.code !== "ENOENT") throw error;
-  }
-
-  const { stdout } = await exec(ffmpeg, [
-    "-v", "error", "-progress", "pipe:1", "-nostats",
-    "-i", file, "-map", "0:a:0", "-f", "null", "-",
-  ]);
-  const duration = parseFfmpegProgressDuration(stdout);
-  if (!Number.isFinite(duration) || duration <= 0) {
-    throw new Error(`Không đo được thời lượng audio bằng ffmpeg: ${file}`);
-  }
-  return duration;
+export async function probeDuration(file, { exec = execFileAsync, env = process.env, bundled } = {}) {
+  const { ffprobe } = resolveMediaBinaries(env, bundled);
+  const { stdout } = await exec(ffprobe, ["-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", file]);
+  return parseFloat(stdout.trim());
 }
 
 export async function trimClip(rawPath, finalPath, startSec, durSec) {
