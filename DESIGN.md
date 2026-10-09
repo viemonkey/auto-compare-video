@@ -185,10 +185,14 @@ with no `top`/`left` adapt automatically.
   - `kim-cuong-vs-than-da` uses a third, bespoke mechanism (direct `<img src>` swap, no
     crossfade, full-bleed frame) predating this pipeline — not documented here as a reusable
     pattern.
-- **Active-side emphasis**: during Giải A / Giải B, the inactive card dims to 55% opacity +
-  scales to 0.96; the active card stays at full opacity/scale — directs the eye without a
-  camera move (`camera-static` — the split symmetry is the subject early, but attention
-  shifts once the verdict starts).
+- **Active-side emphasis (spotlight)**: whenever the narration is about ONE side, that side
+  is unmistakable. Active card: scale 1.07 (`back.out` pop), 7px yellow frame + glow
+  (`.card-ring`, `--accent-yellow`), photo pushes in slowly (1 → 1.10) for as long as the side
+  stays active, its title scales 1.06. Inactive card: scale 0.93, photo drained to 25% saturation
+  + `.card-veil` at 50%, its title dims to 50%. `side:"both"` = neutral (no frame, gentle shared
+  push-in). Never lower `.card` opacity — use the veil. Implemented in `focus()` / `flushFocus()`
+  (`templates/auto-compare/index.html`); the layout boxes (seam 48px, margins 96px) are unchanged
+  because the scale stays within ±14px of the nominal card edge.
 
 ## Rhythm
 

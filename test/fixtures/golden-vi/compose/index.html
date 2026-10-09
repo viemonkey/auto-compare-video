@@ -107,7 +107,18 @@
         height: 372px;
         overflow: hidden;
         background: #000;
-        box-shadow: 0 18px 40px rgba(0, 0, 0, 0.35);
+        /* two shadow layers (drop + glow) so GSAP can tween both ends — see focus() */
+        box-shadow: rgba(0, 0, 0, 0.35) 0px 18px 40px 0px, rgba(255, 230, 0, 0) 0px 0px 0px 0px;
+      }
+      /* spotlight frame on the panel being talked about — faded in by focus(); sits inside the
+         card (overflow:hidden) so it never changes the card's layout box */
+      .card-ring {
+        position: absolute;
+        inset: 0;
+        border: 7px solid var(--accent-yellow);
+        box-shadow: inset 0 0 26px rgba(255, 230, 0, 0.5);
+        opacity: 0;
+        pointer-events: none;
       }
       #card-left {
         left: 96px;
@@ -121,6 +132,7 @@
         width: 100%;
         height: 100%;
         object-fit: cover;
+        filter: saturate(1); /* explicit start so focus() can tween it (a "none" start would snap) */
       }
       /* darkens the off-topic panel — fading .card itself would blend it into
          the backdrop and wash it out instead */
@@ -356,10 +368,12 @@
         <div data-hf-id="hf-acv4" id="card-left" class="card" data-layout-allow-overflow="true">
           <img data-hf-id="hf-acv6" class="card-image" src="assets/images/card-left.jpg" alt="Bạch kim" />
           <div data-hf-id="hf-acv5" class="card-veil"></div>
+          <div data-hf-id="hf-acvr1" class="card-ring"></div>
         </div>
         <div data-hf-id="hf-acv8" id="card-right" class="card" data-layout-allow-overflow="true">
           <img data-hf-id="hf-acva" class="card-image" src="assets/images/card-right.jpg" alt="Vàng trắng" />
           <div data-hf-id="hf-acv9" class="card-veil"></div>
+          <div data-hf-id="hf-acvr2" class="card-ring"></div>
         </div>
 
         <div data-hf-id="hf-acve" id="eyebrow">SO SÁNH KIẾN THỨC</div>
@@ -598,13 +612,46 @@
       }
       void setCardImage;
 
-      // Panel focus — darken the side the host is not talking about.
+      // Panel focus — make it unmistakable WHICH side the host is talking about.
+      //   active   : card pops up (scale 1.07) with a yellow frame + glow, its photo slowly pushes in
+      //              (Ken Burns) for as long as the side is active, its title scales up
+      //   inactive : card shrinks (0.93), photo drained of colour + darkened by .card-veil, title dims
+      //   both     : everything neutral, photos drift in gently together
+      // focus() only RECORDS the change; flushFocus() (end of script) builds the tweens once the end of
+      // each span is known, so the push-in lasts exactly as long as the side stays active.
+      const FOCUS_EVENTS = [];
       function focus(side, at) {
-        const veil = (s) => "#card-" + s + " .card-veil";
-        const lit = side === "both" ? ["left", "right"] : [side];
-        const dim = side === "both" ? [] : [side === "left" ? "right" : "left"];
-        lit.forEach((s) => tl.to(veil(s), { opacity: 0, duration: 0.35, ease: "power2.out" }, at));
-        dim.forEach((s) => tl.to(veil(s), { opacity: 0.55, duration: 0.35, ease: "power2.out" }, at));
+        FOCUS_EVENTS.push({ side, at });
+      }
+
+      /* focusSpans:start */
+      // [{ side, at, end }] — each focus lasts until the next one (the last until the end of the video).
+      function focusSpans(events, endAt) {
+        const sorted = events.slice().sort((a, b) => a.at - b.at);
+        return sorted.map((ev, i) => ({ side: ev.side, at: ev.at, end: i + 1 < sorted.length ? sorted[i + 1].at : Math.max(endAt, ev.at) }));
+      }
+      /* focusSpans:end */
+
+      function flushFocus(endAt) {
+        const POP = 0.5; // seconds for the pop / shrink transition
+        const ACTIVE = { card: 1.07, veil: 0, ring: 1, label: 1.06, labelOpacity: 1, shadow: "rgba(0, 0, 0, 0.5) 0px 26px 56px 0px, rgba(255, 230, 0, 0.55) 0px 0px 46px 8px", sat: 1, push: 1.1 };
+        const IDLE = { card: 0.93, veil: 0.5, ring: 0, label: 0.94, labelOpacity: 0.5, shadow: "rgba(0, 0, 0, 0.3) 0px 10px 24px 0px, rgba(255, 230, 0, 0) 0px 0px 0px 0px", sat: 0.25, push: 1 };
+        const NEUTRAL = { card: 1, veil: 0, ring: 0, label: 1, labelOpacity: 1, shadow: "rgba(0, 0, 0, 0.35) 0px 18px 40px 0px, rgba(255, 230, 0, 0) 0px 0px 0px 0px", sat: 1, push: 1.05 };
+        focusSpans(FOCUS_EVENTS, endAt).forEach(({ side, at, end }) => {
+          ["left", "right"].forEach((s) => {
+            const st = side === "both" ? NEUTRAL : side === s ? ACTIVE : IDLE;
+            const card = "#card-" + s;
+            const img = card + " .card-image";
+            tl.to(card, { scale: st.card, boxShadow: st.shadow, duration: POP, ease: st === ACTIVE ? "back.out(1.6)" : "power3.out" }, at);
+            tl.to(card + " .card-veil", { opacity: st.veil, duration: POP, ease: "power2.out" }, at);
+            tl.to(card + " .card-ring", { opacity: st.ring, duration: POP * 0.8, ease: "power2.out" }, at);
+            tl.to("#lb-fixed .lb-" + s + " .lb-1", { scale: st.label, opacity: st.labelOpacity, duration: POP, ease: "power3.out" }, at);
+            tl.to(img, { filter: "saturate(" + st.sat + ")", duration: POP, ease: "power2.out" }, at);
+            // slow push-in while the side is on screen; settles back when it loses focus
+            if (st.push > 1) tl.fromTo(img, { scale: 1 }, { scale: st.push, duration: Math.max(0.01, end - at), ease: "none" }, at);
+            else tl.to(img, { scale: 1, duration: POP, ease: "power2.out" }, at);
+          });
+        });
       }
 
       // Retimed after trimming ~0.2s lead + ~0.8s trailing silence off every
@@ -674,6 +721,7 @@
       for (const n of Object.keys(CAPTIONS).map(Number)) showCaption(n);
 
       const ROOT_DURATION = 51;
+      flushFocus(ROOT_DURATION);
       window.__timelines["main"] = tl;
     </script>
 
