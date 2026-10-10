@@ -2,6 +2,7 @@
 import { h } from "/product/dom.js";
 import { api } from "/product/dom.js";
 import { createStep1 } from "/product/step1.js";
+import { createStep2 } from "/product/step2.js";
 
 const STEP_LABELS = {
   product: [["Ảnh và thông số", "Sản phẩm + giọng HuyK"], ["Kịch bản và ảnh cảnh", "Duyệt từng cảnh"], ["Dựng video", "Dựng và kiểm tra"]],
@@ -53,9 +54,11 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.cfg = await api("/api/product/config");
         state.source = ctx.cfg.defaultImageSource;
         const step1 = createStep1(ctx);
-        steps = [step1, { el: h("section", { class: "step-section" }) }, { el: h("section", { class: "step-section" }) }];
+        const step2 = createStep2(ctx);
+        steps = [step1, step2, { el: h("section", { class: "step-section", id: "pd-step-3" }) }];
         steps.forEach((s) => productApp.append(s.el));
-        ctx.onAnalyzed = () => { /* Bước 2 nối ở Mốc 5 */ };
+        ctx.onAnalyzed = async (project) => { await step2.show(project); gotoStep(2); };
+        ctx.onBuildStarted = () => { /* Bước 3 nối ở Mốc 6 */ };
         await step1.init();
         gotoStep(state.step || 1);
       } catch (err) {
