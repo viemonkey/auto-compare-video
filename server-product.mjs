@@ -14,7 +14,7 @@ import { normalizeForm, validateForm, productKindOfForm, productDisplayName } fr
 import { analyzeProduct } from "./scripts/lib/product/analyze.mjs";
 import { writeScript, assembleScript, validateScriptRules, readingEstimate } from "./scripts/lib/product/script.mjs";
 import { createBudget } from "./scripts/lib/product/budget.mjs";
-import { getLocale, getDefaultLocale } from "./scripts/lib/locales.mjs";
+import { getLocale, getDefaultLocale, needsGloss } from "./scripts/lib/locales.mjs";
 import { checkRenderability } from "./scripts/lib/capabilities.mjs";
 import { AbortedError } from "./scripts/lib/gemini-client.mjs";
 import { planScenes, buildBlockers, slotLabelOf } from "./scripts/lib/product/scenes.mjs";
@@ -374,6 +374,53 @@ export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedSt
       res.status(202).json(job);
     } catch (e) {
       fail(res, e);
+    }
+  });
+
+
+  /**
+   * Phiên bản cho thị trường khác: dùng lại TOÀN BỘ ảnh sản phẩm, ảnh cảnh đã duyệt, pose, clip AI (nếu có) — chỉ viết lại kịch bản + (khi dựng) đọc giọng.
+   * KHÔNG gọi API ảnh/clip. Tạo dự án MỚI (derivedFrom) ở Bước 2 để người dùng xem/sửa kịch bản bản dịch rồi dựng.
+   */
+  router.post("/:id/market-version", async (req, res) => {
+    const source = getProject(req, res);
+    if (!source) return;
+    const locale = localeOf(req.body?.locale);
+    if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
+    if (locale.code === source.locale) return res.status(400).json({ error: `Video này đã là thị trường ${locale.displayName} — chọn thị trường khác.` });
+    const renderability = checkRenderability(locale);
+    if (!renderability.renderable) return res.status(400).json({ error: `Thị trường ${locale.displayName} chưa dựng được video: ${renderability.blockers.map((b) => b.message).join(" ")}` });
+    if (!source.script?.lines?.length) return res.status(409).json({ error: "Dự án nguồn chưa có kịch bản." });
+    if (running.has(source.id)) return res.status(409).json({ error: "Dự án nguồn đang có việc chạy nền." });
+    const blockers = buildBlockers(source.scenes || []);
+    if (blockers.length) return res.status(409).json({ error: `Dự án nguồn còn cảnh chưa duyệt: ${blockers.map((b) => b.message).join(" ")}` });
+    const controller = new AbortController();
+    res.on("close", () => { if (!res.writableEnded) controller.abort(); });
+    let created = null;
+    try {
+      created = store.create({});
+      for (const name of fs.readdirSync(store.projectDir(source.id))) {
+        if (name === "project.json" || name.startsWith("_") || name.startsWith("incoming-tmp")) continue;
+        fs.copyFileSync(path.join(store.projectDir(source.id), name), path.join(store.projectDir(created.id), name));
+      }
+      const sourceLines = source.script.lines.map((l) => ({ beat: l.beat, text: needsGloss(localeOf(source.locale)) ? l.vi || l.text : l.text }));
+      const script = await scriptWriter({
+        form: source.form, analysis: source.analysis, locale, ledgerSlug: created.ledgerSlug, signal: controller.signal,
+        fixedBeats: source.script.lines.slice(1).map((l) => l.beat), sourceScript: sourceLines,
+      });
+      Object.assign(created, {
+        locale: locale.code, form: source.form, displayName: source.displayName, images: source.images, analysis: source.analysis,
+        settings: { ...source.settings, tts: {}, notes: [`Phiên bản ${locale.displayName} tạo từ dự án ${source.id}: dùng lại ảnh/cảnh đã duyệt, không gọi lại API ảnh.`] },
+        script: { openers: script.openers, openerIndex: 0, lines: script.lines, mismatches: [], specValues: script.specValues || {}, warnings: script.warnings, model: script.model, rulesIssues: [] },
+        scenes: (source.scenes || []).map((sc) => ({ ...sc, busy: null })),
+        clip: source.clip || undefined, status: "scripted", derivedFrom: source.id, aiGenerated: false,
+      });
+      store.write(created);
+      res.json(publicProject(store.read(created.id)));
+    } catch (e) {
+      if (created) store.remove(created.id);
+      if (e instanceof AbortedError || controller.signal.aborted) return;
+      fail(res, e, "Không tạo được phiên bản thị trường khác.");
     }
   });
 

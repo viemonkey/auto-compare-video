@@ -9,6 +9,7 @@ import { loadProductConfig, labelsFor } from "./config.mjs";
 import { productPromptPath, renderSection } from "./prompts.mjs";
 import { textModels } from "./estimate.mjs";
 import { specRows } from "./form.mjs";
+import { measure } from "../../../public/shared/text-length.mjs";
 
 const norm = (s) => stripDiacritics(String(s || "")).toLowerCase();
 const digitsOf = (s) => (String(s || "").match(/\d[\d.,]*/g) || []).map((d) => d.replace(/[.,]/g, "").replace(/^0+(?=\d)/, ""));
@@ -83,10 +84,11 @@ export function validateScriptRules({ lines }, { form, locale, config = loadProd
     const said = specs.some((l) => [norm(l.text), norm(l.vi)].some((t) => originWords.some((w) => t.includes(w)) || (form.stoneOrigin === "lab" && /nhan tao|lab/.test(t))));
     if (!said) issues.push(`Form ghi đá ${config.stoneOrigins[form.stoneOrigin].label.toLowerCase()} nên phải nói rõ điều đó trong ít nhất 1 câu thông số.`);
   }
+  // đơn vị đo theo thị trường (vi/ja/th: ký tự, en: từ) và tốc độ đọc theo cùng đơn vị
   const rate = locale.limits?.readingRate || cfg.readingCharsPerSecond;
-  const total = lines.reduce((a, l) => a + [...String(l.text || "")].length, 0);
+  const total = lines.reduce((a, l) => a + measure(l.text || "", locale.limits?.unit), 0);
   const maxTotal = Math.round(cfg.targetSeconds[1] * rate * (cfg.totalCharsTolerance || 1));
-  if (total > maxTotal) issues.push(`Tổng độ dài ${total} ký tự quá dài (tối đa ~${maxTotal} để video không vượt ${cfg.targetSeconds[1]} giây) — rút gọn các câu.`);
+  if (total > maxTotal) issues.push(`Tổng độ dài ${total} ${locale.limits?.unit === "word" ? "từ" : "ký tự"} quá dài (tối đa ~${maxTotal} để video không vượt ${cfg.targetSeconds[1]} giây) — rút gọn các câu.`);
   const hasCta = lines.at(-1)?.beat === "cta";
   if (!hasCta) issues.push('Câu cuối phải là câu kêu gọi (beat "cta").');
   return issues;
@@ -95,8 +97,7 @@ export function validateScriptRules({ lines }, { form, locale, config = loadProd
 /** Thời lượng đọc ước tính (giây) + cảnh báo nếu ngoài 15–20 giây (chỉ cảnh báo). */
 export function readingEstimate(lines, locale, config = loadProductConfig()) {
   const rate = locale.limits?.readingRate || config.script.readingCharsPerSecond;
-  const chars = lines.reduce((a, l) => a + [...String(l.text || "")].length, 0);
-  const seconds = chars / rate;
+  const seconds = lines.reduce((a, l) => a + measure(l.text || "", locale.limits?.unit), 0) / rate;
   const [lo, hi] = config.script.targetSeconds;
   const warnings = [];
   if (seconds < lo - 3) warnings.push(`Kịch bản ngắn (~${seconds.toFixed(0)} giây đọc) — video có thể dưới ${lo} giây.`);
@@ -114,7 +115,7 @@ export function assembleScript({ openers, lines }, openerIndex = 0) {
 /**
  * @returns {Promise<{openers:Array<{text,vi}>, openerIndex:number, lines:Array, mismatches:Array, warnings:string[], model:string}>}
  */
-export async function writeScript({ form, analysis, locale, ledgerSlug, signal, generate = generateJson, config = loadProductConfig(), env = process.env, promptFile = productPromptPath("product-script.md") }) {
+export async function writeScript({ form, analysis, locale, ledgerSlug, signal, fixedBeats = null, sourceScript = null, generate = generateJson, config = loadProductConfig(), env = process.env, promptFile = productPromptPath("product-script.md") }) {
   const cfg = config.script;
   const gloss = needsGloss(locale);
   const glossary = glossaryEntries(locale).map(({ concept, term }) => `- ${concept} -> ${term}`).join("\n");
@@ -133,11 +134,15 @@ export async function writeScript({ form, analysis, locale, ledgerSlug, signal, 
     specTranslate: renderSection(promptFile, gloss ? "fragment.spec.translate" : "fragment.spec.copy", { language: locale.prompt.language }),
     maxChars: cfg.maxCharsPerLine,
     maxTotalChars: Math.round(cfg.targetSeconds[1] * (locale.limits?.readingRate || cfg.readingCharsPerSecond)),
+    totalUnit: locale.limits?.unit === "word" ? "từ" : "ký tự",
     targetSeconds: cfg.targetSeconds.join("–"),
     minLines: cfg.minLines,
     maxLines: cfg.maxLines,
-    bodyMin: cfg.minLines - 1,
-    bodyMax: cfg.maxLines - 1,
+    bodyMin: fixedBeats ? fixedBeats.length : cfg.minLines - 1,
+    bodyMax: fixedBeats ? fixedBeats.length : cfg.maxLines - 1,
+    fixedBeats: fixedBeats ? fixedBeats.join(", ") : "",
+    fixedCount: fixedBeats ? fixedBeats.length : 0,
+    sourceScript: sourceScript ? sourceScript.map((l, i) => `${i + 1}. [${l.beat}] ${l.text}`).join("\n") : "",
     openerCount: cfg.openerChoices,
     mismatchFields: cfg.mismatchFields.join("; "),
   };
@@ -165,6 +170,7 @@ export async function writeScript({ form, analysis, locale, ledgerSlug, signal, 
     const lines = assembleScript({ openers, lines: result.lines.map((l) => ({ ...l, vi: gloss ? l.vi : "" })) }, 0);
     // mọi phương án mở đầu đều phải đạt luật (người dùng có thể chọn bất kỳ phương án nào)
     lastIssues = [];
+    if (fixedBeats && (result.lines.length !== fixedBeats.length || result.lines.some((l, i) => l.beat !== fixedBeats[i]))) lastIssues.push(`Phải đúng ${fixedBeats.length} câu với beat: ${fixedBeats.join(", ")} (ảnh/cảnh đã duyệt sẵn).`);
     openers.forEach((_, oi) => {
       const issues = validateScriptRules({ lines: assembleScript({ openers, lines: result.lines.map((l) => ({ ...l, vi: gloss ? l.vi : "" })) }, oi) }, { form, locale, config });
       for (const it of issues) if (!lastIssues.includes(it)) lastIssues.push(oi === 0 ? it : `${it} (phương án mở đầu ${oi + 1})`);

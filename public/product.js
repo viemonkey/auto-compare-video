@@ -4,6 +4,7 @@ import { api } from "/product/dom.js";
 import { createStep1 } from "/product/step1.js";
 import { createStep2 } from "/product/step2.js";
 import { createStep3 } from "/product/step3.js";
+import { openMarketDialog } from "/product/market.js";
 
 const STEP_LABELS = {
   product: [["Ảnh và thông số", "Sản phẩm + giọng HuyK"], ["Kịch bản và ảnh cảnh", "Duyệt từng cảnh"], ["Dựng video", "Dựng và kiểm tra"]],
@@ -62,7 +63,20 @@ document.addEventListener("DOMContentLoaded", () => {
         ctx.onAnalyzed = async (project) => { await step2.show(project); gotoStep(2); };
         ctx.onBuildStarted = (job) => { step2.stop(); step3.watch(job); gotoStep(3); };
         ctx.reset = () => { state.project = null; state.files = []; step3.stop(); location.reload(); };
-        ctx.openMarketVersion = (id) => alert(`Phiên bản thị trường khác cho dự án ${id} — nối ở Mốc 7.`);
+        ctx.openMarketVersion = (id) => openMarketDialog(ctx, id);
+        // phiên bản thị trường khác: giọng đọc phải theo thị trường MỚI (không mang engine/giọng của thị trường cũ sang)
+        ctx.onVersionCreated = async (project) => {
+          state.locale = project.locale;
+          try {
+            const data = await api(`/api/tts-engines?locale=${encodeURIComponent(project.locale)}`);
+            const usable = (data.engines || []).filter((e) => e.ready);
+            const pick = (data.defaultEngine && usable.find((e) => e.id === data.defaultEngine)) || usable[0];
+            state.tts = pick ? { engine: pick.id, voice: pick.defaultVoice || "" } : { engine: "", voice: "" };
+          } catch { state.tts = { engine: "", voice: "" }; }
+          step3.stop();
+          await step2.show(project);
+          gotoStep(2);
+        };
         await step1.init();
         gotoStep(state.step || 1);
       } catch (err) {
