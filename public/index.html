@@ -48,6 +48,12 @@
       </div>
     </header>
 
+    <!-- Chế độ: So sánh 2 ảnh (mặc định) / Giới thiệu sản phẩm — product.js ẩn/hiện các phần theo chế độ -->
+    <div class="mode-switch" role="radiogroup" aria-label="Chế độ tạo video">
+      <button type="button" class="mode-btn" role="radio" aria-checked="true" data-mode="compare" id="mode-compare">So sánh 2 ảnh</button>
+      <button type="button" class="mode-btn" role="radio" aria-checked="false" data-mode="product" id="mode-product">Giới thiệu sản phẩm</button>
+    </div>
+
     <!-- Progress Stepper -->
     <nav class="stepper-bar">
       <div class="step-item active" id="step-nav-1">
@@ -74,6 +80,9 @@
         </div>
       </div>
     </nav>
+
+    <!-- Chế độ "Giới thiệu sản phẩm": 3 bước do public/product.js dựng -->
+    <div id="product-app" class="product-app hidden"></div>
 
     <!-- STEP 1: Upload Images & Topic Hint -->
     <section class="step-section active" id="step-1">
@@ -514,5 +523,6 @@
   </div>
 
   <script type="module" src="app.js"></script>
+  <script type="module" src="product.js"></script>
 </body>
 </html>

@@ -78,6 +78,7 @@ import { validateGeminiModels } from "./scripts/lib/gemini-models.mjs";
 import { createCleanupQueue, existingVideoWebPath, MIN_MP4_BYTES } from "./scripts/lib/pending-cleanup.mjs";
 import { effectiveSlugSuffix, hasLocaleSuffix, stripLocaleSuffix, uniqueSlugForLocale } from "./scripts/lib/market-slug.mjs";
 import { copySourceImages, readRecord, writeRecord } from "./scripts/lib/content-store.mjs";
+import { createProductApi } from "./server-product.mjs";
 import { rewriteField, translateField, FieldEditError } from "./scripts/lib/field-edit.mjs";
 import { AbortedError } from "./scripts/lib/gemini-client.mjs";
 import { checkFfmpeg, extractPoseTimeline, setReelThumbnail } from "./scripts/lib/reel-thumbnail.mjs";
@@ -543,6 +544,9 @@ const marketApi = createMarketApi({
   runGenerateContent,
   localeFromCode,
 });
+
+// Chế độ "Giới thiệu sản phẩm" (/api/product/*) — xem server-product.mjs.
+createProductApi({ app, dataDir: DATA_DIR, hostRefsRoot: __dirname });
 
 // Chuẩn hoá 1 hashtag người dùng gõ tay ở Studio (bỏ dấu, thường, <=25 ký tự, lọc blocked) — để UI
 // dùng ĐÚNG luật của server thay vì tự cài lại. tier="topic" nếu tag nằm trong whitelist chủ đề.
