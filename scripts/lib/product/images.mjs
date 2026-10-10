@@ -171,8 +171,9 @@ function featheredAlpha(mask, width, height, passes = 2) {
 
 /**
  * Tách nền đơn giản: ảnh sản phẩm nền trắng/đồng màu -> PNG nền trong suốt, cắt sát vật thể (+ lề), phóng to `scale` lần.
- * @returns {{file:string, box:{x:number,y:number,w:number,h:number}, width:number, height:number}}
- *   box = khung bao của vật thể trong ẢNH GỐC (chuẩn hoá); width/height = kích thước PNG kết quả.
+ * @returns {{file:string, box:{x:number,y:number,w:number,h:number}, crop:{x:number,y:number,w:number,h:number}, width:number, height:number}}
+ *   box = khung bao của vật thể trong ẢNH GỐC (chuẩn hoá); crop = vùng ảnh gốc thực sự được cắt ra (gồm lề, chuẩn hoá) — dùng để đổi toạ độ ảnh gốc -> toạ độ PNG;
+ *   width/height = kích thước PNG kết quả.
  */
 export async function cutoutBackground(inFile, outFile, { tolerance = 12, holeTolerance = 4, scale = 0, targetWidth = 1000, pad = 0.03, maxDim = 1600 } = {}) {
   const img = await decodeRgba(inFile, { maxDim });
@@ -201,7 +202,7 @@ export async function cutoutBackground(inFile, outFile, { tolerance = 12, holeTo
   // Ảnh sản phẩm thường nhỏ: phóng to tới ~targetWidth (tối đa x8) để khỏi bị vỡ ô khi đặt lên khung dọc.
   const k = scale || Math.min(8, Math.max(1, targetWidth / w));
   await encodeRgbaPng({ width: w, height: h, data: out }, outFile, { scale: k });
-  return { file: outFile, box, width: Math.round(w * k), height: Math.round(h * k) };
+  return { file: outFile, box, crop: { x: cx0 / img.width, y: cy0 / img.height, w: w / img.width, h: h / img.height }, width: Math.round(w * k), height: Math.round(h * k) };
 }
 
 /** Cắt ảnh theo khung bao chuẩn hoá {x,y,w,h}; `outWidth` (tuỳ chọn) phóng/thu về chiều ngang đó (lanczos). */

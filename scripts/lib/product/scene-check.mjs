@@ -15,9 +15,22 @@ export const CRITERIA_LABEL_VI = { product: "Đúng sản phẩm", face: "Giốn
 const scoreSchema = { type: "integer", nullable: true };
 export const checkSchema = {
   type: "object",
-  required: ["product", "face", "hands", "outfit"],
-  properties: Object.fromEntries(["product", "face", "hands", "outfit"].map((k) => [k, { type: "object", required: ["score", "reason", "issue"], properties: { score: scoreSchema, reason: { type: "string", maxLength: 220 }, issue: { type: "string", enum: ISSUE_CODES } } }])),
+  required: ["product", "face", "hands", "outfit", "product_bbox"],
+  properties: {
+    ...Object.fromEntries(["product", "face", "hands", "outfit"].map((k) => [k, { type: "object", required: ["score", "reason", "issue"], properties: { score: scoreSchema, reason: { type: "string", maxLength: 220 }, issue: { type: "string", enum: ISSUE_CODES } } }])),
+    // khung bao CHẶT quanh trang sức trong ảnh (0–1) — để đặt chớp sáng / ánh sáng chạy đúng chỗ sản phẩm; không thấy thì null
+    product_bbox: { type: "object", nullable: true, required: ["x", "y", "w", "h"], properties: { x: { type: "number" }, y: { type: "number" }, w: { type: "number" }, h: { type: "number" } } },
+  },
 };
+
+const clamp01 = (v) => Math.min(1, Math.max(0, Number(v)));
+/** Khung bao hợp lệ (chuẩn hoá 0–1, kẹp trong ảnh, đủ lớn) hoặc null. */
+export function sanitizeProductBox(b) {
+  if (!b || ![b.x, b.y, b.w, b.h].every((v) => Number.isFinite(Number(v)))) return null;
+  const x = clamp01(b.x), y = clamp01(b.y);
+  const w = Math.min(1 - x, clamp01(b.w)), h = Math.min(1 - y, clamp01(b.h));
+  return w >= 0.02 && h >= 0.02 ? { x, y, w, h } : null;
+}
 
 /** Điểm đạt khi MỌI tiêu chí đo được ≥ ngưỡng (tiêu chí không đo được = null, không tính). */
 export function evaluateScores(scores, passScore) {
@@ -77,7 +90,7 @@ export async function checkSceneImage({ image, slot, lockText, refs, ledgerSlug,
     notes.push(reasons.face);
   }
   const { pass, failed } = evaluateScores(scores, config.scenes.check.passScore);
-  const out = { scores, reasons, issues, pass, failed, model: model || primary, notes };
+  const out = { scores, reasons, issues, pass, failed, model: model || primary, notes, productBox: sanitizeProductBox(result.product_bbox) };
   if (key) cache.putCheck(key, out);
   return { ...out, fromCache: false };
 }

@@ -130,7 +130,7 @@ export function createSceneService({ store, billing, config = loadProductConfig(
   }
 
   const passScore = () => config.scenes.check.passScore;
-  const summarize = (check) => (check ? { scores: check.scores, reasons: check.reasons, issues: check.issues, pass: check.pass, failed: check.failed, model: check.model } : null);
+  const summarize = (check) => (check ? { scores: check.scores, reasons: check.reasons, issues: check.issues, pass: check.pass, failed: check.failed, model: check.model, productBox: check.productBox || null } : null);
 
   /** Lùi cảnh về ảnh tư thế (không gọi API ảnh), kèm lý do tiếng Việt. */
   function fallbackToPose(project, scene, message) {
@@ -236,6 +236,7 @@ export function createSceneService({ store, billing, config = loadProductConfig(
       s.image = best.file;
       s.source = "gemini";
       s.check = summarize(best.check);
+      s.productBox = best.check?.productBox || null;
       const pass = !!best.check?.pass;
       s.status = pass ? "ok" : "needs-review";
       s.approved = pass;
@@ -345,6 +346,7 @@ export function createSceneService({ store, billing, config = loadProductConfig(
         s.image = file;
         s.source = "gemini";
         s.check = summarize(check);
+        s.productBox = check?.productBox || null;
         s.busy = null;
         s.status = check?.pass ? "ok" : "needs-review";
         s.approved = !!check?.pass;
@@ -387,6 +389,7 @@ export function createSceneService({ store, billing, config = loadProductConfig(
       s.image = file;
       s.source = "manual";
       s.check = summarize(check);
+      s.productBox = check?.productBox || null;
       s.busy = null;
       s.status = check?.pass ? "ok" : "needs-review";
       s.approved = !!check?.pass;

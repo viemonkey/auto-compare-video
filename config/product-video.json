@@ -191,11 +191,23 @@
     "slots": {
       "hold-close": {
         "label": "Cầm sản phẩm gần mặt",
-        "productShare": "one quarter of the frame width"
+        "productShare": "one quarter of the frame width",
+        "defaultBox": {
+          "x": 0.3,
+          "y": 0.46,
+          "w": 0.4,
+          "h": 0.2
+        }
       },
       "wear-hand": {
         "label": "Đeo lên người",
-        "productShare": "one quarter of the frame width"
+        "productShare": "one quarter of the frame width",
+        "defaultBox": {
+          "x": 0.28,
+          "y": 0.3,
+          "w": 0.44,
+          "h": 0.24
+        }
       }
     },
     "reference": {
@@ -300,13 +312,33 @@
       "panPx": 36
     },
     "macro": {
-      "zoomToBox": 0.62
+      "zoomToBox": 0.62,
+      "maxZoom": 3.2,
+      "minZoom": 1.25,
+      "fallbackZoom": 1.6
     },
     "background": {
       "top": "#0b0b12",
       "mid": "#17141f",
       "bottom": "#0a090e",
       "glow": "rgba(255, 224, 168, 0.16)"
+    },
+    "hero": {
+      "width": 760,
+      "maxHeight": 860,
+      "cx": 540,
+      "cy": 690
+    },
+    "pose": {
+      "productWidth": 700,
+      "productCx": 540,
+      "productCy": 560,
+      "hostScale": 0.92,
+      "hostShiftPx": 170,
+      "hostBottom": 0
+    },
+    "half": {
+      "zoom": 1.45
     }
   },
   "poses": {

@@ -9,6 +9,8 @@ Bạn là biên tập viên kiểm ảnh quảng cáo trang sức. Bạn nhận 
 - "hands" (tay không lỗi): số ngón tay (đúng 5), khớp ngón, tỉ lệ tay (tay KHÔNG bị phóng to bất thường so với đầu), cách cầm/đeo tự nhiên. Thừa/thiếu ngón, tay méo thì ≤ 4. Cảnh không có tay lộ rõ thì chấm theo phần thấy được.
 - "outfit" (đúng trang phục): host phải mặc: {{outfitText}}.{{#hasOutfitRef}} (có ảnh trang phục đối chiếu.){{/hasOutfitRef}} Mặc khác (áo sơ mi, không tạp dề, màu khác...) thì ≤ 4.
 
+Ngoài ra trả "product_bbox": khung bao CHẶT quanh món trang sức trong ẢNH CẦN KIỂM (ảnh 1), toạ độ chuẩn hoá 0–1 (x,y = góc trên-trái; w,h = rộng, cao); không thấy rõ món trang sức thì null.
+
 Mỗi tiêu chí kèm "reason": 1 câu tiếng Việt ngắn nêu CỤ THỂ điều đúng/sai (vd "Nhẫn có 2 hàng đá, ảnh gốc 3 hàng"). "issue": nếu có lỗi thì chọn mã ngắn từ danh sách: "product-color", "product-rows", "product-stones", "product-detail", "product-hidden", "face-off", "hand-fingers", "hand-size", "outfit-wrong", "other"; không lỗi thì "".
 
 @@@ user
