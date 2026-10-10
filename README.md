@@ -284,6 +284,12 @@ node scripts/seed-fake-cost-data.mjs --clear
 Lệnh `--clear` chỉ xoá đúng các dòng do script này sinh ra (đánh dấu `"seed": true`), không đụng
 tới dòng chi phí thật nào khác đã có trong file.
 
+## 🛍️ Chế độ "Giới thiệu sản phẩm"
+
+Ngoài "So sánh 2 ảnh", UI có chế độ **Giới thiệu sản phẩm**: tải 1–3 ảnh sản phẩm + nhập thông số → video dọc 15–20 giây, host HuyK giới thiệu (giọng đọc, phụ đề từng từ, ánh sáng + chớp sáng GSAP,
+thẻ thông số, cảnh cuối là sản phẩm thật kèm lời kêu gọi). Ba nguồn ảnh: ảnh tư thế có sẵn (miễn phí, mặc định) / tự tải ảnh từ Google AI Studio / tự động qua Gemini (cần billing). Trần chi phí 15.000đ/video.
+Hướng dẫn đầy đủ: [docs/product-showcase.md](docs/product-showcase.md).
+
 ## 🌏 Đa thị trường
 
 Web UI hỗ trợ nhiều **thị trường** (vi-VN mặc định, ja-JP, en-US, th-TH): Gemini viết nội dung bằng ngôn ngữ đích theo văn phong/thuật ngữ của thị trường kèm **dòng nghĩa tiếng Việt** để bạn kiểm soát được nội dung dù không đọc được ngôn ngữ đó; Bước 2 có trình soạn song ngữ, lưu nháp, và tạo phiên bản thị trường khác từ cùng 2 ảnh

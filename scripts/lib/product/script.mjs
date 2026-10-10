@@ -89,6 +89,8 @@ export function validateScriptRules({ lines }, { form, locale, config = loadProd
   const total = lines.reduce((a, l) => a + measure(l.text || "", locale.limits?.unit), 0);
   const maxTotal = Math.round(cfg.targetSeconds[1] * rate * (cfg.totalCharsTolerance || 1));
   if (total > maxTotal) issues.push(`Tổng độ dài ${total} ${locale.limits?.unit === "word" ? "từ" : "ký tự"} quá dài (tối đa ~${maxTotal} để video không vượt ${cfg.targetSeconds[1]} giây) — rút gọn các câu.`);
+  const minTotal = Math.round(cfg.targetSeconds[0] * rate * (cfg.minTotalFraction || 0));
+  if (total < minTotal) issues.push(`Tổng độ dài ${total} ${locale.limits?.unit === "word" ? "từ" : "ký tự"} quá ngắn (tối thiểu ~${minTotal} để video đủ ${cfg.targetSeconds[0]} giây) — thêm chi tiết có thật cho các câu.`);
   const hasCta = lines.at(-1)?.beat === "cta";
   if (!hasCta) issues.push('Câu cuối phải là câu kêu gọi (beat "cta").');
   return issues;
@@ -133,6 +135,7 @@ export async function writeScript({ form, analysis, locale, ledgerSlug, signal, 
     glossRule: renderSection(promptFile, gloss ? "fragment.gloss.need" : "fragment.gloss.none", { language: locale.prompt.language }),
     specTranslate: renderSection(promptFile, gloss ? "fragment.spec.translate" : "fragment.spec.copy", { language: locale.prompt.language }),
     maxChars: cfg.maxCharsPerLine,
+    minTotalChars: Math.round(cfg.targetSeconds[0] * (locale.limits?.readingRate || cfg.readingCharsPerSecond) * cfg.minTotalFraction),
     maxTotalChars: Math.round(cfg.targetSeconds[1] * (locale.limits?.readingRate || cfg.readingCharsPerSecond)),
     totalUnit: locale.limits?.unit === "word" ? "từ" : "ký tự",
     targetSeconds: cfg.targetSeconds.join("–"),

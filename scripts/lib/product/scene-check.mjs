@@ -9,7 +9,8 @@ import { referenceLayout } from "./scene-prompts.mjs";
 import { checkCacheKey, sha256 } from "./scene-cache.mjs";
 import { slotLabelOf } from "./scenes.mjs";
 
-export const ISSUE_CODES = ["", "product-color", "product-rows", "product-stones", "product-detail", "product-hidden", "face-off", "hand-fingers", "hand-size", "outfit-wrong", "other"];
+// Gemini không nhận enum chứa chuỗi rỗng ("cannot be empty"): "none" = không lỗi (đổi về "" khi đọc kết quả).
+export const ISSUE_CODES = ["none", "product-color", "product-rows", "product-stones", "product-detail", "product-hidden", "face-off", "hand-fingers", "hand-size", "outfit-wrong", "other"];
 export const CRITERIA_LABEL_VI = { product: "Đúng sản phẩm", face: "Giống mặt HuyK", hands: "Tay không lỗi", outfit: "Đúng trang phục" };
 
 const scoreSchema = { type: "integer", nullable: true };
@@ -83,7 +84,8 @@ export async function checkSceneImage({ image, slot, lockText, refs, ledgerSlug,
     const raw = typeof r.score === "number" ? Math.max(0, Math.min(10, Math.round(r.score))) : null;
     scores[k] = k === "face" && !refs.faces.length ? null : raw; // không có ảnh mặt chuẩn thì không đánh giá được "giống mặt"
     reasons[k] = String(r.reason || "");
-    issues[k] = r.issue || "";
+    // mã lỗi chỉ có nghĩa khi tiêu chí đo được và chưa đạt
+    issues[k] = r.issue && r.issue !== "none" && raw !== null && raw < config.scenes.check.passScore ? r.issue : "";
   }
   if (!refs.faces.length) {
     reasons.face = "Chưa có ảnh khuôn mặt chuẩn trong assets/host-refs/ nên chưa kiểm được độ giống mặt.";

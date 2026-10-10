@@ -293,7 +293,8 @@
       "maxPx": 1024,
       "timeoutMs": 90000
     },
-    "totalCharsTolerance": 1.1
+    "totalCharsTolerance": 1.1,
+    "minTotalFraction": 0.85
   },
   "video": {
     "width": 1080,
@@ -326,9 +327,9 @@
     },
     "hero": {
       "width": 760,
-      "maxHeight": 860,
+      "maxHeight": 800,
       "cx": 540,
-      "cy": 690
+      "cy": 640
     },
     "pose": {
       "productWidth": 700,
@@ -344,9 +345,9 @@
     },
     "layout": {
       "captionTop": 1520,
-      "chipsTop": 1150,
+      "chipsTop": 1160,
       "poseChipsTop": 990,
-      "ctaTop": 1120
+      "ctaTop": 1170
     },
     "fade": 0.14,
     "cutout": {
@@ -354,7 +355,9 @@
       "holeTolerance": 4,
       "fringeDistance": 40,
       "featherPasses": 1
-    }
+    },
+    "minDuration": 15,
+    "maxPadPerGap": 0.4
   },
   "poses": {
     "byBeat": {

@@ -168,3 +168,14 @@ test("cờ ai_generated: ảnh gemini/manual hoặc clip AI -> true; pose/cắt/
   assert.equal(usesAiImages({ scenes: [{ id: "s1", kind: "photo", source: "gemini", image: "a.png" }, { id: "s2", kind: "half", from: "s1" }] }), true);
   assert.equal(usesAiImages({ scenes: [{ id: "s1", kind: "hero", source: "product" }, { id: "s2", kind: "half", from: "s1" }] }), false);
 });
+
+test("nhịp thoại: lời thoại ngắn làm video < 15 giây thì giãn khoảng nghỉ rồi giữ cuối cho đủ minDuration; câu vẫn tuần tự không chồng", () => {
+  const shortDurs = Object.fromEntries(LINES.map((l) => [l.id, 1.6]));
+  const t = computeProductTiming(LINES, shortDurs, config);
+  assert.ok(t.ROOT_DURATION >= config.video.minDuration, `${t.ROOT_DURATION}`);
+  for (let i = 1; i < t.timing.length; i++) assert.ok(t.timing[i].start >= t.timing[i - 1].start + shortDurs[`line-${i}`] - 1e-9, "không chồng câu");
+  const last = t.timing.at(-1);
+  assert.ok(t.ROOT_DURATION >= last.start + last.dur + config.video.outroHold - 0.06, "vẫn giữ cuối");
+  const normal = computeProductTiming(LINES, DURS, config);
+  assert.ok(Math.abs(normal.timing[1].start - (normal.timing[0].start + DURS["line-1"] + config.video.gap)) < 0.002, "đủ dài thì không giãn");
+});

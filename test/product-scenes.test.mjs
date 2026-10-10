@@ -362,3 +362,21 @@ test("ImageDowngrade mang lý do (billing / budget / model)", () => {
   assert.equal(d.message, "Vượt trần");
   void textResponse;
 });
+
+test("schema gửi Gemini không có enum rỗng / enum trống (Gemini trả 400 'cannot be empty' — lỗi thật gặp khi chạy thật)", async () => {
+  const { checkSchema, ISSUE_CODES } = await import("../scripts/lib/product/scene-check.mjs");
+  const { analysisSchema } = await import("../scripts/lib/product/analyze.mjs");
+  const { scriptSchema } = await import("../scripts/lib/product/script.mjs");
+  const { getLocale } = await import("../scripts/lib/locales.mjs");
+  const bad = [];
+  const walk = (node, where) => {
+    if (!node || typeof node !== "object") return;
+    if (Array.isArray(node.enum) && (!node.enum.length || node.enum.some((v) => v === "" || v === null))) bad.push(where);
+    for (const [k, v] of Object.entries(node)) walk(v, `${where}.${k}`);
+  };
+  walk(checkSchema, "check");
+  walk(analysisSchema, "analysis");
+  walk(scriptSchema({ locale: getLocale("vi-VN"), config }), "script");
+  assert.deepEqual(bad, []);
+  assert.ok(ISSUE_CODES.includes("none") && !ISSUE_CODES.includes(""));
+});

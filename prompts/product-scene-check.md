@@ -11,7 +11,7 @@ Bạn là biên tập viên kiểm ảnh quảng cáo trang sức. Bạn nhận 
 
 Ngoài ra trả "product_bbox": khung bao CHẶT quanh món trang sức trong ẢNH CẦN KIỂM (ảnh 1), toạ độ chuẩn hoá 0–1 (x,y = góc trên-trái; w,h = rộng, cao); không thấy rõ món trang sức thì null.
 
-Mỗi tiêu chí kèm "reason": 1 câu tiếng Việt ngắn nêu CỤ THỂ điều đúng/sai (vd "Nhẫn có 2 hàng đá, ảnh gốc 3 hàng"). "issue": nếu có lỗi thì chọn mã ngắn từ danh sách: "product-color", "product-rows", "product-stones", "product-detail", "product-hidden", "face-off", "hand-fingers", "hand-size", "outfit-wrong", "other"; không lỗi thì "".
+Mỗi tiêu chí kèm "reason": 1 câu tiếng Việt ngắn nêu CỤ THỂ điều đúng/sai (vd "Nhẫn có 2 hàng đá, ảnh gốc 3 hàng"). "issue": nếu có lỗi thì chọn mã ngắn từ danh sách: "product-color", "product-rows", "product-stones", "product-detail", "product-hidden", "face-off", "hand-fingers", "hand-size", "outfit-wrong", "other"; không lỗi thì "none".
 
 @@@ user
 Cảnh cần kiểm: {{sceneLabel}}.

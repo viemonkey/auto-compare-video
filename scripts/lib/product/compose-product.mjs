@@ -25,8 +25,18 @@ export function computeProductTiming(lines, durations, config = loadProductConfi
     if (i > 0) start = timing[i - 1].start + timing[i - 1].dur + gap;
     timing.push({ start: round3(start), dur });
   });
-  const last = timing.at(-1);
-  return { timing, ROOT_DURATION: Math.round((last.start + last.dur + outroHold) * 10) / 10 };
+  let last = timing.at(-1);
+  let root = last.start + last.dur + outroHold;
+  // Lời thoại ngắn làm video dưới `minDuration` (15 giây): giãn đều khoảng nghỉ giữa các câu (tối đa maxPadPerGap mỗi khoảng), phần còn thiếu dồn vào đoạn giữ cuối.
+  if (root < config.video.minDuration && timing.length > 1) {
+    const gaps = timing.length - 1;
+    const pad = Math.min(config.video.maxPadPerGap, (config.video.minDuration - root) / gaps);
+    timing.forEach((t, i) => { t.start = round3(t.start + pad * i); });
+    last = timing.at(-1);
+    root = last.start + last.dur + outroHold;
+  }
+  root = Math.max(root, config.video.minDuration);
+  return { timing, ROOT_DURATION: Math.round(root * 10) / 10 };
 }
 
 /** Khoảng thời gian của từng cảnh: cảnh i từ vạch của câu i (trừ chút "dẫn") tới vạch câu i+1; cảnh đầu từ 0, cảnh cuối tới hết video. */

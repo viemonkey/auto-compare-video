@@ -13,6 +13,8 @@ import { normalizeForm } from "../scripts/lib/product/form.mjs";
 import { tmpDir, makeRingPng, makeSolidPng } from "./helpers/product-fixtures.mjs";
 
 const config = loadProductConfig();
+const MIN_FRACTION = config.script.minTotalFraction;
+config.script.minTotalFraction = 0; // kịch bản mẫu trong test ngắn; luật độ dài tối thiểu có test riêng bên dưới
 const saved = {};
 beforeEach(() => { for (const k of ["COST_LEDGER_PATH", "GEMINI_BILLING_ENABLED"]) saved[k] = process.env[k]; process.env.COST_LEDGER_PATH = path.join(tmpDir(), "l.jsonl"); delete process.env.GEMINI_BILLING_ENABLED; });
 afterEach(() => { for (const [k, v] of Object.entries(saved)) { if (v === undefined) delete process.env[k]; else process.env[k] = v; } });

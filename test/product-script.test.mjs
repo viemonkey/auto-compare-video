@@ -15,6 +15,8 @@ import { createProductApi } from "../server-product.mjs";
 import { tmpDir, makeRingPng, textResponse } from "./helpers/product-fixtures.mjs";
 
 const config = loadProductConfig();
+const MIN_FRACTION = config.script.minTotalFraction;
+config.script.minTotalFraction = 0; // kịch bản mẫu trong test ngắn; luật độ dài tối thiểu có test riêng bên dưới
 const vi = getLocale("vi-VN");
 const ja = getLocale("ja-JP");
 const FORM = normalizeForm({ type: "nhẫn", material: "bạc 925", metalColor: "trắng", mainStone: "đá moissanite", stoneOrigin: "lab", feature: "vòng bánh răng xoay được" }, config);
@@ -274,4 +276,25 @@ test("API analyze: lỗi Gemini trả thông báo tiếng Việt (userMessage), 
     const noScript = await (await fetch(`${base}/api/product/p-khongco-1234/budget`)).status;
     assert.equal(noScript, 404);
   });
+});
+
+test("độ dài: kịch bản quá ngắn (video dưới 15 giây) bị yêu cầu viết lại; đủ dài thì đạt; prompt nêu cả tối thiểu lẫn tối đa; số viết bằng chữ số", async () => {
+  config.script.minTotalFraction = MIN_FRACTION;
+  try {
+    const tiny = JSON.parse(JSON.stringify(GOOD));
+    tiny.lines = tiny.lines.map((l) => ({ ...l, text: "Rất đẹp." }));
+    const short = validateScriptRules({ lines: assembleScript(tiny, 0) }, { form: FORM, locale: vi, config });
+    assert.ok(short.some((i) => /quá ngắn/.test(i)), short.join(" | "));
+    const long = JSON.parse(JSON.stringify(GOOD));
+    long.lines = long.lines.map((l) => ({ ...l, text: `${l.text} Rất đẹp.` }));
+    assert.deepEqual(validateScriptRules({ lines: assembleScript(long, 0) }, { form: FORM, locale: vi, config }).filter((i) => /quá (ngắn|dài)/.test(i)), []);
+    const gen = asGen(tiny, long);
+    const out = await writeScript({ form: FORM, analysis: { kind: "ring", lock: LOCK.lock, lockText: LOCK.lockText }, locale: vi, ledgerSlug: "s", generate: gen, config, env: {} });
+    assert.equal(out.attempts, 2);
+    assert.match(gen.calls[0].systemPrompt, /tối thiểu \d+ và tối đa \d+ ký tự/);
+    assert.match(gen.calls[0].systemPrompt, /CHỮ SỐ/);
+    assert.match(gen.calls[1].userText, /quá ngắn/);
+  } finally {
+    config.script.minTotalFraction = 0;
+  }
 });
