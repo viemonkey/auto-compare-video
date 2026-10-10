@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="__HTML_LANG__">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=1080, height=1920">
+    <title>__DOC_TITLE__</title>
+    <script src="https://cdn.jsdelivr.net/npm/gsap@3.14.2/dist/gsap.min.js"></script>
+    <style>
+      /* Font local (OFL) — danh sách @font-face + chuỗi font theo thị trường do scripts/lib/product/compose-product.mjs điền. */
+/*FONT_FACES*/
+      :root {
+        --font-display: __FONT_DISPLAY__;
+        --font-mono: __FONT_MONO__;
+        --cap-px: __CAP_PX__px;
+        --cap-gap: __CAP_GAP__px;
+        --gold: #f6d58e;
+        --gold-deep: #c99a3c;
+        --ink: #0a0a10;
+        --cap-idle: #ffffff;
+        --cap-active: #ffe600;
+        --cap-kw: #f6d58e;
+      }
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body { width: 1080px; height: 1920px; overflow: hidden; font-family: var(--font-display); background: #0a0a10; }
+      #root { position: relative; width: 1080px; height: 1920px; overflow: hidden; background: #0a0a10; }
+      .clip { position: absolute; inset: 0; }
+
+      /* Nền tối sang trọng: gradient dọc + quầng sáng ấm + vignette. Chỉ CSS, không ảnh nền. */
+      #bg { position: absolute; inset: 0; background: linear-gradient(180deg, __BG_TOP__ 0%, __BG_MID__ 52%, __BG_BOTTOM__ 100%); }
+      #bg .glow { position: absolute; left: 140px; top: 260px; width: 800px; height: 800px; border-radius: 50%; background: radial-gradient(circle, __BG_GLOW__ 0%, rgba(0,0,0,0) 68%); }
+      #bg .vignette { position: absolute; inset: 0; background: radial-gradient(ellipse at 50% 45%, rgba(0,0,0,0) 45%, rgba(0,0,0,0.55) 100%); }
+      #ai-clip { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; object-fit: cover; }
+
+      .sc { position: absolute; inset: 0; opacity: 0; }
+      .kb { position: absolute; }
+      .kb img { display: block; }
+      .kb .prod { width: 100%; height: 100%; object-fit: contain; filter: drop-shadow(0 30px 40px rgba(0,0,0,0.55)); }
+      .kb .full { object-fit: cover; }
+      /* Ánh sáng chạy qua kim loại: dải sáng chéo, cắt theo hình sản phẩm (mask = chính PNG đã tách nền) hoặc theo khung bao (ảnh cảnh). */
+      .sweep { position: absolute; inset: 0; background-image: linear-gradient(105deg, rgba(255,255,255,0) 38%, rgba(255,255,255,0.9) 50%, rgba(255,255,255,0) 62%); background-size: 320% 100%; background-position: 160% 0; background-repeat: no-repeat; mix-blend-mode: screen; opacity: 0.85; -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; pointer-events: none; }
+      .sweep.box { inset: auto; overflow: hidden; border-radius: 16px; }
+      .spk { position: absolute; width: 40px; height: 40px; margin: -20px 0 0 -20px; opacity: 0; pointer-events: none; }
+      .spk svg { display: block; width: 100%; height: 100%; filter: drop-shadow(0 0 8px rgba(255,255,255,0.9)); }
+
+      .host { position: absolute; bottom: 0; }
+      .chips { position: absolute; display: flex; flex-direction: column; gap: 12px; z-index: 6; width: 540px; }
+      .chips.center { left: 270px; align-items: center; }
+      .chips.left { left: 56px; align-items: flex-start; }
+      .chips.right { right: 56px; align-items: flex-end; }
+      .chip { display: inline-flex; flex-direction: column; max-width: 540px; padding: 10px 22px 12px; border-radius: 18px; background: rgba(255,255,255,0.09); border: 1.5px solid rgba(246,213,142,0.7); backdrop-filter: blur(6px); box-shadow: 0 10px 30px rgba(0,0,0,0.45); opacity: 0; }
+      .chip .k { font-family: var(--font-mono); font-size: 20px; font-weight: 700; letter-spacing: 0.08em; color: var(--gold); text-transform: uppercase; }
+      .chip .v { font-size: 38px; font-weight: 900; line-height: 1.12; color: #fff; text-shadow: 0 2px 10px rgba(0,0,0,0.6); }
+      .cta { position: absolute; left: 60px; right: 60px; z-index: 6; text-align: center; opacity: 0; display: flex; flex-direction: column; align-items: center; gap: 18px; }
+      .cta .t { font-size: 64px; font-weight: 900; line-height: 1.15; color: #fff; -webkit-text-stroke: 4px #000; paint-order: stroke fill; text-shadow: 0 6px 24px rgba(0,0,0,0.7); }
+      .cta .p { display: inline-flex; align-items: baseline; gap: 14px; padding: 10px 30px 12px; border-radius: 999px; background: linear-gradient(135deg, #f6d58e, #c99a3c); color: #1a1205; font-weight: 900; font-size: 46px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+      .cta .p small { font-size: 26px; font-weight: 800; opacity: 0.8; }
+
+      #eyebrow { position: absolute; top: 44px; left: 64px; font-family: var(--font-mono); font-weight: 700; font-size: 22px; letter-spacing: 0.14em; color: #f6d58e; opacity: 0; z-index: 7; text-shadow: 0 1px 6px rgba(0,0,0,0.8); }
+
+      #caption-zone { position: absolute; top: __CAP_TOP__px; left: 40px; width: 1000px; height: 96px; z-index: 8; }
+      .cap-line { position: absolute; inset: 0; opacity: 0; }
+      .cap-phrase { position: absolute; left: 0; right: 0; top: 50%; transform: translateY(-50%); text-align: center; white-space: nowrap; opacity: 0; visibility: hidden; }
+      .cap-wd { display: inline-block; font-family: var(--font-display); font-weight: 900; font-size: var(--cap-px); line-height: 1.1; color: var(--cap-idle); -webkit-text-stroke: 5px #000; paint-order: stroke fill; text-shadow: 3px 3px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000; transform-origin: 50% 65%; margin: 0 var(--cap-gap); }
+      .cap-wd.kw { color: var(--cap-kw); }
+    </style>
+  </head>
+  <body>
+    <div id="root" data-composition-id="main" data-start="0" data-width="1080" data-height="1920" data-duration="__ROOT_DURATION__">
+      <div id="bg"><div class="glow"></div><div class="vignette"></div></div>
+<!--CLIP_TAG-->
+      <section id="scene" class="clip" data-start="0" data-duration="__ROOT_DURATION__" data-track-index="1">
+<!--SCENES_HTML-->
+        <div id="eyebrow">__DEFAULT_EYEBROW__</div>
+        <div id="caption-zone" data-layout-allow-overflow="true"></div>
+      </section>
+<!--AUDIO_TAG-->
+    </div>
+
+    <script>
+      const tl = gsap.timeline({ paused: true });
+      const DATA = /*DATA_OBJECT*/;
+      const CAPTIONS = {
+/*CAPTIONS_OBJECT*/
+      };
+      const PHRASES = {
+/*PHRASES_OBJECT*/
+      };
+      const VO = {
+/*VO_OBJECT*/
+      };
+      const KEYWORDS = new Set(/*KEYWORDS_ARRAY*/);
+      const CAP_JOINER = "__CAP_JOINER__";
+      const CAP_ACTIVE_SCALE = __CAP_ACTIVE_SCALE__;
+      const ROOT_DURATION = __ROOT_DURATION__;
+      const FADE = 0.14;
+
+      // ---------- chớp sáng: tạo DOM 1 lần lúc nạp (xác định — toạ độ do Node tính bằng PRNG có hạt giống) ----------
+      const STAR = '<svg viewBox="0 0 40 40"><path d="M20 0 L24 16 L40 20 L24 24 L20 40 L16 24 L0 20 L16 16 Z" fill="#fff"/></svg>';
+      for (const sc of DATA.scenes) {
+        const host = document.getElementById("kb-" + sc.n);
+        sc.shots.forEach((shot, si) => {
+          shot.nodes = shot.sparkles.map((p) => {
+            const el = document.createElement("div");
+            el.className = "spk";
+            el.style.left = p.x + "px";
+            el.style.top = p.y + "px";
+            el.style.width = el.style.height = p.size + "px";
+            el.style.margin = -(p.size / 2) + "px 0 0 " + -(p.size / 2) + "px";
+            el.innerHTML = STAR;
+            host.appendChild(el);
+            return el;
+          });
+        });
+      }
+
+      // ---------- nền: quầng sáng trôi chậm ----------
+      tl.fromTo("#bg .glow", { x: -60, y: 0 }, { x: 120, y: 160, duration: ROOT_DURATION, ease: "sine.inOut" }, 0);
+      tl.fromTo("#eyebrow", { y: 8, opacity: 0 }, { y: 0, opacity: 0.7, duration: 0.5, ease: "power3.out" }, 0.2);
+
+      // ---------- cảnh: cắt cảnh nhanh theo shot 1,5–2,5 giây, chuyển cảnh bằng cross-dissolve ngắn ----------
+      DATA.scenes.forEach((sc, i) => {
+        const el = "#sc-" + sc.n;
+        const kb = "#kb-" + sc.n;
+        const first = i === 0;
+        const last = i === DATA.scenes.length - 1;
+        tl.fromTo(el, { opacity: first ? 1 : 0 }, { opacity: 1, duration: first ? 0.01 : FADE, ease: "none" }, first ? 0 : sc.at - FADE / 2);
+        if (!last) tl.to(el, { opacity: 0, duration: FADE, ease: "none" }, sc.end - FADE / 2);
+        sc.shots.forEach((shot) => {
+          const org = sc.origin ? sc.origin.x + "px " + sc.origin.y + "px" : "50% 50%";
+          tl.fromTo(kb, { scale: shot.zoom[0], x: shot.pan[0], y: shot.pan[1], transformOrigin: org }, { scale: shot.zoom[1], x: shot.pan[0] * 0.4, y: shot.pan[1] * 0.4, duration: shot.dur, ease: "none" }, shot.at);
+          const sweep = document.querySelector("#sw-" + sc.n);
+          if (sweep && !sc.clipHook) tl.fromTo(sweep, { backgroundPosition: "160% 0" }, { backgroundPosition: "-60% 0", duration: DATA.sweepSeconds, ease: "power1.inOut" }, shot.at + shot.sweepAt);
+          shot.sparkles.forEach((p, k) => {
+            const node = shot.nodes[k];
+            const t = shot.at + p.delay;
+            tl.fromTo(node, { scale: 0, opacity: 0, rotation: 0 }, { scale: 1, opacity: p.peak, rotation: 45, duration: 0.22, ease: "power2.out" }, t);
+            tl.to(node, { scale: 0, opacity: 0, duration: 0.3, ease: "power2.in" }, t + 0.22);
+          });
+        });
+        if (sc.host) tl.fromTo("#host-" + sc.n, { opacity: 0 }, { opacity: 1, duration: 0.3, ease: "power2.out" }, Math.max(0, sc.at));
+        if (sc.chips) sc.chips.forEach((_, k) => tl.fromTo("#chip-" + sc.n + "-" + k, { y: 36, opacity: 0 }, { y: 0, opacity: 1, duration: 0.4, ease: "power3.out" }, sc.at + 0.25 + k * 0.14));
+        if (sc.cta) tl.fromTo("#cta-" + sc.n, { y: 40, opacity: 0, scale: 0.94 }, { y: 0, opacity: 1, scale: 1, duration: 0.5, ease: "back.out(1.4)" }, sc.at + 0.2);
+      });
+
+      // ---------- phụ đề: bật từng từ (karaoke), từ khoá nổi bật màu vàng ----------
+      function chunkPhrases(words, n) {
+        const out = [];
+        let i = 0;
+        for (const [count, px] of PHRASES[n]) { out.push({ words: words.slice(i, i + count), px }); i += count; }
+        return out;
+      }
+      const capZone = document.getElementById("caption-zone");
+      const capRefs = {};
+      const norm = (s) => s.normalize("NFKC").toLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+      for (const n of Object.keys(CAPTIONS)) {
+        const lineEl = document.createElement("div");
+        lineEl.className = "cap-line";
+        lineEl.id = "cap-" + n;
+        const phrases = chunkPhrases(CAPTIONS[n], n).map((ph) => {
+          const pEl = document.createElement("div");
+          pEl.className = "cap-phrase";
+          if (ph.px) pEl.style.setProperty("--cap-px", ph.px + "px");
+          const wds = ph.words.map((w) => {
+            const s = document.createElement("span");
+            const kw = KEYWORDS.has(norm(w[0]));
+            s.className = "cap-wd" + (kw ? " kw" : "");
+            s.textContent = w[0];
+            pEl.appendChild(s);
+            if (CAP_JOINER) pEl.appendChild(document.createTextNode(CAP_JOINER));
+            return { el: s, at: w[1], kw };
+          });
+          lineEl.appendChild(pEl);
+          return { el: pEl, wds };
+        });
+        capZone.appendChild(lineEl);
+        capRefs[n] = { lineEl, phrases };
+      }
+
+      /* captionWindow:start */
+      function captionWindow(n, vo, captions) {
+        const FADE = 0.18, LINGER = 0.75, SAFE = 0.02, LEAD = 0.1;
+        const base = vo[n].start;
+        const words = captions[n];
+        const lastAbs = base + words[words.length - 1][1];
+        const nextBeatStart = vo[n + 1] ? vo[n + 1].start : base + vo[n].dur + 0.6;
+        const nextCap = Object.keys(captions).map(Number).sort((a, b) => a - b).find((k) => k > n);
+        const nextAppear = nextCap === undefined ? Infinity : vo[nextCap].start + captions[nextCap][0][1] - LEAD;
+        const hideBy = Math.min(nextBeatStart + FADE - 0.05, nextAppear - SAFE);
+        const fadeStart = Math.max(lastAbs, Math.min(lastAbs + LINGER, hideBy - FADE));
+        const fadeDur = Math.min(FADE, hideBy - fadeStart);
+        return fadeDur >= 0.02 ? { fadeStart, fadeDur, hideAt: fadeStart + fadeDur } : { fadeStart: hideBy, fadeDur: 0, hideAt: hideBy };
+      }
+      function phraseTimes(base, starts, pi, lineHideAt) {
+        const hasNext = starts[pi + 1] !== undefined;
+        const phEnd = hasNext ? base + starts[pi + 1] : lineHideAt + 0.03;
+        return { phStart: base + starts[pi], phEnd, showAt: base + starts[pi] - 0.04, hideAt: phEnd - (hasNext ? 0.04 : 0.03) };
+      }
+      /* captionWindow:end */
+
+      function showCaption(n) {
+        const { lineEl, phrases } = capRefs[n];
+        const base = VO[n].start;
+        const words = CAPTIONS[n];
+        const firstAbs = base + words[0][1];
+        const { fadeStart, fadeDur, hideAt } = captionWindow(n, VO, CAPTIONS);
+        tl.set(lineEl, { opacity: 1 }, firstAbs - 0.1);
+        if (fadeDur > 0) tl.to(lineEl, { opacity: 0, duration: fadeDur, ease: "power2.in" }, fadeStart);
+        else tl.set(lineEl, { opacity: 0 }, fadeStart);
+        const starts = phrases.map((ph) => ph.wds[0].at);
+        phrases.forEach((ph, pi) => {
+          const { phEnd, showAt, hideAt: phHideAt } = phraseTimes(base, starts, pi, hideAt);
+          tl.set(ph.el, { visibility: "visible", opacity: 1 }, showAt);
+          tl.fromTo(ph.el, { y: 12 }, { y: 0, duration: 0.16, ease: "power3.out" }, showAt);
+          tl.set(ph.el, { visibility: "hidden", opacity: 0 }, phHideAt);
+          ph.wds.forEach((wd, wi) => {
+            const on = base + wd.at;
+            const off = ph.wds[wi + 1] ? base + ph.wds[wi + 1].at : phEnd - 0.03;
+            tl.set(wd.el, { color: "var(--cap-active)", scale: CAP_ACTIVE_SCALE }, on);
+            tl.set(wd.el, { color: wd.kw ? "var(--cap-kw)" : "var(--cap-idle)", scale: 1 }, off);
+          });
+        });
+      }
+      for (const n of Object.keys(CAPTIONS).map(Number)) showCaption(n);
+
+      window.__timelines = window.__timelines || {};
+      window.__timelines["main"] = tl;
+    </script>
+  </body>
+</html>

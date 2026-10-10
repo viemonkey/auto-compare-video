@@ -21,7 +21,10 @@ export function errorDetails(error) {
   return { message, code, technical };
 }
 
-export function createBuildJob({ id = crypto.randomUUID(), slug, request, now = Date.now }) {
+/** Chế độ "Giới thiệu sản phẩm" có thêm khâu tạo clip AI (chỉ khi bật) đứng đầu; các khâu còn lại giống video so sánh. */
+export const PRODUCT_CLIP_STAGE = Object.freeze({ id: "clip", label: "Clip AI mở đầu" });
+
+export function createBuildJob({ id = crypto.randomUUID(), slug, request, now = Date.now, stages = BUILD_STAGES }) {
   const at = nowIso(now);
   return {
     version: 1,
@@ -32,7 +35,7 @@ export function createBuildJob({ id = crypto.randomUUID(), slug, request, now = 
     createdAt: at,
     updatedAt: at,
     request: clone(request),
-    stages: BUILD_STAGES.map((stage) => ({ ...stage, status: "pending", startedAt: null, finishedAt: null, error: null })),
+    stages: stages.map((stage) => ({ ...stage, status: "pending", startedAt: null, finishedAt: null, error: null })),
     log: [],
     result: null,
   };

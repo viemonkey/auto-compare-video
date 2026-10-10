@@ -13,6 +13,7 @@ const BY_CODE = {
 };
 
 const BY_STAGE = {
+  clip: "Clip AI không tạo được — video vẫn dựng bằng hiệu ứng GSAP. Bấm “Thử lại” nếu muốn thử lại.",
   voice: "Giọng đọc chưa sinh xong — thường do mất mạng hoặc dịch vụ đọc (Edge/Vbee/VieNeu) tạm lỗi. Kiểm tra kết nối rồi bấm “Thử lại”; kịch bản và ảnh đã dựng được giữ nguyên, không gọi lại Gemini.",
   timing: "Không tính được nhịp từ file giọng đọc. Bấm “Thử lại”; nếu vẫn lỗi, chọn “Dựng lại từ đầu” để sinh lại giọng.",
   scene: "Không ghép được cảnh. Nếu log nhắc chữ không vừa khung, quay lại Bước 2 để rút gọn câu đó rồi dựng lại.",

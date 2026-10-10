@@ -14,6 +14,8 @@ const norm = (s) => stripDiacritics(String(s || "")).toLowerCase();
 const digitsOf = (s) => (String(s || "").match(/\d[\d.,]*/g) || []).map((d) => d.replace(/[.,]/g, "").replace(/^0+(?=\d)/, ""));
 const wordRe = (term) => new RegExp(`(^|[^\\p{L}\\p{N}])${norm(term).replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}(?![\\p{L}\\p{N}])`, "u");
 
+export const SPEC_KEYS = ["type", "material", "metalColor", "mainStone", "carat", "cut", "sideStones", "feature", "origin"];
+
 export function scriptSchema({ locale, config = loadProductConfig() }) {
   const max = Math.max(config.script.maxCharsPerLine * 2, 160);
   const line = { type: "object", required: ["text", "vi"], properties: { text: { type: "string", maxLength: max }, vi: { type: "string", maxLength: max * 2 } } };
@@ -21,8 +23,9 @@ export function scriptSchema({ locale, config = loadProductConfig() }) {
   void locale;
   return {
     type: "object",
-    required: ["openers", "lines", "mismatches"],
+    required: ["openers", "lines", "mismatches", "spec_values"],
     properties: {
+      spec_values: { type: "object", required: SPEC_KEYS, properties: Object.fromEntries(SPEC_KEYS.map((k) => [k, { type: "string", maxLength: 160 }])) },
       openers: { type: "array", items: line },
       lines: { type: "array", items: body },
       mismatches: { type: "array", items: { type: "object", required: ["field", "form_value", "observed", "message_vi"], properties: { field: { type: "string", maxLength: 40 }, form_value: { type: "string", maxLength: 120 }, observed: { type: "string", maxLength: 160 }, message_vi: { type: "string", maxLength: 300 } } } },
@@ -127,6 +130,7 @@ export async function writeScript({ form, analysis, locale, ledgerSlug, signal, 
     originRule: renderSection(promptFile, `fragment.origin.${originFragment(form)}`, {}),
     priceRule: form.price ? renderSection(promptFile, "fragment.price.given", { price: form.price }) : renderSection(promptFile, "fragment.price.none", {}),
     glossRule: renderSection(promptFile, gloss ? "fragment.gloss.need" : "fragment.gloss.none", { language: locale.prompt.language }),
+    specTranslate: renderSection(promptFile, gloss ? "fragment.spec.translate" : "fragment.spec.copy", { language: locale.prompt.language }),
     maxChars: cfg.maxCharsPerLine,
     maxTotalChars: Math.round(cfg.targetSeconds[1] * (locale.limits?.readingRate || cfg.readingCharsPerSecond)),
     targetSeconds: cfg.targetSeconds.join("–"),
@@ -167,13 +171,25 @@ export async function writeScript({ form, analysis, locale, ledgerSlug, signal, 
     });
     if (!lastIssues.length) {
       const { warnings } = readingEstimate(lines, locale, config);
-      return { openers, openerIndex: 0, lines, mismatches: normalizeMismatches(result.mismatches), warnings, model: usedModel || model, attempts: attempt };
+      return { openers, openerIndex: 0, lines, mismatches: normalizeMismatches(result.mismatches), specValues: normalizeSpecValues(result.spec_values, form, gloss), warnings, model: usedModel || model, attempts: attempt };
     }
     feedback = lastIssues.map((i) => `- ${i}`).join("\n");
   }
   const err = new Error(`Gemini viết kịch bản chưa đạt luật sau ${cfg.maxAttempts} lần: ${lastIssues.join(" ")}`);
   err.userMessage = `Gemini chưa viết được kịch bản đúng luật (số liệu chỉ lấy từ form...). Lý do: ${lastIssues.slice(0, 3).join(" ")} Hãy thử lại hoặc bổ sung thông số vào form.`;
   throw err;
+}
+
+/** Giá trị thẻ thông số: thị trường tiếng Việt = đúng form; thị trường khác = bản dịch của Gemini (rỗng/thiếu -> rơi về chữ form). Không bao giờ thêm giá trị mà form không có. */
+export function normalizeSpecValues(raw, form, gloss) {
+  const out = {};
+  for (const k of SPEC_KEYS) {
+    const formValue = k === "origin" ? (form.stoneOrigin ? "x" : "") : String(form[k] || "");
+    if (!formValue) { out[k] = ""; continue; }
+    const got = gloss && raw && typeof raw[k] === "string" ? raw[k].trim() : "";
+    out[k] = got || (k === "origin" ? "" : formValue);
+  }
+  return out;
 }
 
 function normalizeMismatches(list) {

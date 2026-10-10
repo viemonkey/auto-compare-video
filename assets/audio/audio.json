@@ -1,0 +1,20 @@
+{
+  "_doc": "Âm thanh dùng trong video giới thiệu sản phẩm. Mỗi mục BẮT BUỘC có license + source, thiếu thì tool không dùng. Nhạc nền: thêm mục vào \"bgm\" (xem docs/product-showcase.md); để trống = video không nhạc.",
+  "sfx": [
+    {
+      "id": "whoosh",
+      "file": "sfx/whoosh.wav",
+      "title": "Whoosh chuyển cảnh",
+      "license": "CC0-1.0",
+      "source": "Tổng hợp bằng scripts/generate-sfx.mjs (ffmpeg lavfi) — không dùng mẫu của bên thứ ba"
+    },
+    {
+      "id": "sparkle",
+      "file": "sfx/sparkle.wav",
+      "title": "Lấp lánh khi ánh sáng chạy qua",
+      "license": "CC0-1.0",
+      "source": "Tổng hợp bằng scripts/generate-sfx.mjs (ffmpeg lavfi) — không dùng mẫu của bên thứ ba"
+    }
+  ],
+  "bgm": []
+}

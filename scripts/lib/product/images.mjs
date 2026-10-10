@@ -77,7 +77,7 @@ function borderColor({ width, height, data }) {
  * Mặt nạ nền: điểm "giống màu nền" (khoảng cách <= tolerance) nối với viền ảnh, cộng các vùng giống nền KHÔNG chạm viền nhưng đủ lớn
  * (lỗ giữa nhẫn, khoảng hở) — vùng nhỏ (điểm sáng của đá) được giữ lại. Trả Uint8Array 1 = nền.
  */
-export function backgroundMask({ width, height, data }, { tolerance = 12, holeTolerance = 4, holeMinFraction = 0.004 } = {}) {
+export function backgroundMask({ width, height, data }, { tolerance = 12, holeTolerance = 4, holeMinFraction = 0.004, fringeDistance = 0 } = {}) {
   const bg = borderColor({ width, height, data });
   const n = width * height;
   const like = new Uint8Array(n);
@@ -112,6 +112,17 @@ export function backgroundMask({ width, height, data }, { tolerance = 12, holeTo
     // Lỗ giữa nhẫn: phải đủ lớn VÀ gần như đúng màu nền (thân kim loại trắng cũng "giống nền" nhưng có sắc độ khác hẳn nên bị loại).
     const tight = touchesBorder ? 0 : members.reduce((a, p) => a + (dist[p] <= holeTolerance ? 1 : 0), 0) / members.length;
     if (touchesBorder || (members.length >= holeMin && tight >= 0.9)) for (const p of members) mask[p] = 1;
+  }
+  // Viền sáng (bóng đổ nhạt quanh sản phẩm): điểm KHÔNG phải nền nhưng còn rất gần màu nền và sát nền -> coi là nền (1 điểm ảnh), tránh quầng sáng trên nền tối.
+  if (fringeDistance > 0) {
+    const grow = [];
+    for (let p = 0; p < n; p++) {
+      if (mask[p] || dist[p] > fringeDistance) continue;
+      const x = p % width;
+      const y = (p - x) / width;
+      if ((x > 0 && mask[p - 1]) || (x < width - 1 && mask[p + 1]) || (y > 0 && mask[p - width]) || (y < height - 1 && mask[p + width])) grow.push(p);
+    }
+    for (const p of grow) mask[p] = 1;
   }
   return { mask, bg };
 }
@@ -175,12 +186,12 @@ function featheredAlpha(mask, width, height, passes = 2) {
  *   box = khung bao của vật thể trong ẢNH GỐC (chuẩn hoá); crop = vùng ảnh gốc thực sự được cắt ra (gồm lề, chuẩn hoá) — dùng để đổi toạ độ ảnh gốc -> toạ độ PNG;
  *   width/height = kích thước PNG kết quả.
  */
-export async function cutoutBackground(inFile, outFile, { tolerance = 12, holeTolerance = 4, scale = 0, targetWidth = 1000, pad = 0.03, maxDim = 1600 } = {}) {
+export async function cutoutBackground(inFile, outFile, { tolerance = 12, holeTolerance = 4, fringeDistance = 0, featherPasses = 2, scale = 0, targetWidth = 1000, pad = 0.03, maxDim = 1600 } = {}) {
   const img = await decodeRgba(inFile, { maxDim });
-  const { mask } = backgroundMask(img, { tolerance, holeTolerance });
+  const { mask } = backgroundMask(img, { tolerance, holeTolerance, fringeDistance });
   const box = contentBoxFromMask(mask, img.width, img.height, 0);
   if (!box) throw new Error("Không tách được sản phẩm khỏi nền (ảnh không có vật thể rõ ràng trên nền đồng màu).");
-  const alpha = featheredAlpha(mask, img.width, img.height);
+  const alpha = featheredAlpha(mask, img.width, img.height, featherPasses);
   const padPx = Math.round(Math.max(box.w * img.width, box.h * img.height) * pad);
   const cx0 = Math.max(0, Math.floor(box.x * img.width) - padPx);
   const cy0 = Math.max(0, Math.floor(box.y * img.height) - padPx);

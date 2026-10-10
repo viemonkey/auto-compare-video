@@ -315,7 +315,8 @@
       "zoomToBox": 0.62,
       "maxZoom": 3.2,
       "minZoom": 1.25,
-      "fallbackZoom": 1.6
+      "fallbackZoom": 1.6,
+      "maxUpscale": 7
     },
     "background": {
       "top": "#0b0b12",
@@ -332,13 +333,27 @@
     "pose": {
       "productWidth": 700,
       "productCx": 540,
-      "productCy": 560,
+      "productCy": 520,
       "hostScale": 0.92,
       "hostShiftPx": 170,
-      "hostBottom": 0
+      "hostBottom": 0,
+      "productMaxHeight": 760
     },
     "half": {
       "zoom": 1.45
+    },
+    "layout": {
+      "captionTop": 1520,
+      "chipsTop": 1150,
+      "poseChipsTop": 990,
+      "ctaTop": 1120
+    },
+    "fade": 0.14,
+    "cutout": {
+      "tolerance": 12,
+      "holeTolerance": 4,
+      "fringeDistance": 40,
+      "featherPasses": 1
     }
   },
   "poses": {

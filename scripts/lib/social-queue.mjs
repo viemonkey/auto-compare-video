@@ -141,7 +141,7 @@ const SKIP_SAVE = Symbol("skip-save");
  *   thiếu (job cũ/video cũ) thì đăng đúng `caption` như trước
  * @returns item mới, hoặc null nếu slug đã đăng / đang chờ đăng
  */
-export function enqueueVideo({ slug, videoPath, caption, hashtags, locale }) {
+export function enqueueVideo({ slug, videoPath, caption, hashtags, locale, aiGenerated }) {
   return updateQueue((data) => {
     // Slug đã đăng, hoặc đang chờ/đang verify -> không enqueue trùng. Render lại cùng slug ghi đè
     // output/<slug>.mp4 nên job pending sẵn có tự đăng bản mới.
@@ -153,6 +153,8 @@ export function enqueueVideo({ slug, videoPath, caption, hashtags, locale }) {
       videoPath,
       caption: caption || slug,
       hashtags: Array.isArray(hashtags) && hashtags.length ? hashtags : null,
+      // true khi video dùng ảnh/clip AI (gemini/manual): bước đăng bài phải bật nhãn nội dung AI. Không có = video thường (job cũ).
+      ...(aiGenerated === true ? { aiGenerated: true } : {}),
       locale: locale || null, // thị trường của video; job cũ thiếu -> thị trường mặc định (xem jobLocale)
       addedAt: new Date().toISOString(),
       status: "pending",

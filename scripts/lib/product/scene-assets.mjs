@@ -22,10 +22,12 @@ export function boxIntoCrop(box, crop) {
 }
 
 /** Zoom để viên đá (khung `box` chuẩn hoá trong PNG hiển thị rộng `shownW`) chiếm ~zoomToBox bề ngang khung video; kẹp trong [minZoom, maxZoom]. */
-export function macroZoom(box, shownW, frameW, macroCfg) {
-  if (!box) return macroCfg.fallbackZoom;
-  const want = (frameW * macroCfg.zoomToBox) / Math.max(1, box.w * shownW);
-  return Math.min(macroCfg.maxZoom, Math.max(macroCfg.minZoom, want));
+export function macroZoom(box, shownW, frameW, macroCfg, { sourcePx = 0 } = {}) {
+  const want = box ? (frameW * macroCfg.zoomToBox) / Math.max(1, box.w * shownW) : macroCfg.fallbackZoom;
+  let zoom = Math.min(macroCfg.maxZoom, Math.max(macroCfg.minZoom, want));
+  // Ảnh sản phẩm nhỏ (vd 300px): sản phẩm đã bị phóng nhiều lần chỉ để vừa khung, zoom thêm là vỡ ô -> giới hạn tổng độ phóng đại (px màn hình / px ảnh gốc).
+  if (sourcePx > 0 && macroCfg.maxUpscale) zoom = Math.max(1, Math.min(zoom, macroCfg.maxUpscale / (shownW / sourcePx)));
+  return zoom;
 }
 
 /**
@@ -45,12 +47,12 @@ export async function prepareSceneAssets({ project, store, targetDir, config = l
     const original = `assets/images/product-${index + 1}${ext}`;
     fs.copyFileSync(src, path.join(targetDir, original));
     const cutFile = `assets/images/product-${index + 1}-cut.png`;
-    const cut = await cutout(src, path.join(targetDir, cutFile), {});
+    const cut = await cutout(src, path.join(targetDir, cutFile), { ...config.video.cutout });
     const analysisImg = project.analysis?.images?.[index];
     products[index] = {
       index, original, cut: cutFile, cutW: cut.width, cutH: cut.height, box: cut.box,
       stoneBox: boxIntoCrop(analysisImg?.stoneBbox, cut.crop), // viên đá trong hệ toạ độ PNG đã cắt
-      origW: info.width, origH: info.height,
+      origW: info.width, origH: info.height, sourcePx: Math.round(cut.box.w * info.width), // chiều ngang sản phẩm trong ảnh gốc (px)
     };
   }
   const photos = {};

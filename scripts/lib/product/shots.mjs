@@ -62,7 +62,7 @@ export const centerOf = (b) => ({ x: round(b.x + b.w / 2, 1), y: round(b.y + b.h
  * Vị trí chớp sáng nhỏ TRONG khung bao: lưới có nhiễu xác định, mỗi điểm có độ trễ/cỡ/độ sáng riêng.
  * @returns {Array<{x:number,y:number,size:number,delay:number,peak:number}>} x,y px trong cùng hệ toạ độ của `box`; delay (giây) tương đối đầu shot
  */
-export function sparklePoints(box, count, seed, { shotDur = 2 } = {}) {
+export function sparklePoints(box, count, seed, { shotDur = 2, accept = null } = {}) {
   const rand = seededRandom(hashSeed(seed));
   const cols = Math.ceil(Math.sqrt(count * (box.w / Math.max(1, box.h))));
   const rows = Math.ceil(count / cols);
@@ -73,9 +73,18 @@ export function sparklePoints(box, count, seed, { shotDur = 2 } = {}) {
     const j = Math.floor(rand() * (i + 1));
     [cells[i], cells[j]] = [cells[j], cells[i]];
   }
+  // `accept(x, y)` (tuỳ chọn): chỉ nhận điểm nằm trên vật thể thật (vd alpha của PNG đã tách nền > ngưỡng) — thử lại tối đa 12 lần trong ô rồi lấy điểm cuối
+  const pick = (cell) => {
+    let x = 0, y = 0;
+    for (let t = 0; t < 12; t++) {
+      x = round(box.x + ((cell.c + 0.1 + rand() * 0.8) / cols) * box.w, 1);
+      y = round(box.y + ((cell.r + 0.1 + rand() * 0.8) / rows) * box.h, 1);
+      if (!accept || accept(x, y)) break;
+    }
+    return { x, y };
+  };
   return cells.slice(0, count).map((cell, i) => ({
-    x: round(box.x + ((cell.c + 0.2 + rand() * 0.6) / cols) * box.w, 1),
-    y: round(box.y + ((cell.r + 0.2 + rand() * 0.6) / rows) * box.h, 1),
+    ...pick(cell),
     size: round(26 + rand() * 30, 1),
     delay: round(((i + rand() * 0.6) / count) * Math.max(0.2, shotDur - 0.6), 2),
     peak: round(0.75 + rand() * 0.25, 2),

@@ -48,7 +48,7 @@ export async function productImageWarnings(file, config = loadProductConfig()) {
   return warnings;
 }
 
-export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedStore, log = console, deps = {} }) {
+export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedStore, log = console, deps = {}, hooks = {} }) {
   const config = loadProductConfig();
   const analyze = deps.analyzeProduct || analyzeProduct;
   const scriptWriter = deps.writeScript || writeScript;
@@ -230,7 +230,7 @@ export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedSt
           form,
           settings: { imageSource, aiClip, tts: requested.tts || {}, notes },
           analysis,
-          script: { openers: script.openers, openerIndex: 0, lines: script.lines, mismatches: script.mismatches, warnings: script.warnings, model: script.model, rulesIssues: [] },
+          script: { openers: script.openers, openerIndex: 0, lines: script.lines, mismatches: script.mismatches, specValues: script.specValues || {}, warnings: script.warnings, model: script.model, rulesIssues: [] },
           scenes: planScenes({ lines: script.lines, imageSource, kind: analysis.kind, analysis, config }),
           status: "scripted",
           aiGenerated: false,
@@ -359,6 +359,24 @@ export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedSt
     });
   }));
 
+
+  /** Duyệt và dựng video: tạo job dựng theo khâu (cùng /api/build-jobs/:id để xem trạng thái, thử lại, dựng lại). */
+  router.post("/:id/build", async (req, res) => {
+    const project = getProject(req, res);
+    if (!project) return;
+    if (!project.script?.lines?.length) return res.status(409).json({ error: "Dự án chưa có kịch bản." });
+    if (running.has(project.id)) return res.status(409).json({ error: "Dự án đang có việc chạy nền — đợi xong rồi dựng." });
+    const blockers = buildBlockers(project.scenes || []);
+    if (blockers.length) return res.status(409).json({ error: `Chưa dựng được: ${blockers.map((b) => b.message).join(" ")}` });
+    if (!hooks.prepareBuild) return res.status(501).json({ error: "Server chưa cấu hình dựng video." });
+    try {
+      const job = await hooks.prepareBuild(project, { slug: req.body?.slug, tts: req.body?.tts || {} });
+      res.status(202).json(job);
+    } catch (e) {
+      fail(res, e);
+    }
+  });
+
   router.get("/:id/budget", (req, res) => {
     const project = getProject(req, res);
     if (!project) return;
@@ -385,5 +403,12 @@ export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedSt
   });
 
   app.use("/api/product", router);
-  return { store, publicProject, getProject, router, sceneService, running, normalizeForm, validateForm, kindFromText, fileUrl };
+  const costSummary = (project) => {
+    const b = budgetOf(project);
+    const sp = b.spent();
+    return { totalVnd: b.spentVnd(), maxVnd: b.maxVnd(), byTask: Object.fromEntries(Object.entries(sp.byTask).map(([k, usd]) => [k, usdToVndRounded(usd)])) };
+  };
+  const markBuilding = (id, { slug, jobId }) => store.withLock(id, async () => { const p = store.read(id); Object.assign(p, { slug, status: "building", build: { jobId, slug } }); store.write(p); });
+  const markBuilt = (id, result) => store.withLock(id, async () => { const p = store.read(id); Object.assign(p, { status: "built", aiGenerated: result.aiGenerated === true, build: { ...(p.build || {}), ...result, builtAt: new Date().toISOString() } }); store.write(p); });
+  return { store, publicProject, getProject, router, sceneService, running, costSummary, markBuilding, markBuilt, normalizeForm, validateForm, kindFromText, fileUrl };
 }

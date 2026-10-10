@@ -77,13 +77,16 @@ import { createMarketApi, buildRecord, generatedByOf, resolveSocialPost as resol
 import { validateGeminiModels } from "./scripts/lib/gemini-models.mjs";
 import { createCleanupQueue, existingVideoWebPath, MIN_MP4_BYTES } from "./scripts/lib/pending-cleanup.mjs";
 import { effectiveSlugSuffix, hasLocaleSuffix, stripLocaleSuffix, uniqueSlugForLocale } from "./scripts/lib/market-slug.mjs";
+import { slugify as slugifyName } from "./scripts/lib/slug.mjs";
 import { copySourceImages, readRecord, writeRecord } from "./scripts/lib/content-store.mjs";
 import { createProductApi } from "./server-product.mjs";
 import { rewriteField, translateField, FieldEditError } from "./scripts/lib/field-edit.mjs";
 import { AbortedError } from "./scripts/lib/gemini-client.mjs";
 import { checkFfmpeg, extractPoseTimeline, setReelThumbnail } from "./scripts/lib/reel-thumbnail.mjs";
 import { checkMediaBinaries, describeSpawnError, mediaToolsEnv, mediaToolsErrorVi } from "./scripts/lib/media-binaries.mjs";
-import { FileBuildJobStore, createBuildJob, jobSummary, latestJobBySlug, recoverInterruptedJobs, resetJobForRetry, resetJobFromStart, runBuildJob } from "./scripts/lib/build-jobs.mjs";
+import { FileBuildJobStore, BUILD_STAGES, PRODUCT_CLIP_STAGE, createBuildJob, jobSummary, latestJobBySlug, recoverInterruptedJobs, resetJobForRetry, resetJobFromStart, runBuildJob } from "./scripts/lib/build-jobs.mjs";
+import { ensureOpeningClip } from "./scripts/lib/product/clip-flow.mjs";
+import { billing as productBilling } from "./scripts/lib/product/billing.mjs";
 import { getLocale, listLocales, localeErrors, getDefaultLocale } from "./scripts/lib/locales.mjs";
 import {
   listEngines,
@@ -546,7 +549,7 @@ const marketApi = createMarketApi({
 });
 
 // Chế độ "Giới thiệu sản phẩm" (/api/product/*) — xem server-product.mjs.
-createProductApi({ app, dataDir: DATA_DIR, hostRefsRoot: __dirname });
+const productApi = createProductApi({ app, dataDir: DATA_DIR, hostRefsRoot: __dirname, hooks: { prepareBuild: prepareProductBuild } });
 
 // Chuẩn hoá 1 hashtag người dùng gõ tay ở Studio (bỏ dấu, thường, <=25 ký tự, lọc blocked) — để UI
 // dùng ĐÚNG luật của server thay vì tự cài lại. tier="topic" nếu tag nằm trong whitelist chủ đề.
@@ -608,6 +611,15 @@ function buildStageError(stage, result, fallback) {
 
 function scaffoldStageArgs(job, stage) {
   const request = job.request;
+  if (request.kind === "product") {
+    // Chế độ "Giới thiệu sản phẩm": scripts/scaffold-product-video.mjs (cùng khung khâu voice/timing/scene)
+    const a = [path.join(SCRIPTS_DIR, "scaffold-product-video.mjs"), "--project", request.projectId, "--slug", job.slug, "--stage", stage];
+    if (fs.existsSync(path.join(VIDEOS_DIR, job.slug, ".build", "plan.json"))) a.push("--resume");
+    if (request.ttsProvider) a.push("--tts-provider", request.ttsProvider);
+    if (request.ttsVoice) a.push("--tts-voice", request.ttsVoice);
+    if (request.vieneuVoice) a.push("--vieneu-voice", request.vieneuVoice);
+    return a;
+  }
   const args = [
     path.join(SCRIPTS_DIR, "scaffold-compare-video.mjs"),
     request.leftPath,
@@ -677,6 +689,70 @@ async function finalizeBuildJob(job, log) {
   };
 }
 
+// Video giới thiệu sản phẩm: lưu MP4 + bản ghi (cờ ai_generated cho bước đăng bài) + hàng đợi đăng (nếu bật) — xem server-product.mjs.
+async function finalizeProductJob(job, log) {
+  const target = path.join(VIDEOS_DIR, job.slug);
+  const request = job.request;
+  const project = productApi.store.read(request.projectId);
+  let meta = {};
+  try {
+    meta = JSON.parse(fs.readFileSync(path.join(target, ".build", "product-meta.json"), "utf8"));
+  } catch {
+    log("⚠ Không đọc được product-meta.json — coi như video không dùng AI.");
+  }
+  const briefSrc = path.join(target, "BRIEF.md");
+  if (fs.existsSync(briefSrc)) fs.copyFileSync(briefSrc, path.join(CONTENT_ARCHIVE_DIR, `${job.slug}.BRIEF.md`));
+  let renderUrl = latestRender(job.slug);
+  if (!renderUrl) throw new Error("Render đã chạy nhưng không tìm thấy file MP4 thành phẩm.");
+  const keepProject = request.keepProject === true || process.env.KEEP_PROJECT === "1";
+  if (!keepProject) renderUrl = await archiveAndCleanup(job.slug, renderUrl, log);
+
+  const aiGenerated = meta.ai_generated === true;
+  const costs = productApi.costSummary(project);
+  await productApi.markBuilt(project.id, { slug: job.slug, renderUrl, aiGenerated, rootDuration: meta.rootDuration || null });
+  fs.writeFileSync(path.join(CONTENT_ARCHIVE_DIR, `${job.slug}.product.json`), `${JSON.stringify({
+    kind: "product", projectId: project.id, slug: job.slug, locale: project.locale, displayName: project.displayName, ai_generated: aiGenerated,
+    imageSource: project.settings?.imageSource, clip: !!meta.clip, form: project.form, script: project.script?.lines, builtAt: new Date().toISOString(), cost: costs,
+  }, null, 2)}\n`);
+  if (aiGenerated) log("ℹ Video có dùng ảnh/clip AI: đã gắn cờ ai_generated — khi đăng bài hãy bật nhãn nội dung AI.");
+
+  const locale = localeFromCode(project.locale);
+  if (renderUrl && isAutoPostEnabled() && locale) {
+    const absoluteVideoPath = path.join(__dirname, renderUrl.replace(/^\//, ""));
+    if (fs.existsSync(absoluteVideoPath)) {
+      const queued = tryEnqueueVideo(
+        { slug: job.slug, videoPath: absoluteVideoPath, caption: project.script?.lines?.[0]?.text || project.displayName || job.slug, hashtags: [], locale: locale.code, aiGenerated },
+        { pages: getConfiguredPages(), defaultCode: getDefaultLocale().code },
+      );
+      log(queued.status === "enqueued" ? "ℹ Đã thêm vào hàng đợi đăng Facebook." : queued.reason || "ℹ Không thêm vào hàng đợi đăng.");
+    }
+  }
+  return { slug: job.slug, previewUrl: renderUrl, renderUrl, compositionUrl: fs.existsSync(path.join(target, "index.html")) ? `/videos/${job.slug}/index.html` : null, aiGenerated, cost: costs, projectId: project.id };
+}
+
+/** Tạo job dựng cho 1 dự án sản phẩm đã duyệt (gọi từ POST /api/product/:id/build). */
+async function prepareProductBuild(project, { slug: rawSlug, tts = {} }) {
+  const locale = localeFromCode(project.locale);
+  if (!locale) throw new Error("Thị trường không tồn tại hoặc đang bị tắt.");
+  const renderability = checkRenderability(locale);
+  if (!renderability.renderable) throw new Error(`Thị trường ${locale.displayName} chưa dựng được video: ${renderability.blockers.map((b) => b.message).join(" ")}`);
+  const base = stripLocaleSuffix(String(rawSlug || "").trim() || slugifyName(project.displayName || project.form.type), locale);
+  if (!SLUG_RE.test(base)) throw new Error(`Mã thư mục "${base}" không hợp lệ — chỉ dùng a-z, 0-9 và dấu gạch ngang.`);
+  const taken = (candidate) => fs.existsSync(path.join(VIDEOS_DIR, candidate)) || fs.existsSync(path.join(OUTPUT_DIR, `${candidate}.mp4`));
+  const slug = uniqueSlugForLocale(base, locale, taken);
+  const engine = tts.engine ? getEngine(tts.engine) : null;
+  if (tts.engine && !engine) throw new Error(`Engine giọng đọc "${tts.engine}" không tồn tại hoặc đang bị tắt.`);
+  const request = { kind: "product", projectId: project.id, locale: locale.code, ttsProvider: tts.engine || null, ttsVoice: tts.engine && tts.engine !== "vieneu" ? tts.voice || null : null, vieneuVoice: tts.engine === "vieneu" ? tts.voice || null : null, keepProject: false };
+  const stages = project.settings?.aiClip ? [PRODUCT_CLIP_STAGE, ...BUILD_STAGES] : BUILD_STAGES;
+  const job = createBuildJob({ slug, request, stages });
+  buildJobStore.write(job);
+  // chi phí đã dùng ở Bước 1-2 (slug tạm) -> slug thật của video
+  renameCostLedgerSlug(project.ledgerSlug, slug);
+  await productApi.markBuilding(project.id, { slug, jobId: job.id });
+  startBuildJob(job.id);
+  return buildJobStore.read(job.id);
+}
+
 function buildStageHandlers(jobId) {
   const runScaffoldStage = (stage) => async ({ job, log }) => {
     if (stage === "voice" && !mediaTools.ok) {
@@ -700,6 +776,10 @@ function buildStageHandlers(jobId) {
   };
 
   return {
+    // Clip AI (chỉ có trong job sản phẩm khi bật): lỗi/vượt trần/chưa billing -> lùi về GSAP, KHÔNG làm hỏng job
+    clip: async ({ job, log }) => {
+      await ensureOpeningClip({ projectId: job.request.projectId, store: productApi.store, billing: productBilling, log });
+    },
     voice: runScaffoldStage("voice"),
     timing: runScaffoldStage("timing"),
     scene: runScaffoldStage("scene"),
@@ -726,12 +806,13 @@ function buildStageHandlers(jobId) {
       const result = await runCommand(npmCheck.command, npmCheck.args, { cwd: target, onLine: log });
       if (result.code !== 0) throw buildStageError("check", result, "Khâu kiểm tra video thất bại.");
       const latest = buildJobStore.read(jobId);
-      return finalizeBuildJob(latest, log);
+      return latest.request.kind === "product" ? finalizeProductJob(latest, log) : finalizeBuildJob(latest, log);
     },
   };
 }
 
 function updateContentRecordStatus(job, status) {
+  if (job.request?.kind === "product") return; // dự án sản phẩm có trạng thái riêng (data/products/<id>/project.json)
   const locale = localeFromCode(job.request.locale || job.request.content?.locale);
   const previous = readRecord(CONTENT_ARCHIVE_DIR, job.slug);
   if (!locale || !previous) return;
