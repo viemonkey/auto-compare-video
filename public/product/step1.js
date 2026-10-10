@@ -170,6 +170,7 @@ export function createStep1(ctx) {
         h("span", {}, h("strong", { text: "Clip AI cho cảnh mở đầu" }), h("br"), h("small", { class: "field-help", text: `1 clip ${ctx.cfg.clip.seconds} giây từ ảnh “cầm sản phẩm” (${ctx.cfg.clip.model}). Mặc định tắt; lỗi hoặc vượt trần thì tự lùi về hiệu ứng GSAP.` }))),
       enabled ? null : note(ctx.cfg.clip.reason),
     );
+    for (const n of Array.from(clipBox.childNodes)) if (n.nodeType === 3) n.remove(); // append(null) tạo chữ "null"
   }
   const hostRefsBox = h("div");
   function renderHostRefs() {

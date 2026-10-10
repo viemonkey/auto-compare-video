@@ -62,6 +62,7 @@ KỊCH BẢN GỐC ĐÃ DUYỆT (tiếng Việt) — giữ đúng ý từng câu
 (Phương án mở đầu số 1 phải bám câu mở đầu gốc; hai phương án còn lại là biến thể.)
 
 {{/sourceScript}}
+NHẮC LẠI: "spec_values" phải {{specTranslate}} — thẻ thông số hiển thị đúng ngôn ngữ của video.
 Hãy viết kịch bản theo đúng schema.
 
 @@@ fragment.origin.natural

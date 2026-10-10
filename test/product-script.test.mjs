@@ -298,3 +298,21 @@ test("độ dài: kịch bản quá ngắn (video dưới 15 giây) bị yêu c�
     config.script.minTotalFraction = 0;
   }
 });
+
+test("thị trường ngoài tiếng Việt: spec_values còn chữ tiếng Việt (chưa dịch) bị yêu cầu viết lại; đã dịch thì đạt", async () => {
+  const { untranslatedSpecValues } = await import("../scripts/lib/product/script.mjs");
+  const form = normalizeForm({ type: "nhẫn", material: "bạc 925", mainStone: "đá moissanite", stoneOrigin: "lab", feature: "vòng bánh răng xoay được" }, config);
+  assert.deepEqual(untranslatedSpecValues({ type: "リング", material: "シルバー925", mainStone: "モアサナイト", feature: "回る歯車", origin: "人工石" }, form), []);
+  assert.deepEqual(untranslatedSpecValues({ type: "リング", material: "bạc 925", mainStone: "", feature: "回る歯車", origin: "Nhân tạo" }, form).sort(), ["mainStone", "material", "origin"]);
+  const ja = getLocale("ja-JP");
+  const jaLines = (t) => ({ openers: [{ text: "このリングの秘密は？", vi: "Bí mật?" }, { text: "回る指輪を見た？", vi: "Thấy chưa?" }, { text: "なぜ話題？", vi: "Vì sao?" }], lines: ["specs", "wear", "emotion", "cta"].map((beat) => ({ beat, text: t, vi: "Nhẫn bạc 925 nhân tạo moissanite" })), mismatches: [] });
+  const bad = { ...jaLines("シルバー925の指輪です。モアサナイト（人工石）を使っています。"), spec_values: { type: "nhẫn", material: "bạc 925", metalColor: "", mainStone: "đá moissanite", carat: "", cut: "", sideStones: "", feature: "vòng bánh răng xoay được", origin: "Nhân tạo" } };
+  const good = { ...bad, spec_values: { type: "リング", material: "シルバー925", metalColor: "", mainStone: "モアサナイト", carat: "", cut: "", sideStones: "", feature: "回る歯車", origin: "人工石" } };
+  const gen = asGen(bad, good);
+  const loose = { ...config, script: { ...config.script, minTotalFraction: 0, claimTerms: [] } };
+  const out = await writeScript({ form, analysis: { kind: "ring", lock: {}, lockText: LOCK.lockText }, locale: ja, ledgerSlug: "s", generate: gen, config: loose, env: {} });
+  assert.equal(out.attempts, 2);
+  assert.match(gen.calls[1].userText, /spec_values chưa dịch/);
+  assert.equal(out.specValues.material, "シルバー925");
+  assert.match(gen.calls[0].systemPrompt, /spec_values/);
+});

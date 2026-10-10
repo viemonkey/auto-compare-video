@@ -39,7 +39,7 @@ export function createStep3(ctx) {
     clear(successCard);
     const r = job.result || {};
     const rows = Object.entries(r.cost?.byTask || {}).filter(([, v]) => v > 0);
-    successCard.append(
+    successCard.append(...[
       h("h3", { text: "ĐÃ DỰNG VIDEO THÀNH CÔNG!" }),
       h("p", { text: `Video “${r.slug}” đã được dựng và kiểm tra xong.` }),
       r.renderUrl ? h("video", { class: "pd-final", src: r.renderUrl, controls: true, playsInline: true, preload: "metadata" }) : null,
@@ -54,7 +54,7 @@ export function createStep3(ctx) {
         r.renderUrl ? h("a", { class: "btn btn-primary btn-large", href: r.renderUrl, target: "_blank", rel: "noopener", text: "Mở video" }) : null,
         btn("Tạo phiên bản cho thị trường khác", "btn-secondary", () => ctx.openMarketVersion(r.projectId)),
         btn("Tạo video mới", "btn-secondary", () => { forget(); ctx.reset(); })),
-    );
+    ].filter(Boolean));
   }
 
   function render() {

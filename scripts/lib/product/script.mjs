@@ -174,6 +174,10 @@ export async function writeScript({ form, analysis, locale, ledgerSlug, signal, 
     // mọi phương án mở đầu đều phải đạt luật (người dùng có thể chọn bất kỳ phương án nào)
     lastIssues = [];
     if (fixedBeats && (result.lines.length !== fixedBeats.length || result.lines.some((l, i) => l.beat !== fixedBeats[i]))) lastIssues.push(`Phải đúng ${fixedBeats.length} câu với beat: ${fixedBeats.join(", ")} (ảnh/cảnh đã duyệt sẵn).`);
+    if (gloss) {
+      const bad = untranslatedSpecValues(result.spec_values, form);
+      if (bad.length) lastIssues.push(`spec_values chưa dịch sang ${locale.prompt.language} (${bad.join(", ")}) — mỗi giá trị thẻ thông số phải viết bằng ${locale.prompt.language}, không giữ chữ tiếng Việt.`);
+    }
     openers.forEach((_, oi) => {
       const issues = validateScriptRules({ lines: assembleScript({ openers, lines: result.lines.map((l) => ({ ...l, vi: gloss ? l.vi : "" })) }, oi) }, { form, locale, config });
       for (const it of issues) if (!lastIssues.includes(it)) lastIssues.push(oi === 0 ? it : `${it} (phương án mở đầu ${oi + 1})`);
@@ -187,6 +191,19 @@ export async function writeScript({ form, analysis, locale, ledgerSlug, signal, 
   const err = new Error(`Gemini viết kịch bản chưa đạt luật sau ${cfg.maxAttempts} lần: ${lastIssues.join(" ")}`);
   err.userMessage = `Gemini chưa viết được kịch bản đúng luật (số liệu chỉ lấy từ form...). Lý do: ${lastIssues.slice(0, 3).join(" ")} Hãy thử lại hoặc bổ sung thông số vào form.`;
   throw err;
+}
+
+const VI_DIACRITICS = /[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]/i;
+
+/** Thị trường ngoài tiếng Việt: giá trị thẻ thông số còn nguyên chữ tiếng Việt (có dấu) = Gemini chưa dịch -> lỗi để viết lại. */
+export function untranslatedSpecValues(raw, form) {
+  const bad = [];
+  for (const k of SPEC_KEYS) {
+    const formValue = k === "origin" ? (form.stoneOrigin ? "x" : "") : String(form[k] || "");
+    const v = raw && typeof raw[k] === "string" ? raw[k].trim() : "";
+    if (formValue && (!v || VI_DIACRITICS.test(v))) bad.push(k);
+  }
+  return bad;
 }
 
 /** Giá trị thẻ thông số: thị trường tiếng Việt = đúng form; thị trường khác = bản dịch của Gemini (rỗng/thiếu -> rơi về chữ form). Không bao giờ thêm giá trị mà form không có. */
