@@ -218,3 +218,13 @@ export async function cropImage(inFile, box, outFile, { outWidth = 0 } = {}) {
 }
 
 export const fileExists = (f) => fs.existsSync(f);
+
+/** Ảnh -> JPEG base64 thu nhỏ (cạnh dài <= maxPx) để gửi vision / làm ảnh tham chiếu — giảm token và dung lượng request. */
+export async function toJpegBase64(file, { maxPx = 1024, quality = 3 } = {}) {
+  const { width, height } = await probeImage(file);
+  const k = Math.min(1, maxPx / Math.max(width, height));
+  const w = Math.max(2, Math.round((width * k) / 2) * 2);
+  const h = Math.max(2, Math.round((height * k) / 2) * 2);
+  const data = await runFfmpeg(["-i", file, "-vf", `scale=${w}:${h}:flags=lanczos,format=yuvj420p`, "-q:v", String(quality), "-frames:v", "1", "-f", "mjpeg", "-"]);
+  return { mimeType: "image/jpeg", data: data.toString("base64"), width: w, height: h };
+}

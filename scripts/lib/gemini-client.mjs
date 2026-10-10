@@ -30,15 +30,17 @@ export class AbortedError extends Error {
   }
 }
 
-async function callOnce({ systemPrompt, userText, schema, model, signal, attempt, ledger }) {
+async function callOnce({ systemPrompt, userText, schema, model, signal, attempt, ledger, images = [], timeoutMs = REQUEST_TIMEOUT_MS, temperature = 0.4 }) {
   const key = apiKey();
   const url = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${key}`;
+  // `images`: [{ mimeType, data(base64) }] — chế độ Giới thiệu sản phẩm gửi ảnh sản phẩm/ảnh cảnh kèm chữ; không truyền thì giữ đúng hành vi cũ (chỉ chữ).
+  const parts = [{ text: userText }, ...images.map((img) => ({ inlineData: { mimeType: img.mimeType, data: img.data } }))];
   const body = {
     systemInstruction: { parts: [{ text: systemPrompt }] },
-    contents: [{ role: "user", parts: [{ text: userText }] }],
-    generationConfig: { temperature: 0.4, responseMimeType: "application/json", responseSchema: schema },
+    contents: [{ role: "user", parts }],
+    generationConfig: { temperature, responseMimeType: "application/json", responseSchema: schema },
   };
-  const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
+  const timeout = AbortSignal.timeout(timeoutMs);
   const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
 
   let res;
@@ -47,7 +49,7 @@ async function callOnce({ systemPrompt, userText, schema, model, signal, attempt
   } catch (err) {
     if (signal?.aborted) throw new AbortedError();
     const isTimeout = err.name === "TimeoutError" || err.name === "AbortError";
-    const reason = redactKey(isTimeout ? `Gemini request timeout sau ${REQUEST_TIMEOUT_MS / 1000}s` : `Gemini request thất bại (network): ${err.message}`, key);
+    const reason = redactKey(isTimeout ? `Gemini request timeout sau ${timeoutMs / 1000}s` : `Gemini request thất bại (network): ${err.message}`, key);
     appendCostEntry({ ...ledger, model, status: "error", errorMessage: reason, attempt });
     throw new RetryableError(reason, {
       userMessage: isTimeout ? "Gemini không phản hồi kịp (timeout), vui lòng thử lại." : "Không kết nối được tới Gemini, vui lòng kiểm tra mạng rồi thử lại.",
@@ -87,9 +89,10 @@ async function callOnce({ systemPrompt, userText, schema, model, signal, attempt
  *   ledger:{task:string, subtask?:string, slug?:string|null, locale?:string}}} args
  * @returns {Promise<{result:object, model:string}>}
  */
-export async function generateJson({ systemPrompt, userText, schema, validate = (o) => o, signal, ledger }) {
+export async function generateJson({ systemPrompt, userText, schema, validate = (o) => o, signal, ledger, images = [], models = null, timeoutMs, temperature }) {
   if (!apiKey()) throw new NonRetryableError("Thiếu GEMINI_API_KEY trong .env (repo root).", { userMessage: "Server chưa cấu hình GEMINI_API_KEY." });
-  const { primary, fallback } = resolveGeminiModels();
+  // `models` (tuỳ chọn): { primary, fallback } riêng cho tác vụ này (vd model rẻ để kiểm ảnh); không truyền -> GEMINI_MODEL / GEMINI_FALLBACK_MODEL.
+  const { primary, fallback } = models ? { primary: models.primary, fallback: models.fallback && models.fallback !== models.primary ? models.fallback : "" } : resolveGeminiModels();
   return runWithModelFallback({
     primaryModel: primary,
     fallbackModel: fallback,
@@ -100,7 +103,7 @@ export async function generateJson({ systemPrompt, userText, schema, validate = 
       usedFallback: model !== primary,
       result: await withRetry(
         async (attempt) => {
-          const text = await callOnce({ systemPrompt, userText, schema, model, signal, attempt, ledger });
+          const text = await callOnce({ systemPrompt, userText, schema, model, signal, attempt, ledger, images, timeoutMs, temperature });
           let parsed;
           try {
             parsed = JSON.parse(text);

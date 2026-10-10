@@ -10,7 +10,13 @@ import { estimateProductCost } from "./scripts/lib/product/estimate.mjs";
 import { createProductStore } from "./scripts/lib/product/store.mjs";
 import { inspectHostRefs } from "./scripts/lib/product/host-refs.mjs";
 import { probeImage, findContentBox } from "./scripts/lib/product/images.mjs";
-import { normalizeForm, validateForm } from "./scripts/lib/product/form.mjs";
+import { normalizeForm, validateForm, productKindOfForm, productDisplayName } from "./scripts/lib/product/form.mjs";
+import { analyzeProduct } from "./scripts/lib/product/analyze.mjs";
+import { writeScript, assembleScript, validateScriptRules, readingEstimate } from "./scripts/lib/product/script.mjs";
+import { createBudget } from "./scripts/lib/product/budget.mjs";
+import { getLocale, getDefaultLocale } from "./scripts/lib/locales.mjs";
+import { checkRenderability } from "./scripts/lib/capabilities.mjs";
+import { AbortedError } from "./scripts/lib/gemini-client.mjs";
 
 export const IMAGE_SOURCES = ["pose", "manual", "gemini"];
 
@@ -35,8 +41,10 @@ export async function productImageWarnings(file, config = loadProductConfig()) {
   return warnings;
 }
 
-export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedStore, log = console }) {
+export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedStore, log = console, deps = {} }) {
   const config = loadProductConfig();
+  const analyze = deps.analyzeProduct || analyzeProduct;
+  const scriptWriter = deps.writeScript || writeScript;
   const store = injectedStore || createProductStore({ dir: path.join(dataDir, "products") });
   const router = express.Router();
 
@@ -120,6 +128,104 @@ export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedSt
         res.status(400).json({ error: `Không đọc được ảnh: ${e.message}` });
       }
     });
+  });
+
+  const localeOf = (code) => (String(code || "").trim() ? getLocale(String(code).trim()) : getDefaultLocale());
+  const budgetOf = (project) => createBudget({ slugs: () => [project.ledgerSlug, project.slug] });
+  const kindsWithTemplates = ["ring", "necklace", "earring"];
+  const fail = (res, e, fallback = "Không xử lý được yêu cầu.") => {
+    log.warn?.(`[product] ${e.message}`);
+    res.status(e.status || (e.userMessage ? 502 : 500)).json({ error: e.userMessage || e.message || fallback });
+  };
+
+  /**
+   * Bước 1 -> 2: phân tích ảnh (Gemini nhìn ảnh -> mô tả khoá + khung bao) rồi viết kịch bản (+3 câu mở đầu, đối chiếu form).
+   * Chạy lại được: ghi đè phân tích + kịch bản cũ (ảnh cảnh đã duyệt — nếu có — bị xoá vì sản phẩm/kịch bản đổi).
+   */
+  router.post("/:id/analyze", async (req, res) => {
+    const project = getProject(req, res);
+    if (!project) return;
+    const locale = localeOf(req.body?.locale);
+    if (!locale) return res.status(400).json({ error: "Thị trường không tồn tại hoặc đang bị tắt." });
+    const renderability = checkRenderability(locale);
+    if (!renderability.renderable) return res.status(400).json({ error: `Thị trường ${locale.displayName} chưa dựng được video: ${renderability.blockers.map((b) => b.message).join(" ")}` });
+    const form = normalizeForm(req.body?.form, config);
+    const errors = validateForm(form);
+    if (errors.length) return res.status(400).json({ error: errors.join(" ") });
+    const requested = req.body?.settings || {};
+    const notes = [];
+    let imageSource = IMAGE_SOURCES.includes(requested.imageSource) ? requested.imageSource : "pose";
+    let aiClip = requested.aiClip === true;
+    const kind = productKindOfForm(form, config);
+    if (imageSource === "gemini" && !billing.isEnabled()) {
+      imageSource = "pose";
+      notes.push(`Nguồn "Tự động" cần billing — ${billing.status().reason} Đã dùng ảnh tư thế có sẵn.`);
+    }
+    if (imageSource !== "pose" && !kindsWithTemplates.includes(kind)) {
+      imageSource = "pose";
+      notes.push(`Chưa có mẫu cảnh AI cho loại món "${form.type}" (mới có nhẫn, dây chuyền, bông tai) — dùng ảnh tư thế có sẵn.`);
+    }
+    if (aiClip && (!billing.isEnabled() || imageSource === "pose")) {
+      aiClip = false;
+      notes.push("Clip AI cần billing và ảnh cảnh “cầm sản phẩm” — đã tắt clip AI (dùng hiệu ứng GSAP).");
+    }
+    const controller = new AbortController();
+    res.on("close", () => { if (!res.writableEnded) controller.abort(); });
+    try {
+      await store.withLock(project.id, async () => {
+        const fresh = store.read(project.id);
+        const imageFiles = fresh.images.map((img) => store.fileAbs(fresh.id, img.file));
+        const analysis = await analyze({ imageFiles, ledgerSlug: fresh.ledgerSlug, locale: locale.code, signal: controller.signal });
+        const script = await scriptWriter({ form, analysis, locale, ledgerSlug: fresh.ledgerSlug, signal: controller.signal });
+        Object.assign(fresh, {
+          locale: locale.code,
+          form,
+          settings: { imageSource, aiClip, tts: requested.tts || {}, notes },
+          analysis,
+          script: { openers: script.openers, openerIndex: 0, lines: script.lines, mismatches: script.mismatches, warnings: script.warnings, model: script.model, rulesIssues: [] },
+          scenes: [],
+          status: "scripted",
+          aiGenerated: false,
+        });
+        fresh.displayName = productDisplayName(form);
+        store.write(fresh);
+      });
+      res.json(publicProject(store.read(project.id)));
+    } catch (e) {
+      if (e instanceof AbortedError || controller.signal.aborted) return;
+      fail(res, e, "Gemini xử lý thất bại, vui lòng thử lại.");
+    }
+  });
+
+  /** Người dùng chọn câu mở đầu / sửa câu thoại ở Bước 2. Luật nội dung chỉ CẢNH BÁO (người dùng được quyết), không chặn. */
+  router.put("/:id/script", async (req, res) => {
+    const project = getProject(req, res);
+    if (!project?.script) return project ? res.status(409).json({ error: "Dự án chưa có kịch bản." }) : undefined;
+    const locale = localeOf(project.locale);
+    const incoming = req.body || {};
+    await store.withLock(project.id, async () => {
+      const fresh = store.read(project.id);
+      const script = fresh.script;
+      if (Number.isInteger(incoming.openerIndex) && incoming.openerIndex >= 0 && incoming.openerIndex < script.openers.length) script.openerIndex = incoming.openerIndex;
+      if (Array.isArray(incoming.openers)) script.openers = script.openers.map((o, i) => ({ text: String(incoming.openers[i]?.text ?? o.text).slice(0, 400), vi: String(incoming.openers[i]?.vi ?? o.vi).slice(0, 600) }));
+      if (Array.isArray(incoming.lines)) {
+        script.lines = script.lines.map((l, i) => (i === 0 ? l : { ...l, text: String(incoming.lines[i]?.text ?? l.text).slice(0, 400), vi: String(incoming.lines[i]?.vi ?? l.vi).slice(0, 600) }));
+      }
+      const opener = script.openers[script.openerIndex];
+      script.lines[0] = { ...script.lines[0], text: opener.text, vi: opener.vi };
+      script.rulesIssues = validateScriptRules({ lines: script.lines }, { form: fresh.form, locale, config });
+      script.warnings = readingEstimate(script.lines, locale, config).warnings;
+      if (typeof incoming.slug === "string") fresh.slugDraft = incoming.slug.trim().slice(0, 80);
+      store.write(fresh);
+    });
+    res.json(publicProject(store.read(project.id)));
+  });
+
+  router.get("/:id/budget", (req, res) => {
+    const project = getProject(req, res);
+    if (!project) return;
+    const b = budgetOf(project);
+    res.json({ maxVnd: b.maxVnd(), spentVnd: b.spentVnd(), remainingVnd: b.remainingVnd(), byTask: b.spent().byTask });
   });
 
   router.get("/:id", (req, res) => {

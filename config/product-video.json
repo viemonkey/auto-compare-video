@@ -1,103 +1,308 @@
 {
   "_doc": "Cấu hình chế độ \"Giới thiệu sản phẩm\". Mọi con số/tên model/ngưỡng nằm ở đây (hoặc .env — xem .env.example); prompt nằm ở prompts/product-*.md và prompts/product-scenes/*.md. Đổi xong khởi động lại server.",
-
   "budget": {
     "maxVnd": 15000,
     "maxVndEnv": "PRODUCT_VIDEO_MAX_COST_VND",
-    "allocationVnd": { "analysis": 1000, "images": 5000, "clip": 5200 },
+    "allocationVnd": {
+      "analysis": 1000,
+      "images": 5000,
+      "clip": 5200
+    },
     "_note": "allocationVnd chỉ để hiển thị ước tính; trần cứng là maxVnd. Khi bật clip AI, phần clip được GIỮ CHỖ trước nên ảnh không ăn mất ngân sách của clip."
   },
-
-  "billing": { "envFlag": "GEMINI_BILLING_ENABLED" },
-
-  "models": {
-    "image": { "id": "gemini-3.1-flash-image", "envId": "PRODUCT_IMAGE_MODEL", "size": "1K", "envSize": "PRODUCT_IMAGE_SIZE", "aspectRatio": "9:16" },
-    "clip": { "id": "veo-3.1-lite-generate-preview", "envId": "PRODUCT_CLIP_MODEL", "resolution": "720p", "seconds": 4, "aspectRatio": "9:16", "pollIntervalMs": 8000, "timeoutMs": 420000 },
-    "analysis": { "id": "", "_note": "rỗng = dùng GEMINI_MODEL (+ GEMINI_FALLBACK_MODEL)" },
-    "script": { "id": "" },
-    "check": { "id": "gemini-3.5-flash-lite", "envId": "PRODUCT_CHECK_MODEL", "_note": "kiểm ảnh dùng model rẻ; thiếu/sai tên thì tự rơi về GEMINI_MODEL" }
+  "billing": {
+    "envFlag": "GEMINI_BILLING_ENABLED"
   },
-
-  "batch": { "envFlag": "PRODUCT_IMAGE_BATCH", "default": false, "_note": "Batch API: chậm (tới 24 giờ), rẻ ~50%. Mặc định tắt." },
-
+  "models": {
+    "image": {
+      "id": "gemini-3.1-flash-image",
+      "envId": "PRODUCT_IMAGE_MODEL",
+      "size": "1K",
+      "envSize": "PRODUCT_IMAGE_SIZE",
+      "aspectRatio": "9:16"
+    },
+    "clip": {
+      "id": "veo-3.1-lite-generate-preview",
+      "envId": "PRODUCT_CLIP_MODEL",
+      "resolution": "720p",
+      "seconds": 4,
+      "aspectRatio": "9:16",
+      "pollIntervalMs": 8000,
+      "timeoutMs": 420000
+    },
+    "analysis": {
+      "id": "",
+      "_note": "rỗng = dùng GEMINI_MODEL (+ GEMINI_FALLBACK_MODEL)"
+    },
+    "script": {
+      "id": ""
+    },
+    "check": {
+      "id": "gemini-3.5-flash-lite",
+      "envId": "PRODUCT_CHECK_MODEL",
+      "_note": "kiểm ảnh dùng model rẻ; thiếu/sai tên thì tự rơi về GEMINI_MODEL"
+    }
+  },
+  "batch": {
+    "envFlag": "PRODUCT_IMAGE_BATCH",
+    "default": false,
+    "_note": "Batch API: chậm (tới 24 giờ), rẻ ~50%. Mặc định tắt."
+  },
   "estimate": {
-    "analysis": { "inputTokens": 5000, "outputTokens": 2500 },
-    "script": { "inputTokens": 2500, "outputTokens": 2000 },
-    "check": { "inputTokens": 4500, "outputTokens": 800 },
+    "analysis": {
+      "inputTokens": 5000,
+      "outputTokens": 2500
+    },
+    "script": {
+      "inputTokens": 2500,
+      "outputTokens": 2000
+    },
+    "check": {
+      "inputTokens": 4500,
+      "outputTokens": 800
+    },
     "imagesPerScene": 1,
     "editsPerScene": 1
   },
-
   "upload": {
     "maxImages": 3,
     "maxBytes": 15728640,
-    "extensions": [".jpg", ".jpeg", ".png", ".webp"],
+    "extensions": [
+      ".jpg",
+      ".jpeg",
+      ".png",
+      ".webp"
+    ],
     "recommendedMinPx": 800,
     "hardMinPx": 200
   },
-
   "host": {
     "name": "HuyK",
-    "outfit": { "text": "áo phông đen, tạp dề da nâu", "imageFile": "assets/host-refs/outfit.jpg" },
-    "faceRefs": { "dir": "assets/host-refs", "prefix": "face-", "extensions": [".jpg", ".jpeg", ".png", ".webp"], "minCount": 3, "maxCount": 4, "minPx": 1024 }
+    "outfit": {
+      "text": "áo phông đen, tạp dề da nâu",
+      "imageFile": "assets/host-refs/outfit.jpg"
+    },
+    "faceRefs": {
+      "dir": "assets/host-refs",
+      "prefix": "face-",
+      "extensions": [
+        ".jpg",
+        ".jpeg",
+        ".png",
+        ".webp"
+      ],
+      "minCount": 3,
+      "maxCount": 4,
+      "minPx": 1024
+    }
   },
-
   "productKinds": {
-    "ring": ["nhẫn", "nhan", "ring"],
-    "necklace": ["dây chuyền", "day chuyen", "vòng cổ", "necklace", "pendant", "mặt dây"],
-    "earring": ["bông tai", "bong tai", "khuyên tai", "khuyen tai", "hoa tai", "earring"]
+    "ring": [
+      "nhẫn",
+      "nhan",
+      "ring"
+    ],
+    "necklace": [
+      "dây chuyền",
+      "day chuyen",
+      "vòng cổ",
+      "necklace",
+      "pendant",
+      "mặt dây"
+    ],
+    "earring": [
+      "bông tai",
+      "bong tai",
+      "khuyên tai",
+      "khuyen tai",
+      "hoa tai",
+      "earring"
+    ]
   },
-
   "stoneOrigins": {
-    "natural": { "label": "Thiên nhiên", "keywords": ["thiên nhiên", "tự nhiên", "natural"] },
-    "lab": { "label": "Nhân tạo", "keywords": ["nhân tạo", "lab", "synthetic"] },
-    "moissanite": { "label": "Moissanite", "keywords": ["moissanite"] }
+    "natural": {
+      "label": "Thiên nhiên",
+      "keywords": [
+        "thiên nhiên",
+        "tự nhiên",
+        "natural"
+      ]
+    },
+    "lab": {
+      "label": "Nhân tạo",
+      "keywords": [
+        "nhân tạo",
+        "lab",
+        "synthetic"
+      ]
+    },
+    "moissanite": {
+      "label": "Moissanite",
+      "keywords": [
+        "moissanite"
+      ]
+    }
   },
-
   "scenes": {
-    "check": { "criteria": ["product", "face", "hands", "outfit"], "passScore": 7, "minTotal": 8 },
-    "maxAttempts": { "generate": 2, "fixFace": 1, "fixProduct": 1, "totalImageCalls": 4 },
-    "aiScenes": ["hold-close", "wear-hand"],
+    "check": {
+      "criteria": [
+        "product",
+        "face",
+        "hands",
+        "outfit"
+      ],
+      "passScore": 7,
+      "minTotal": 8
+    },
+    "maxAttempts": {
+      "generate": 2,
+      "fixFace": 1,
+      "fixProduct": 1,
+      "totalImageCalls": 4
+    },
+    "aiScenes": [
+      "hold-close",
+      "wear-hand"
+    ],
     "cacheDir": "data/products/_cache",
     "promptDir": "prompts/product-scenes"
   },
-
   "script": {
     "minLines": 5,
     "maxLines": 6,
     "openerChoices": 3,
-    "maxCharsPerLine": 75,
-    "targetSeconds": [15, 20],
+    "maxCharsPerLine": 58,
+    "targetSeconds": [
+      15,
+      20
+    ],
     "readingCharsPerSecond": 15,
-    "beats": ["hook", "specs", "specs", "wear", "emotion", "cta"]
+    "beats": [
+      "hook",
+      "specs",
+      "specs",
+      "wear",
+      "emotion",
+      "cta"
+    ],
+    "maxAttempts": 3,
+    "claimTerms": [
+      "kim cương",
+      "diamond",
+      "vàng",
+      "bạch kim",
+      "platinum",
+      "18k",
+      "14k",
+      "10k",
+      "24k",
+      "bạc",
+      "silver",
+      "gold",
+      "ruby",
+      "sapphire",
+      "emerald",
+      "ngọc trai",
+      "pearl",
+      "titanium",
+      "topaz",
+      "aquamarine",
+      "thạch anh",
+      "zircon",
+      "cubic"
+    ],
+    "numberWords": [
+      "một",
+      "hai",
+      "ba",
+      "bốn",
+      "năm",
+      "sáu",
+      "bảy",
+      "tám",
+      "chín",
+      "mười"
+    ],
+    "countUnits": [
+      "hàng",
+      "viên",
+      "carat",
+      "ly",
+      "mm",
+      "ct",
+      "li"
+    ],
+    "mismatchFields": [
+      "loại món (type)",
+      "màu kim loại (metalColor)",
+      "đá chính có/không và màu đá (mainStone)",
+      "đá phụ có/không (sideStones)"
+    ],
+    "vision": {
+      "maxPx": 1024,
+      "timeoutMs": 90000
+    },
+    "totalCharsTolerance": 1.1
   },
-
   "video": {
     "width": 1080,
     "height": 1920,
     "startOffset": 0.35,
     "gap": 0.12,
     "outroHold": 0.9,
-    "shotSeconds": { "min": 1.5, "max": 2.5 },
+    "shotSeconds": {
+      "min": 1.5,
+      "max": 2.5
+    },
     "sparklesPerShot": 4,
     "sweepSeconds": 1.3,
-    "kenBurns": { "zoom": 1.1, "panPx": 36 },
-    "macro": { "zoomToBox": 0.62 },
-    "background": { "top": "#0b0b12", "mid": "#17141f", "bottom": "#0a090e", "glow": "rgba(255, 224, 168, 0.16)" }
+    "kenBurns": {
+      "zoom": 1.1,
+      "panPx": 36
+    },
+    "macro": {
+      "zoomToBox": 0.62
+    },
+    "background": {
+      "top": "#0b0b12",
+      "mid": "#17141f",
+      "bottom": "#0a090e",
+      "glow": "rgba(255, 224, 168, 0.16)"
+    }
   },
-
   "poses": {
     "byBeat": {
-      "hook": ["thinking", "shrug-a", "confused"],
-      "specs": ["point-up-left", "point-up-right", "explain-b", "explain-a"],
-      "wear": ["explain-a", "point-up-right", "point-up-left"],
-      "emotion": ["shocked-a", "thumbs-up-a"],
-      "cta": ["thumbs-up-a", "explain-a"]
+      "hook": [
+        "thinking",
+        "shrug-a",
+        "confused"
+      ],
+      "specs": [
+        "point-up-left",
+        "point-up-right",
+        "explain-b",
+        "explain-a"
+      ],
+      "wear": [
+        "explain-a",
+        "point-up-right",
+        "point-up-left"
+      ],
+      "emotion": [
+        "shocked-a",
+        "thumbs-up-a"
+      ],
+      "cta": [
+        "thumbs-up-a",
+        "explain-a"
+      ]
     },
-    "hostSideByPose": { "point-up-left": "right", "point-up-right": "left" },
+    "hostSideByPose": {
+      "point-up-left": "right",
+      "point-up-right": "left"
+    },
     "defaultPose": "explain-a"
   },
-
   "audio": {
     "targetLufs": -14,
     "truePeakDb": -1.5,
@@ -109,17 +314,79 @@
     "manifest": "assets/audio/audio.json",
     "sampleRate": 44100
   },
-
   "clip": {
     "promptFile": "prompts/product-clip.md",
     "adapter": "veo",
     "fallback": "gsap"
   },
-
   "labels": {
-    "vi-VN": { "specsTitle": "Thông số", "type": "Loại", "material": "Chất liệu", "metalColor": "Màu kim loại", "mainStone": "Đá chính", "carat": "Trọng lượng", "cut": "Giác cắt", "sideStones": "Đá phụ", "price": "Giá", "feature": "Điểm nổi bật", "origin": "Nguồn gốc đá", "cta": "Nhắn tin để được tư vấn", "ctaPrice": "Giá chỉ", "eyebrow": "TRANG SỨC", "docTitle": "Giới thiệu — {name}" },
-    "en-US": { "specsTitle": "Specs", "type": "Type", "material": "Material", "metalColor": "Metal colour", "mainStone": "Main stone", "carat": "Weight", "cut": "Cut", "sideStones": "Side stones", "price": "Price", "feature": "Highlight", "origin": "Stone origin", "cta": "Message us to order", "ctaPrice": "Only", "eyebrow": "JEWELRY", "docTitle": "Showcase — {name}" },
-    "ja-JP": { "specsTitle": "仕様", "type": "種類", "material": "素材", "metalColor": "メタルカラー", "mainStone": "メインストーン", "carat": "重さ", "cut": "カット", "sideStones": "サイドストーン", "price": "価格", "feature": "特徴", "origin": "石の由来", "cta": "ご注文はメッセージで", "ctaPrice": "価格", "eyebrow": "ジュエリー", "docTitle": "紹介 — {name}" },
-    "th-TH": { "specsTitle": "รายละเอียด", "type": "ประเภท", "material": "วัสดุ", "metalColor": "สีโลหะ", "mainStone": "พลอยหลัก", "carat": "น้ำหนัก", "cut": "การเจียระไน", "sideStones": "พลอยเสริม", "price": "ราคา", "feature": "จุดเด่น", "origin": "แหล่งกำเนิดพลอย", "cta": "ทักแชทเพื่อสั่งซื้อ", "ctaPrice": "ราคา", "eyebrow": "เครื่องประดับ", "docTitle": "แนะนำ — {name}" }
+    "vi-VN": {
+      "specsTitle": "Thông số",
+      "type": "Loại",
+      "material": "Chất liệu",
+      "metalColor": "Màu kim loại",
+      "mainStone": "Đá chính",
+      "carat": "Trọng lượng",
+      "cut": "Giác cắt",
+      "sideStones": "Đá phụ",
+      "price": "Giá",
+      "feature": "Điểm nổi bật",
+      "origin": "Nguồn gốc đá",
+      "cta": "Nhắn tin để được tư vấn",
+      "ctaPrice": "Giá chỉ",
+      "eyebrow": "TRANG SỨC",
+      "docTitle": "Giới thiệu — {name}"
+    },
+    "en-US": {
+      "specsTitle": "Specs",
+      "type": "Type",
+      "material": "Material",
+      "metalColor": "Metal colour",
+      "mainStone": "Main stone",
+      "carat": "Weight",
+      "cut": "Cut",
+      "sideStones": "Side stones",
+      "price": "Price",
+      "feature": "Highlight",
+      "origin": "Stone origin",
+      "cta": "Message us to order",
+      "ctaPrice": "Only",
+      "eyebrow": "JEWELRY",
+      "docTitle": "Showcase — {name}"
+    },
+    "ja-JP": {
+      "specsTitle": "仕様",
+      "type": "種類",
+      "material": "素材",
+      "metalColor": "メタルカラー",
+      "mainStone": "メインストーン",
+      "carat": "重さ",
+      "cut": "カット",
+      "sideStones": "サイドストーン",
+      "price": "価格",
+      "feature": "特徴",
+      "origin": "石の由来",
+      "cta": "ご注文はメッセージで",
+      "ctaPrice": "価格",
+      "eyebrow": "ジュエリー",
+      "docTitle": "紹介 — {name}"
+    },
+    "th-TH": {
+      "specsTitle": "รายละเอียด",
+      "type": "ประเภท",
+      "material": "วัสดุ",
+      "metalColor": "สีโลหะ",
+      "mainStone": "พลอยหลัก",
+      "carat": "น้ำหนัก",
+      "cut": "การเจียระไน",
+      "sideStones": "พลอยเสริม",
+      "price": "ราคา",
+      "feature": "จุดเด่น",
+      "origin": "แหล่งกำเนิดพลอย",
+      "cta": "ทักแชทเพื่อสั่งซื้อ",
+      "ctaPrice": "ราคา",
+      "eyebrow": "เครื่องประดับ",
+      "docTitle": "แนะนำ — {name}"
+    }
   }
 }
