@@ -57,3 +57,26 @@ test("usdToVnd: mặc định 26000; đọc USD_TO_VND (cho phép dấu , _); gi
     console.warn = warn;
   }
 });
+
+test("giá ảnh theo độ phân giải + Batch; model ảnh thiếu bảng kích thước vẫn tính giá 1K như cũ", async () => {
+  const { calcImageCost: img } = await import("../config/pricing.mjs");
+  assert.equal(img("gemini-3.1-flash-image", 1), 0.067); // hành vi cũ: không truyền kích thước = 1K
+  assert.equal(img("gemini-3.1-flash-image", 2, { size: "1K" }), 0.134);
+  assert.equal(img("gemini-3.1-flash-image", 1, { size: "2K" }), 0.101);
+  assert.equal(img("gemini-3.1-flash-image", 1, { size: "1K", batch: true }), 0.034);
+  assert.equal(img("gemini-3.1-flash-image", 1, { size: "8K" }), 0.151, "kích thước lạ -> giá cao nhất, ước thừa");
+  assert.equal(img("gemini-3-pro-image", 1, { size: "1K" }), 0.134);
+  assert.equal(img("gemini-3.1-flash-lite-image", 1), 0.0336);
+});
+
+test("giá video Veo: Lite 720p 4 giây = $0.20 (≈5.200đ); model/độ phân giải chưa có giá -> null, không đoán", async () => {
+  const { calcVideoCost, isVideoPriced, VIDEO_PRICING, MODEL_FACTS } = await import("../config/pricing.mjs");
+  assert.ok(Math.abs(calcVideoCost("veo-3.1-lite-generate-preview", 4, "720p") - 0.2) < 1e-9);
+  assert.ok(Math.abs(calcVideoCost("veo-3.1-lite-generate-preview", 8, "1080p") - 0.64) < 1e-9);
+  assert.equal(calcVideoCost("veo-3.1-lite-generate-preview", 4, "4k"), null);
+  assert.equal(calcVideoCost("veo-9", 4), null);
+  assert.equal(isVideoPriced("veo-3.1-fast-generate-preview", "720p"), true);
+  for (const [model, p] of Object.entries(VIDEO_PRICING)) assert.match(p.lastUpdated, /^\d{4}-\d{2}-\d{2}$/, model);
+  assert.match(MODEL_FACTS.checkedAt, /^\d{4}-\d{2}-\d{2}$/);
+  assert.equal(MODEL_FACTS["gemini-2.5-flash-image"].status.startsWith("deprecated"), true);
+});
