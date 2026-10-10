@@ -242,7 +242,7 @@ test("API analyze: lưu phân tích + kịch bản; Tự động bị hạ về 
     assert.equal(out.script.mismatches[0].field, "metalColor");
     assert.equal(out.analysis.images[0].bbox.w, 0.4);
     assert.equal(out.displayName, "nhẫn bạc 925");
-    assert.ok(!JSON.stringify(out).includes("hostRefs"));
+    assert.ok(!/\/tmp\/|\/var\/folders\//.test(JSON.stringify(out)), "không lộ đường dẫn tuyệt đối");
 
     const r2 = await (await post(base, `/api/product/${project.id}/analyze`, { locale: "vi-VN", form: { type: "vòng tay", material: "bạc" }, settings: { imageSource: "manual" } })).json();
     assert.equal(r2.settings.imageSource, "pose");
