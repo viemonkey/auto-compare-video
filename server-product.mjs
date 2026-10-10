@@ -17,6 +17,13 @@ import { createBudget } from "./scripts/lib/product/budget.mjs";
 import { getLocale, getDefaultLocale } from "./scripts/lib/locales.mjs";
 import { checkRenderability } from "./scripts/lib/capabilities.mjs";
 import { AbortedError } from "./scripts/lib/gemini-client.mjs";
+import { planScenes, buildBlockers, slotLabelOf } from "./scripts/lib/product/scenes.mjs";
+import { createSceneService } from "./scripts/lib/product/scene-flow.mjs";
+import { createSceneCache } from "./scripts/lib/product/scene-cache.mjs";
+import { kindsWithSceneTemplates, buildScenePrompt, referenceLayout, manualAttachGuide } from "./scripts/lib/product/scene-prompts.mjs";
+import { listHostRefFiles } from "./scripts/lib/product/host-refs.mjs";
+import { calcImageCost } from "./config/pricing.mjs";
+import { usdToVndRounded } from "./scripts/lib/product/budget.mjs";
 
 export const IMAGE_SOURCES = ["pose", "manual", "gemini"];
 
@@ -70,10 +77,35 @@ export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedSt
   };
 
   /** Dự án cho client: thêm URL ảnh, bỏ đường dẫn tuyệt đối. */
-  const publicProject = (project) => ({
-    ...project,
-    images: (project.images || []).map((img) => ({ ...img, url: fileUrl(project.id, img.file) })),
-  });
+  const publicProject = (project) => {
+    const budget = budgetOf(project);
+    const est = calcImageCost(imageSettings().id, 1, { size: imageSettings().size, batch: imageSettings().batch });
+    const imageVnd = usdToVndRounded(est);
+    const verdict = budget.check(est);
+    const status = billing.status();
+    const hasRefs = listHostRefFiles(config, hostRefsRoot).faces.length > 0;
+    return {
+      ...project,
+      images: (project.images || []).map((img) => ({ ...img, url: fileUrl(project.id, img.file) })),
+      scenes: (project.scenes || []).map((sc) => ({
+        ...sc,
+        imageUrl: sc.image ? fileUrl(project.id, sc.image) : null,
+        attempts: (sc.attempts || []).map((a) => ({ ...a, url: a.file ? fileUrl(project.id, a.file) : null })),
+        // nút có phí: chi phí hiện trước, tắt kèm lý do khi chưa có billing / vượt trần
+        actions: sc.kind === "photo" && sc.slot ? {
+          costVnd: imageVnd,
+          allowed: status.enabled && verdict.ok && !sc.busy,
+          reason: !status.enabled ? status.reason : !verdict.ok ? verdict.message : "",
+          canEdit: !!sc.image,
+        } : null,
+      })),
+      blockers: buildBlockers(project.scenes || []),
+      budget: { maxVnd: budget.maxVnd(), spentVnd: budget.spentVnd(), remainingVnd: budget.remainingVnd() },
+      billing: status,
+      hostRefsReady: hasRefs,
+      busy: running.has(project.id),
+    };
+  };
 
   router.get("/config", async (_req, res) => {
     const billingStatus = billing.status();
@@ -132,7 +164,23 @@ export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedSt
 
   const localeOf = (code) => (String(code || "").trim() ? getLocale(String(code).trim()) : getDefaultLocale());
   const budgetOf = (project) => createBudget({ slugs: () => [project.ledgerSlug, project.slug] });
-  const kindsWithTemplates = ["ring", "necklace", "earring"];
+  const kindsWithTemplates = kindsWithSceneTemplates(config);
+  const sceneService = createSceneService({ store, billing, config, cache: createSceneCache(path.join(store.dir, "_cache")), hostRefsRoot, deps: deps.scene || {}, log });
+  const sceneUpload = multer({ storage: multer.memoryStorage(), limits: { fileSize: config.upload.maxBytes, files: 1 } }).single("image");
+
+  /** Việc dài (tạo ảnh, kiểm, sửa) chạy nền: client hỏi lại GET /:id. Mỗi dự án tối đa 1 việc nền tại một thời điểm. */
+  const running = new Map();
+  const runBackground = (id, fn) => {
+    const task = Promise.resolve().then(fn).catch((e) => log.warn?.(`[product] việc nền lỗi: ${e.message}`)).finally(() => running.delete(id));
+    running.set(id, task);
+    return task;
+  };
+  // Server vừa khởi động lại mà cảnh còn "đang xử lý" -> bỏ cờ + ghi chú để người dùng thử lại (không kẹt vĩnh viễn).
+  for (const p of store.list()) {
+    if (!p.scenes?.some((sc) => sc.busy)) continue;
+    for (const sc of p.scenes) if (sc.busy) { sc.busy = null; sc.note = "Việc đang chạy bị ngắt khi server dừng — hãy thử lại."; if (sc.status === "pending") sc.status = "pending"; }
+    store.write(p);
+  }
   const fail = (res, e, fallback = "Không xử lý được yêu cầu.") => {
     log.warn?.(`[product] ${e.message}`);
     res.status(e.status || (e.userMessage ? 502 : 500)).json({ error: e.userMessage || e.message || fallback });
@@ -183,7 +231,7 @@ export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedSt
           settings: { imageSource, aiClip, tts: requested.tts || {}, notes },
           analysis,
           script: { openers: script.openers, openerIndex: 0, lines: script.lines, mismatches: script.mismatches, warnings: script.warnings, model: script.model, rulesIssues: [] },
-          scenes: [],
+          scenes: planScenes({ lines: script.lines, imageSource, kind: analysis.kind, analysis, config }),
           status: "scripted",
           aiGenerated: false,
         });
@@ -221,6 +269,96 @@ export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedSt
     res.json(publicProject(store.read(project.id)));
   });
 
+
+  const sceneRoute = (handler) => async (req, res) => {
+    const project = getProject(req, res);
+    if (!project) return;
+    if (!project.scenes?.some((sc) => sc.id === req.params.sceneId)) return res.status(404).json({ error: "Không tìm thấy cảnh này." });
+    try {
+      await handler(project, req, res);
+    } catch (e) {
+      fail(res, e);
+    }
+  };
+
+  /** Tạo ảnh AI cho mọi cảnh có HuyK (nguồn Tự động) — chạy nền. */
+  router.post("/:id/scenes/generate", async (req, res) => {
+    const project = getProject(req, res);
+    if (!project) return;
+    if (running.has(project.id)) return res.status(409).json({ error: "Dự án đang có việc chạy nền — đợi xong rồi thử lại." });
+    if (project.settings?.imageSource !== "gemini") return res.status(400).json({ error: "Dự án này không dùng nguồn ảnh Tự động." });
+    runBackground(project.id, () => sceneService.generateAllScenes({ projectId: project.id }));
+    res.status(202).json({ ...publicProject(store.read(project.id)), busy: true });
+  });
+
+  router.post("/:id/scenes/:sceneId/action", sceneRoute(async (project, req, res) => {
+    if (running.has(project.id)) return res.status(409).json({ error: "Dự án đang có việc chạy nền — đợi xong rồi thử lại." });
+    const action = String(req.body?.action || "");
+    if (!["regenerate", "fix-face", "fix-product", "edit"].includes(action)) return res.status(400).json({ error: "Hành động không hợp lệ." });
+    // kiểm sớm để báo lỗi ngay (không phải chờ việc nền)
+    const sc = project.scenes.find((x) => x.id === req.params.sceneId);
+    if (sc.kind !== "photo" || !sc.slot) return res.status(400).json({ error: "Chỉ cảnh có ảnh AI/tự tải mới tạo lại hoặc sửa được." });
+    if (action !== "regenerate" && !sc.image) return res.status(400).json({ error: "Cảnh chưa có ảnh để sửa." });
+    if (action === "edit" && !String(req.body?.userRequest || "").trim()) return res.status(400).json({ error: "Hãy nhập yêu cầu sửa." });
+    runBackground(project.id, () => sceneService.runAction({ projectId: project.id, sceneId: sc.id, action, userRequest: String(req.body?.userRequest || "") }));
+    res.status(202).json(publicProject(store.read(project.id)));
+  }));
+
+  router.post("/:id/scenes/:sceneId/upload", (req, res) => {
+    sceneUpload(req, res, async (err) => {
+      if (err) return res.status(400).json({ error: err.message });
+      const project = getProject(req, res);
+      if (!project) return;
+      if (!project.scenes?.some((sc) => sc.id === req.params.sceneId)) return res.status(404).json({ error: "Không tìm thấy cảnh này." });
+      if (!req.file) return res.status(400).json({ error: "Chưa chọn ảnh." });
+      const ext = path.extname(req.file.originalname).toLowerCase() === ".jpeg" ? ".jpg" : path.extname(req.file.originalname).toLowerCase();
+      if (!config.upload.extensions.includes(ext)) return res.status(400).json({ error: `Chỉ nhận ảnh ${config.upload.extensions.join(", ")}.` });
+      if (running.has(project.id)) return res.status(409).json({ error: "Dự án đang có việc chạy nền — đợi xong rồi thử lại." });
+      try {
+        const tmp = store.saveBuffer(project.id, `incoming-tmp${ext}`, req.file.buffer);
+        const dims = await probeImage(tmp);
+        fs.rmSync(tmp, { force: true });
+        if (Math.min(dims.width, dims.height) < 512) return res.status(400).json({ error: `Ảnh quá nhỏ (${dims.width}×${dims.height}px) — dùng ảnh từ Google AI Studio (cạnh ngắn ≥ 512px).` });
+      } catch {
+        return res.status(400).json({ error: "File tải lên không phải ảnh hợp lệ." });
+      }
+      runBackground(project.id, () => sceneService.adoptUpload({ projectId: project.id, sceneId: req.params.sceneId, buffer: req.file.buffer, ext }));
+      res.status(202).json(publicProject(store.read(project.id)));
+    });
+  });
+
+  router.post("/:id/scenes/:sceneId/pose", sceneRoute(async (project, req, res) => {
+    await sceneService.changePose(project.id, req.params.sceneId, String(req.body?.pose || ""));
+    res.json(publicProject(store.read(project.id)));
+  }));
+  router.post("/:id/scenes/:sceneId/use-original", sceneRoute(async (project, req, res) => {
+    await sceneService.useOriginal(project.id, req.params.sceneId);
+    res.json(publicProject(store.read(project.id)));
+  }));
+  router.post("/:id/scenes/:sceneId/approve", sceneRoute(async (project, req, res) => {
+    await sceneService.approve(project.id, req.params.sceneId);
+    res.json(publicProject(store.read(project.id)));
+  }));
+
+  /** Prompt đã ghép sẵn cho nguồn "manual" (dán vào Google AI Studio) + hướng dẫn đính kèm ảnh. */
+  router.get("/:id/scenes/:sceneId/prompt", sceneRoute(async (project, req, res) => {
+    const sc = project.scenes.find((x) => x.id === req.params.sceneId);
+    const slot = sc.slot || (sc.beat === "wear" ? "wear-hand" : "hold-close");
+    const kind = project.analysis?.kind;
+    if (!kindsWithTemplates.includes(kind)) return res.status(400).json({ error: "Chưa có mẫu cảnh AI cho loại món này." });
+    const refs = listHostRefFiles(config, hostRefsRoot);
+    const products = Math.min(project.images.length, config.scenes.reference.maxProductRefs);
+    const faces = Math.min(refs.faces.length, config.scenes.reference.maxFaceRefs);
+    const layout = referenceLayout({ products, faces, outfit: !!refs.outfit });
+    res.json({
+      slot,
+      label: slotLabelOf(slot, config),
+      prompt: buildScenePrompt({ slot, kind, lockText: project.analysis.lockText, layout, config }),
+      attach: manualAttachGuide({ productCount: products, faceCount: faces, outfitImage: !!refs.outfit, config }),
+      note: "Dán prompt vào Google AI Studio (model tạo ảnh), đính kèm ảnh theo đúng thứ tự bên dưới, chọn tỉ lệ 9:16, tạo xong tải ảnh về rồi tải lên cảnh này.",
+    });
+  }));
+
   router.get("/:id/budget", (req, res) => {
     const project = getProject(req, res);
     if (!project) return;
@@ -247,5 +385,5 @@ export function createProductApi({ app, dataDir, hostRefsRoot, store: injectedSt
   });
 
   app.use("/api/product", router);
-  return { store, publicProject, getProject, router, normalizeForm, validateForm, kindFromText, fileUrl };
+  return { store, publicProject, getProject, router, sceneService, running, normalizeForm, validateForm, kindFromText, fileUrl };
 }

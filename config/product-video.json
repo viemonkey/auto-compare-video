@@ -46,7 +46,8 @@
   "batch": {
     "envFlag": "PRODUCT_IMAGE_BATCH",
     "default": false,
-    "_note": "Batch API: chậm (tới 24 giờ), rẻ ~50%. Mặc định tắt."
+    "pollIntervalMs": 15000,
+    "timeoutMs": 1800000
   },
   "estimate": {
     "analysis": {
@@ -151,8 +152,7 @@
         "hands",
         "outfit"
       ],
-      "passScore": 7,
-      "minTotal": 8
+      "passScore": 7
     },
     "maxAttempts": {
       "generate": 2,
@@ -165,7 +165,46 @@
       "wear-hand"
     ],
     "cacheDir": "data/products/_cache",
-    "promptDir": "prompts/product-scenes"
+    "promptDir": "prompts/product-scenes",
+    "plan": {
+      "pose": {
+        "hook": "pose",
+        "specs": [
+          "macro",
+          "pose"
+        ],
+        "wear": "pose",
+        "emotion": "macro",
+        "cta": "hero"
+      },
+      "ai": {
+        "hook": "photo:hold-close",
+        "specs": [
+          "macro",
+          "hero"
+        ],
+        "wear": "photo:wear-hand",
+        "emotion": "half",
+        "cta": "hero"
+      }
+    },
+    "slots": {
+      "hold-close": {
+        "label": "Cầm sản phẩm gần mặt",
+        "productShare": "one quarter of the frame width"
+      },
+      "wear-hand": {
+        "label": "Đeo lên người",
+        "productShare": "one quarter of the frame width"
+      }
+    },
+    "reference": {
+      "maxPx": 1024,
+      "maxProductRefs": 2,
+      "maxFaceRefs": 3
+    },
+    "imageTimeoutMs": 120000,
+    "imageMaxAttempts": 2
   },
   "script": {
     "minLines": 5,

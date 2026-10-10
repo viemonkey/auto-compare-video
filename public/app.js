@@ -2132,7 +2132,8 @@ document.addEventListener("DOMContentLoaded", () => {
     const enriched = videos.map((v) => ({
       ...v,
       contentCost: (v.byTask && v.byTask["content-generation"]) || 0,
-      imageCost: (v.byTask && v.byTask["context-image"]) || 0,
+      // ảnh minh hoạ ngữ cảnh (so sánh) + ảnh/clip AI của chế độ Giới thiệu sản phẩm
+      imageCost: ((v.byTask && v.byTask["context-image"]) || 0) + ((v.byTask && v.byTask["product-image"]) || 0) + ((v.byTask && v.byTask["product-clip"]) || 0),
     }));
 
     costFilteredSorted = sortVideos(enriched, costSortKey, costSortDir);

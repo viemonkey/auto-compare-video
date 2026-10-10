@@ -31,7 +31,7 @@ import { spawn } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { CONTENT_ANGLES } from "./config/content-angles.mjs";
 import { COST_LEDGER_PATH, renameCostLedgerSlug, countsAsVideo } from "./scripts/lib/cost-ledger.mjs";
-import { isPriced, usdToVnd } from "./config/pricing.mjs";
+import { isPriced, usdToVnd, VIDEO_PRICING } from "./config/pricing.mjs";
 import { getConfiguredPages, inspectConfiguredPages } from "./scripts/lib/facebook-pages.mjs";
 import { graphVersion, isAutoPostEnabled, makeLogger, redactSecrets } from "./scripts/lib/fb-config.mjs";
 import { classifyError } from "./scripts/lib/fb-errors.mjs";
@@ -1423,7 +1423,9 @@ app.get("/api/cost-stats", (_req, res) => {
     const ts = timestamp ? Date.parse(timestamp) : NaN;
     const dateStr = timestamp ? timestamp.slice(0, 10) : null;
 
-    const unpriced = row.status === "success" && !!row.model && !isPriced(row.model, row.task === "context-image" || row.subtask === "context-image" ? "context-image" : "content-generation");
+    // Loại giá của 1 dòng: ảnh (context-image của chế độ so sánh + product-image của chế độ giới thiệu sản phẩm), video AI (product-clip), còn lại theo token.
+    const priceKind = row.task === "context-image" || row.subtask === "context-image" || row.task === "product-image" ? "context-image" : "content-generation";
+    const unpriced = row.status === "success" && !!row.model && (row.task === "product-clip" ? !VIDEO_PRICING[row.model] : !isPriced(row.model, priceKind));
     if (unpriced) {
       unpricedCalls += 1;
       unpricedModels.add(row.model);
@@ -1463,7 +1465,7 @@ app.get("/api/cost-stats", (_req, res) => {
       // Đếm ẢNH THẬT ĐÃ SINH RA (context-image, status success) — khác với đếm số LẦN GỌI, vì
       // 1 lần gọi thành công luôn ra đúng 1 ảnh ở tính năng này (xem generate-context-image.mjs),
       // nhưng dùng image_count thay vì cộng cứng 1 để không sai nếu sau này 1 lần gọi ra >1 ảnh.
-      if (task === "context-image" && row.status === "success") {
+      if ((task === "context-image" || task === "product-image") && row.status === "success") {
         v.imagesGenerated += typeof row.image_count === "number" ? row.image_count : 1;
       }
       if (timestamp && (!v.createdAt || timestamp < v.createdAt)) v.createdAt = timestamp;
